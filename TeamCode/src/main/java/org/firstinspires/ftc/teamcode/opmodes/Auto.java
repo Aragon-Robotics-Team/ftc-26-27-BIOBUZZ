@@ -20,8 +20,6 @@ public class Auto extends OpMode {
         DONE
     }
 
-    // TODO: real field poses (inches, radians). Written for red; Alliance.apply mirrors them for blue.
-    private static final Pose START_POSE = Pose.zero();
     private static final Pose LAUNCH_POSE = Pose.zero();
     private static final Pose PARK_POSE = Pose.zero();
 
@@ -43,14 +41,14 @@ public class Auto extends OpMode {
 
     @Override
     public void init_loop() {
-        // TODO: start position selection
         MatchState.selectAlliance(gamepad1, telemetry);
+        MatchState.selectStartPosition(gamepad1, telemetry);
         telemetry.update();
     }
 
     @Override
     public void start() {
-        startPose = MatchState.alliance.apply(START_POSE);
+        startPose = MatchState.startPosition.pose(MatchState.alliance);
         launchPose = MatchState.alliance.apply(LAUNCH_POSE);
         parkPose = MatchState.alliance.apply(PARK_POSE);
         robot.drivebase.setPose(startPose);
@@ -68,6 +66,7 @@ public class Auto extends OpMode {
         // Saved every loop so TeleOp gets the latest pose however Auto ends
         saveMatchState();
         telemetry.addData("Alliance", MatchState.alliance);
+        telemetry.addData("Start", MatchState.startPosition);
         telemetry.addData("State", state);
         robot.telemetry(telemetry);
         telemetry.update();
@@ -91,13 +90,13 @@ public class Auto extends OpMode {
     private void updateStateMachine() {
         switch (state) {
             case DRIVE_TO_LAUNCH:
-                // TODO
+                // ...
                 break;
             case LAUNCH:
-                // TODO
+                // ...
                 break;
             case PARK:
-                // TODO
+                // ...
                 break;
             case DONE:
                 break;

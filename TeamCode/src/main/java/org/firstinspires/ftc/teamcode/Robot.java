@@ -10,6 +10,7 @@ import org.firstinspires.ftc.teamcode.subsystems.Subsystem;
 
 /** Owns every subsystem so TeleOp and Auto build the robot the same way. */
 public class Robot {
+    // TODO: register new subsystems here
     public final Drivetrain drivebase;
     public final Intake intake;
     public final Launcher launcher;

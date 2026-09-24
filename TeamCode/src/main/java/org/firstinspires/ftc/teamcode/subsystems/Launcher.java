@@ -61,7 +61,7 @@ public class Launcher implements Subsystem {
 
     /** @param velocity ticks/sec */
     public void spinUp(double velocity) {
-        // TODO: pick velocity from distance to the goal (lookup table / regression)
+        // TODO: velocity from distance
         targetVelocity = velocity;
         state = State.SPINNING_UP;
     }
@@ -92,7 +92,7 @@ public class Launcher implements Subsystem {
 
     /** Point the turret at a field position, given where the robot is. */
     public void aimAt(Pose robotPose, Pose target) {
-        // TODO: account for the turret's offset from the robot center if it isn't centered
+        // TODO: turret offset from center
         double fieldAngle = Math.atan2(target.y() - robotPose.y(), target.x() - robotPose.x());
         setTurretAngle(fieldAngle - robotPose.heading());
     }
@@ -122,7 +122,7 @@ public class Launcher implements Subsystem {
 
     /** Fire a game piece. Only meaningful once {@link #isReady()}. */
     public void launch() {
-        // TODO: trigger feeder / gate
+        // TODO: fire feeder / gate
     }
 
     @Override

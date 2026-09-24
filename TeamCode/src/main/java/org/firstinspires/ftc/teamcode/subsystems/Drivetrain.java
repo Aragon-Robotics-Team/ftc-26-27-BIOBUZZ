@@ -34,7 +34,7 @@ public class Drivetrain implements Subsystem {
 
     /** Robot-centric drive. Inputs are in [-1, 1]. */
     public void drive(double forward, double strafe, double turn) {
-        // TODO: field-centric option via ManualDrive.fieldCentric(...)
+        // TODO: field-centric option
         follower.manual(forward, strafe, turn);
     }
 

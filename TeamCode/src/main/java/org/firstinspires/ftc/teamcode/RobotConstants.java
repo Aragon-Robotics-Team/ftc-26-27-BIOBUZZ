@@ -6,7 +6,7 @@ import com.qualcomm.robotcore.hardware.PIDFCoefficients;
 /** Every robot tunable and hardware name in one place. Drivetrain / localizer config lives in pedro.Constants. */
 public class RobotConstants {
     public static class Intake {
-        // TODO: match the name in the robot configuration
+        // TODO: match robot config
         public static String MOTOR_NAME = "intake";
 
         // TODO: tune
@@ -15,11 +15,12 @@ public class RobotConstants {
     }
 
     public static class Launcher {
-        // TODO: match the names in the robot configuration
+        // TODO: match robot config
         public static String FLYWHEEL_MOTOR_NAME = "flywheel";
         public static String TURRET_MOTOR_NAME = "turret";
+        // TODO: feeder / gate hardware
 
-        // TODO: flywheel spins to shoot on positive power; turret turns counter-clockwise (from above) on positive power
+        // TODO: set directions (+ power = shoot / turret CCW)
         public static DcMotorSimple.Direction FLYWHEEL_DIRECTION = DcMotorSimple.Direction.FORWARD;
         public static DcMotorSimple.Direction TURRET_DIRECTION = DcMotorSimple.Direction.FORWARD;
 
@@ -32,10 +33,10 @@ public class RobotConstants {
 
         // ---- Turret ----
         // Angles are robot-relative radians: 0 = facing the front of the robot, positive = counter-clockwise.
-        // TODO: match the turret motor and gearing
+        // TODO: match turret motor + gearing
         public static double TURRET_MOTOR_TICKS_PER_REV = 537.7; // goBILDA 312 RPM
         public static double TURRET_GEAR_RATIO = 1.0;            // motor revs per turret rev
-        // TODO: set to how far the turret can turn before it hits a hard stop or wraps its wires
+        // TODO: set turret soft limits
         public static double TURRET_MIN_ANGLE = -Math.PI / 2;
         public static double TURRET_MAX_ANGLE = Math.PI / 2;
         // TODO: tune

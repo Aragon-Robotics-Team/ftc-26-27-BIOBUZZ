@@ -7,6 +7,7 @@ import com.qualcomm.robotcore.hardware.HardwareMap;
 
 import org.firstinspires.ftc.robotcore.external.Telemetry;
 
+// TODO: match the real intake
 public class Intake implements Subsystem {
     public enum State {
         OFF,
@@ -18,7 +19,7 @@ public class Intake implements Subsystem {
     private State state = State.OFF;
 
     public Intake(HardwareMap hardwareMap) {
-        // TODO: set direction / zero power behavior
+        // TODO: set direction + zero power behavior
         motor = hardwareMap.get(DcMotorEx.class, MOTOR_NAME);
     }
 
@@ -40,7 +41,7 @@ public class Intake implements Subsystem {
 
     @Override
     public void update() {
-        // TODO: apply RobotConstants.Intake.INTAKE_POWER / OUTTAKE_POWER for the current state
+        // TODO: set power for state
     }
 
     @Override

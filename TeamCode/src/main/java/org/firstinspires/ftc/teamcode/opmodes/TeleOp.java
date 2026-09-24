@@ -48,15 +48,16 @@ public class TeleOp extends OpMode {
     }
 
     private void handleDrive() {
-        // TODO: slow mode, field-centric toggle, etc.
+        // TODO: slow mode
         robot.drivebase.drive(-gamepad1.left_stick_y, -gamepad1.left_stick_x, -gamepad1.right_stick_x);
     }
 
     private void handleIntake() {
-        // TODO: bind controls
+        // TODO: intake
     }
 
     private void handleLauncher() {
-        // TODO: bind controls
+        // TODO: bind launcher controls
+        // TODO: aim turret at goal
     }
 }
