@@ -2,8 +2,11 @@ package org.firstinspires.ftc.teamcode.subsystems;
 
 import org.firstinspires.ftc.robotcore.external.Telemetry;
 
-/** Common lifecycle every subsystem implements. Call these once per loop from the OpMode. */
+/** Common lifecycle every subsystem implements. The OpMode drives these through {@link org.firstinspires.ftc.teamcode.Robot}. */
 public interface Subsystem {
+    /** Called once when the match starts, before the first update(). */
+    default void start() {}
+
     /** Push the current target state to hardware. */
     void update();
 

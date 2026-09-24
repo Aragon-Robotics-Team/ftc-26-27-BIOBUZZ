@@ -24,6 +24,10 @@ public class Robot {
         subsystems = new Subsystem[]{drivebase, intake, launcher};
     }
 
+    public void start() {
+        for (Subsystem subsystem : subsystems) subsystem.start();
+    }
+
     public void update() {
         for (Subsystem subsystem : subsystems) subsystem.update();
     }

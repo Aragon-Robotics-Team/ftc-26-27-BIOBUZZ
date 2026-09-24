@@ -1,5 +1,7 @@
 package org.firstinspires.ftc.teamcode.subsystems;
 
+import static org.firstinspires.ftc.teamcode.RobotConstants.Intake.MOTOR_NAME;
+
 import com.qualcomm.robotcore.hardware.DcMotorEx;
 import com.qualcomm.robotcore.hardware.HardwareMap;
 
@@ -12,16 +14,12 @@ public class Intake implements Subsystem {
         OUTTAKING
     }
 
-    // TODO: tune
-    public static double INTAKE_POWER = 1.0;
-    public static double OUTTAKE_POWER = -1.0;
-
     private final DcMotorEx motor;
     private State state = State.OFF;
 
     public Intake(HardwareMap hardwareMap) {
-        // TODO: match the name in the robot configuration, set direction / zero power behavior
-        motor = hardwareMap.get(DcMotorEx.class, "intake");
+        // TODO: set direction / zero power behavior
+        motor = hardwareMap.get(DcMotorEx.class, MOTOR_NAME);
     }
 
     public void intake() {
@@ -42,7 +40,7 @@ public class Intake implements Subsystem {
 
     @Override
     public void update() {
-        // TODO: apply power for the current state
+        // TODO: apply RobotConstants.Intake.INTAKE_POWER / OUTTAKE_POWER for the current state
     }
 
     @Override
