@@ -1,6 +1,7 @@
 package org.firstinspires.ftc.teamcode.examples;
 
 import static com.pedropathing.api.Paths.line;
+import static com.pedropathing.ivy.Scheduler.schedule;
 import static com.pedropathing.ivy.commands.Commands.infinite;
 import static com.pedropathing.ivy.commands.Commands.instant;
 import static com.pedropathing.ivy.commands.Commands.waitMs;
@@ -10,6 +11,7 @@ import static com.pedropathing.ivy.groups.Groups.parallel;
 import static com.pedropathing.ivy.groups.Groups.sequential;
 import static com.pedropathing.ivy.pedro.PedroCommands.follow;
 
+import com.pedropathing.api.PoseFactory;
 import com.pedropathing.follower.Follower;
 import com.pedropathing.ivy.Command;
 import com.pedropathing.ivy.Scheduler;
@@ -37,20 +39,89 @@ import org.firstinspires.ftc.teamcode.subsystems.Launcher;
  */
 @Autonomous(name = "Ivy Example", group = "Examples")
 public class IvyExample extends OpMode {
-    // TODO: real poses (red side, blue is mirrored)
-    private static final Pose START_POSE = new Pose(0, 0, 0);
-    private static final Pose LAUNCH_POSE = new Pose(24, 0, 0);
-    private static final Pose PICKUP_POSE = new Pose(24, 24, Math.PI / 2);
-    private static final Pose PARK_POSE = new Pose(0, 24, 0);
-    private static final Pose GOAL_POSE = new Pose(72, 72, 0); // what the turret aims at
-
     private Robot robot;
+    private Follower follower;
+    private Launcher launcher;
+    private Intake intake;
+    private final PoseFactory poseFactory = PoseFactory.degrees();
+
+    // Poses (red side, blue is mirrored in start())
+    // TODO: real poses
+    private final Pose redStartPose = poseFactory.of(0, 0, 0);
+    private final Pose redLaunchPose = poseFactory.of(24, 0, 0);
+    private final Pose redPickupPose = poseFactory.of(24, 24, 90);
+    private final Pose redParkPose = poseFactory.of(0, 24, 0);
+    private final Pose redGoalPose = poseFactory.of(72, 72, 0); // what the turret aims at
+
+    private Pose startPose;
+    private Pose launchPose;
+    private Pose pickupPose;
+    private Pose parkPose;
+    private Pose goalPose;
+
+    // Path methods
+    private Path startToLaunch() {
+        return line(startPose, launchPose).linear(startPose, launchPose);
+    }
+
+    private Path launchToPickup() {
+        return line(launchPose, pickupPose).linear(launchPose, pickupPose);
+    }
+
+    private Path pickupToLaunch() {
+        return line(pickupPose, launchPose).linear(pickupPose, launchPose);
+    }
+
+    private Path park() {
+        return line(launchPose, parkPose).linear(launchPose, parkPose);
+    }
+
+    private Command autoRoutine() {
+        Command routine = sequential(
+                // Spin up while driving so the flywheel is ready when we arrive
+                parallel(
+                        instant(launcher::spinUp),
+                        follow(follower, startToLaunch())
+                ),
+                shoot(),
+
+                // Run the intake on the way to the pickup, stop it on the way back
+                instant(intake::intake),
+                follow(follower, launchToPickup()),
+                waitMs(300),
+                instant(intake::off),
+                follow(follower, pickupToLaunch()),
+                shoot(),
+
+                instant(launcher::idle),
+                follow(follower, park())
+        );
+
+        // Keep the turret pointed at the goal for as long as the routine runs
+        return deadline(
+                routine,
+                infinite(() -> launcher.aimAt(follower.pose(), goalPose))
+        );
+    }
+
+    /** Wait until the launcher is ready (max 1.5 s so a slow flywheel can't stall the auto), then fire. */
+    private Command shoot() {
+        return sequential(
+                waitUntil(launcher::isReady).raceWith(waitMs(1500)),
+                instant(launcher::launch),
+                waitMs(250) // TODO: tune shot delay
+        );
+    }
 
     @Override
     public void init() {
         // The scheduler is static, so clear anything left over from the last OpMode
         Scheduler.reset();
+
         robot = new Robot(hardwareMap);
+        follower = robot.drivebase.getFollower();
+        launcher = robot.launcher;
+        intake = robot.intake;
     }
 
     @Override
@@ -61,21 +132,32 @@ public class IvyExample extends OpMode {
 
     @Override
     public void start() {
+        // Alliance is picked in init_loop, so poses are set here instead of init()
         Alliance alliance = MatchState.alliance;
-        robot.drivebase.setPose(alliance.apply(START_POSE));
+        startPose = alliance.apply(redStartPose);
+        launchPose = alliance.apply(redLaunchPose);
+        pickupPose = alliance.apply(redPickupPose);
+        parkPose = alliance.apply(redParkPose);
+        goalPose = alliance.apply(redGoalPose);
+        follower.setPose(startPose);
+
         robot.start();
-        Scheduler.schedule(buildAuto(alliance));
+        schedule(autoRoutine());
     }
 
     @Override
     public void loop() {
-        Scheduler.execute(); // run commands first so they can set subsystem targets
-        robot.update();      // then push targets to hardware (this also updates the Pedro follower)
+        robot.update(); // updates the follower
+        Scheduler.execute();
 
-        MatchState.pose = robot.drivebase.getPose();
+        MatchState.pose = follower.pose();
         MatchState.turretAngle = robot.launcher.getTurretAngle();
 
         telemetry.addData("Alliance", MatchState.alliance);
+        telemetry.addData("X", follower.pose().x());
+        telemetry.addData("Y", follower.pose().y());
+        telemetry.addData("Heading", Math.toDegrees(follower.pose().heading()));
+        telemetry.addData("Follower Mode", follower.mode());
         robot.telemetry(telemetry);
         telemetry.update();
     }
@@ -84,57 +166,5 @@ public class IvyExample extends OpMode {
     public void stop() {
         Scheduler.reset();
         robot.stop();
-    }
-
-    private Command buildAuto(Alliance alliance) {
-        Pose start = alliance.apply(START_POSE);
-        Pose launch = alliance.apply(LAUNCH_POSE);
-        Pose pickup = alliance.apply(PICKUP_POSE);
-        Pose park = alliance.apply(PARK_POSE);
-        Pose goal = alliance.apply(GOAL_POSE);
-
-        Follower follower = robot.drivebase.getFollower();
-        Launcher launcher = robot.launcher;
-        Intake intake = robot.intake;
-
-        Path toLaunch = line(start, launch).linear(start, launch);
-        Path toPickup = line(launch, pickup).linear(launch, pickup);
-        Path backToLaunch = line(pickup, launch).linear(pickup, launch);
-        Path toPark = line(launch, park).linear(launch, park);
-
-        Command routine = sequential(
-                // Spin up while driving so the flywheel is ready when we arrive
-                parallel(
-                        instant(launcher::spinUp),
-                        follow(follower, toLaunch)
-                ),
-                shoot(launcher),
-
-                // Run the intake on the way to the pickup, stop it on the way back
-                instant(intake::intake),
-                follow(follower, toPickup),
-                waitMs(300),
-                instant(intake::off),
-                follow(follower, backToLaunch),
-                shoot(launcher),
-
-                instant(launcher::idle),
-                follow(follower, toPark)
-        );
-
-        // Keep the turret pointed at the goal for as long as the routine runs
-        return deadline(
-                routine,
-                infinite(() -> launcher.aimAt(robot.drivebase.getPose(), goal))
-        );
-    }
-
-    /** Wait until the launcher is ready (max 1.5 s so a slow flywheel can't stall the auto), then fire. */
-    private Command shoot(Launcher launcher) {
-        return sequential(
-                waitUntil(launcher::isReady).raceWith(waitMs(1500)),
-                instant(launcher::launch),
-                waitMs(250) // TODO: tune shot delay
-        );
     }
 }

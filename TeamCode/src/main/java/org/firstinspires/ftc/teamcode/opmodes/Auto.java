@@ -1,10 +1,16 @@
 package org.firstinspires.ftc.teamcode.opmodes;
 
 import static com.pedropathing.api.Paths.line;
+import static com.pedropathing.ivy.Scheduler.schedule;
+import static com.pedropathing.ivy.groups.Groups.sequential;
+import static com.pedropathing.ivy.pedro.PedroCommands.follow;
 
+import com.pedropathing.api.PoseFactory;
+import com.pedropathing.follower.Follower;
+import com.pedropathing.ivy.Command;
+import com.pedropathing.ivy.Scheduler;
 import com.pedropathing.math.Pose;
 import com.pedropathing.paths.Path;
-import com.pedropathing.utils.Timer;
 import com.qualcomm.robotcore.eventloop.opmode.Autonomous;
 import com.qualcomm.robotcore.eventloop.opmode.OpMode;
 
@@ -13,30 +19,42 @@ import org.firstinspires.ftc.teamcode.Robot;
 
 @Autonomous(name = "Auto", group = "Competition")
 public class Auto extends OpMode {
-    private enum State {
-        DRIVE_TO_LAUNCH,
-        LAUNCH,
-        PARK,
-        DONE
-    }
+    private Robot robot;
+    private Follower follower;
+    private final PoseFactory poseFactory = PoseFactory.degrees();
 
-    private static final Pose LAUNCH_POSE = Pose.zero();
-    private static final Pose PARK_POSE = Pose.zero();
+    // Poses (red side, blue is mirrored in start())
+    // TODO: real poses
+    private final Pose redLaunchPose = poseFactory.of(0, 0, 0);
+    private final Pose redParkPose = poseFactory.of(0, 0, 0);
 
     private Pose startPose;
     private Pose launchPose;
     private Pose parkPose;
 
-    private Robot robot;
-    private State state;
-    private final Timer stateTimer = new Timer();
+    // Path methods
+    private Path startToLaunch() {
+        return line(startPose, launchPose).linear(startPose, launchPose);
+    }
 
-    private Path toLaunch;
-    private Path toPark;
+    private Path park() {
+        return line(launchPose, parkPose).linear(launchPose, parkPose);
+    }
+
+    private Command autoRoutine() {
+        return sequential(
+                follow(follower, startToLaunch()),
+                // TODO: launch
+                follow(follower, park())
+        );
+    }
 
     @Override
     public void init() {
+        Scheduler.reset();
+
         robot = new Robot(hardwareMap);
+        follower = robot.drivebase.getFollower();
     }
 
     @Override
@@ -48,63 +66,38 @@ public class Auto extends OpMode {
 
     @Override
     public void start() {
+        // Alliance and start position are picked in init_loop, so poses are set here instead of init()
         startPose = MatchState.startPosition.pose(MatchState.alliance);
-        launchPose = MatchState.alliance.apply(LAUNCH_POSE);
-        parkPose = MatchState.alliance.apply(PARK_POSE);
-        robot.drivebase.setPose(startPose);
-        buildPaths();
+        launchPose = MatchState.alliance.apply(redLaunchPose);
+        parkPose = MatchState.alliance.apply(redParkPose);
+        follower.setPose(startPose);
 
         robot.start();
-        setState(State.DRIVE_TO_LAUNCH);
+        schedule(autoRoutine());
     }
 
     @Override
     public void loop() {
-        updateStateMachine();
+        robot.update(); // updates the follower
+        Scheduler.execute();
 
-        robot.update();
         // Saved every loop so TeleOp gets the latest pose however Auto ends
-        saveMatchState();
+        MatchState.pose = follower.pose();
+        MatchState.turretAngle = robot.launcher.getTurretAngle();
+
         telemetry.addData("Alliance", MatchState.alliance);
         telemetry.addData("Start", MatchState.startPosition);
-        telemetry.addData("State", state);
+        telemetry.addData("X", follower.pose().x());
+        telemetry.addData("Y", follower.pose().y());
+        telemetry.addData("Heading", Math.toDegrees(follower.pose().heading()));
+        telemetry.addData("Follower Mode", follower.mode());
         robot.telemetry(telemetry);
         telemetry.update();
     }
 
     @Override
     public void stop() {
+        Scheduler.reset();
         robot.stop();
-    }
-
-    private void saveMatchState() {
-        MatchState.pose = robot.drivebase.getPose();
-        MatchState.turretAngle = robot.launcher.getTurretAngle();
-    }
-
-    private void buildPaths() {
-        toLaunch = line(startPose, launchPose).linear(startPose, launchPose);
-        toPark = line(launchPose, parkPose).linear(launchPose, parkPose);
-    }
-
-    private void updateStateMachine() {
-        switch (state) {
-            case DRIVE_TO_LAUNCH:
-                // ...
-                break;
-            case LAUNCH:
-                // ...
-                break;
-            case PARK:
-                // ...
-                break;
-            case DONE:
-                break;
-        }
-    }
-
-    private void setState(State newState) {
-        state = newState;
-        stateTimer.reset();
     }
 }
