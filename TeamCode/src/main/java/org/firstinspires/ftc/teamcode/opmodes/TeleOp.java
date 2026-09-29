@@ -4,8 +4,8 @@ import static com.pedropathing.ivy.Scheduler.schedule;
 import static org.firstinspires.ftc.teamcode.RobotConstants.Drive.SLOW_MODE_SCALE;
 import static org.firstinspires.ftc.teamcode.RobotConstants.Field.RED_LEFT_CORNER;
 import static org.firstinspires.ftc.teamcode.RobotConstants.Field.RED_RIGHT_CORNER;
-import static org.firstinspires.ftc.teamcode.util.Html.bold;
-import static org.firstinspires.ftc.teamcode.util.Html.color;
+import static org.firstinspires.ftc.teamcode.RobotConstants.Launcher.SHOOT_ON_THE_MOVE;
+import static org.firstinspires.ftc.teamcode.util.Html.*;
 
 import com.pedropathing.ivy.Scheduler;
 import com.pedropathing.math.Pose;
@@ -17,7 +17,10 @@ import org.firstinspires.ftc.teamcode.Alliance;
 import org.firstinspires.ftc.teamcode.Hive;
 import org.firstinspires.ftc.teamcode.MatchState;
 import org.firstinspires.ftc.teamcode.Robot;
+import org.firstinspires.ftc.teamcode.ShotSolver.Shot;
+import org.firstinspires.ftc.teamcode.subsystems.Intake;
 import org.firstinspires.ftc.teamcode.subsystems.Launcher;
+import org.firstinspires.ftc.teamcode.util.FieldDiagram;
 import org.firstinspires.ftc.teamcode.util.Html;
 
 /**
@@ -34,6 +37,8 @@ import org.firstinspires.ftc.teamcode.util.Html;
  */
 @com.qualcomm.robotcore.eventloop.opmode.TeleOp(name = "TeleOp", group = "Competition")
 public class TeleOp extends OpMode {
+    private static final int LEFT_COLUMN = 22; // characters, for the side-by-side numbers
+
     private Robot robot;
     private final ElapsedTime loopTimer = new ElapsedTime();
 
@@ -122,42 +127,99 @@ public class TeleOp extends OpMode {
         if (gamepad2.optionsWasPressed()) schedule(robot.resetPose(RED_RIGHT_CORNER));
     }
 
-    /** The first lines are what the drivers need mid-match; details are below the fold. */
+    /**
+     * Three tiers, most important first:
+     * 1. the field diagram, with the shot readouts beside it (each diagram row and its readout share a line),
+     * 2. two monospace columns of numbers,
+     * 3. every subsystem's own telemetry.
+     * tools/telemetry-preview.html draws this layout in a browser; keep it in step.
+     */
     private void showTelemetry() {
         Launcher launcher = robot.launcher;
+        Shot shot = launcher.getShot();
         Pose pose = robot.drivebase.getPose();
-
-        telemetry.addLine(Html.alliance(MatchState.alliance) + bold(" · Hive: " + MatchState.hive));
-        telemetry.addLine(String.format("Flywheel %s  %.0f / %.0f  (%+.0f)",
-                flywheelStatus(launcher), launcher.getFlywheelVelocity(), launcher.getTargetVelocity(),
-                launcher.getVelocityNudge()));
-        telemetry.addLine(String.format("Turret %s  %.1f° / %.1f°  (%+.0f°)",
-                turretStatus(launcher),
-                Math.toDegrees(launcher.getTurretTargetAngle()), Math.toDegrees(launcher.getTurretAngle()),
-                Math.toDegrees(launcher.getTurretNudge())));
-        telemetry.addLine(String.format("Distance to hive  %.1f in", robot.distanceToHive()));
-        telemetry.addLine(String.format("Pose  x %.1f  y %.1f  h %.0f°", pose.x(), pose.y(), Math.toDegrees(pose.heading())));
-        telemetry.addLine("Intake " + robot.intake.getMode() + (robot.intake.isFeeding() ? " (FEEDING)" : "")
-                + " · Gate " + (robot.gate.isOpen() ? "OPEN" : "CLOSED"));
-        telemetry.addLine(String.format("Loop  %.0f ms", loopTimer.milliseconds()));
+        double loopMs = loopTimer.milliseconds();
         loopTimer.reset();
 
-        telemetry.addLine(color("──── details ────", Html.GRAY));
-        telemetry.addData("Follower mode", robot.drivebase.getFollower().mode());
+        // ---- 1. Field + what the drivers need mid-match ----
+        String[] field = FieldDiagram.draw(pose, MatchState.alliance, MatchState.hive);
+        String[] side = {
+                reachLine(shot),
+                flywheelLine(launcher),
+                turretLine(launcher),
+                "",
+                "Alliance " + Html.alliance(MatchState.alliance),
+                "Hive " + bold(color(MatchState.hive.toString(), MatchState.hive == Hive.LEFT ? PINK : CYAN)),
+                "Intake " + intakeWord(robot.intake.getMode()) + (robot.intake.isFeeding() ? " (feeding)" : ""),
+                "Gate " + (robot.gate.isOpen() ? bold(color("open", GREEN)) : bold(color("closed", GRAY))),
+        };
+        for (int r = 0; r < FieldDiagram.ROWS; r++) {
+            telemetry.addLine(mono(field[r]) + NBSP + NBSP + (r < side.length ? side[r] : ""));
+        }
+
+        // ---- 2. Numbers, side by side ----
+        if (shot != null && shot.feasible) {
+            telemetry.addLine(columns(String.format("Ball speed %.0f in/s", shot.exitSpeed),
+                    String.format("Flight time %.2f s", shot.timeOfFlight)));
+            // How far flywheel speed and turret angle can be off and the ball still goes in
+            telemetry.addLine(columns(String.format("Speed margin ±%.1f%%", shot.speedTolerance / shot.exitSpeed * 100),
+                    String.format("Aim margin ±%.1f°", Math.toDegrees(shot.angleTolerance))));
+            // How far off the hive the turret points to make up for the robot's motion
+            telemetry.addLine(mono(String.format("Aim ahead %+.1f°", Math.toDegrees(shot.leadAngle))));
+        }
+        telemetry.addLine(columns(String.format("Pose %.1f, %.1f", pose.x(), pose.y()),
+                String.format("Heading %.0f°", Math.toDegrees(pose.heading()))));
+        telemetry.addLine(columns(String.format("Loop %.1f ms %.0f Hz", loopMs, 1000 / loopMs),
+                "Follower " + robot.drivebase.getFollower().mode()));
+
+        // ---- 3. Everything else ----
+        telemetry.addLine(color("──── details ────", GRAY));
         robot.telemetry(telemetry);
         telemetry.update();
     }
 
-    private static String turretStatus(Launcher launcher) {
-        if (!launcher.hasShot()) return color("NO SHOT", Html.RED);
-        return launcher.isTurretOnTarget() ? color("ON TARGET", Html.GREEN) : color("AIMING", Html.YELLOW);
+    /** Two plain-text columns on one line, lined up by setting the whole line in monospace. */
+    private static String columns(String left, String right) {
+        StringBuilder line = new StringBuilder(left);
+        for (int i = left.length(); i < LEFT_COLUMN; i++) line.append(NBSP);
+        return mono(line + NBSP + right);
     }
 
-        private static String flywheelStatus(Launcher launcher) {
-        if (!launcher.isSpinning()) return bold("OFF");
-        if (launcher.isFlywheelAtSpeed()) return bold(color("READY", Html.GREEN));
-        return launcher.getFlywheelVelocity() < launcher.getTargetVelocity()
-                ? bold(color("UNDER", Html.YELLOW))
-                : bold(color("OVER", Html.RED));
+    private static String nudge(double value, String unit) {
+        return value != 0 ? String.format(" (%+.0f%s)", value, unit) : "";
+    }
+
+    /** Whether the simulated shot (on the move, if SHOOT_ON_THE_MOVE) can get the ball into the hive from here. */
+    private static String reachLine(Shot shot) {
+        String label = SHOOT_ON_THE_MOVE ? "SOTM " : "Shot (standing) ";
+        if (shot == null) return label + color("not aiming", GRAY);
+        String verdict = shot.feasible ? bold(color("can reach", GREEN)) : bold(color("can't reach", RED));
+        return label + verdict + String.format(" %.0f in", shot.distance);
+    }
+
+    private static String intakeWord(Intake.Mode mode) {
+        switch (mode) {
+            case INTAKE: return bold(color("in", GREEN));
+            case OUTTAKE: return bold(color("out", YELLOW));
+            default: return bold(color("off", GRAY));
+        }
+    }
+
+    private static String flywheelLine(Launcher launcher) {
+        if (!launcher.isSpinning()) return "Flywheel " + color("off", GRAY);
+        double actual = launcher.getFlywheelVelocity();
+        double target = launcher.getTargetVelocity();
+        String word;
+        if (launcher.isFlywheelAtSpeed()) word = bold(color("ok", GREEN));
+        else if (actual < target) word = bold(color("low", YELLOW));
+        else word = bold(color("high", RED));
+        return String.format("Flywheel %.0f/%.0f ", actual, target) + word + nudge(launcher.getVelocityNudge(), "");
+    }
+
+    private static String turretLine(Launcher launcher) {
+        String word = launcher.isTurretOnTarget() ? bold(color("ok", GREEN)) : bold(color("turning", YELLOW));
+        return String.format("Turret %+.0f°/%+.0f° ", Math.toDegrees(launcher.getTurretAngle()),
+                Math.toDegrees(launcher.getTurretTargetAngle()))
+                + word + nudge(Math.toDegrees(launcher.getTurretNudge()), "°");
     }
 }

@@ -20,6 +20,16 @@ public class RobotConstants {
         public static double HIVE_OPENING_HEIGHT = 14;
         public static double HIVE_OPENING_TILT = Math.toRadians(30);
 
+        // Flower column centers, one on each perimeter wall 48 in from a corner, about 3.5 in off the wall (Event Field
+        // Setup Guide V1.0, via BiobuzzSim). The set looks the same from both alliances, so it's used as is for blue.
+        // TODO: check against the real field
+        public static Pose[] FLOWERS = {
+                new Pose(48, 140.5),  // rear wall
+                new Pose(96, 3.5),    // audience wall
+                new Pose(3.5, 48),    // red alliance wall
+                new Pose(140.5, 96),  // blue alliance wall
+        };
+
         // Pose resets: robot pushed into the corner, back against the alliance wall.
         // 9 in = half of an 18 in robot. TODO: use the real robot size from CAD
         public static Pose RED_LEFT_CORNER = new Pose(9, 135, 0); // tile A6, alliance wall x rear wall

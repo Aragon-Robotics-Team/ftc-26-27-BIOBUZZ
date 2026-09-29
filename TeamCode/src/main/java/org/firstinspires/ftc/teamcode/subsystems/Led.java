@@ -12,8 +12,9 @@ import com.qualcomm.robotcore.util.ElapsedTime;
 import org.firstinspires.ftc.robotcore.external.Telemetry;
 
 /**
- * goBILDA RGB Indicator Light (PWM). Shows whether the flywheel is at speed:
- * off = flywheel off, green = on target, yellow = undershooting, red = overshooting.
+ * goBILDA RGB Indicator Light (PWM). Shows whether a shot right now would go in the hive:
+ * off = flywheel off, green = ready to shoot (there's a shot, flywheel at speed, turret on target),
+ * yellow = spinning up or aiming, red = no shot from here.
  * flash() shows white briefly to confirm a button press.
  */
 public class Led implements Subsystem {
@@ -52,9 +53,13 @@ public class Led implements Subsystem {
 
     private double color() {
         if (flashing) return WHITE;
-        if (!launcher.isSpinning()) return OFF;
-        if (launcher.isFlywheelAtSpeed()) return GREEN;
-        return launcher.getFlywheelVelocity() < launcher.getTargetVelocity() ? YELLOW : RED;
+        switch (launcher.getStatus()) {
+            case READY: return GREEN;
+            case NO_SHOT: return RED;
+            case SPINNING_UP:
+            case AIMING: return YELLOW;
+            default: return OFF;
+        }
     }
 
     @Override

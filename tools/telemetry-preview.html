@@ -1,0 +1,667 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>BIOBUZZ Driver Hub Preview</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@600;700&family=Barlow:wght@400;500;600&family=Roboto:wght@400;700&family=Roboto+Mono:wght@400;700&display=swap">
+<style>
+/*
+  Preview of TeleOp's driver telemetry on the Driver Hub. The telemetry pane is built from the same strings
+  TeleOp.showTelemetry() sends (see the JS below, which mirrors it line for line), rendered with the browser's HTML,
+  which handles the tags Android's Html.fromHtml supports the same way. Keep it in step with TeleOp.java.
+  Layout: device mock on the left (fixed size, scrolls sideways on a phone), robot-state controls on the right,
+  the exact HTML lines underneath.
+*/
+:root {
+  --bg: #eceff2;
+  --panel: #ffffff;
+  --ink: #14181d;
+  --muted: #5a6470;
+  --line: #d3d9df;
+  --accent: #a8680f;        /* honey, for the hive */
+  --accent-soft: #f6e7cc;
+  --code-bg: #f5f7f9;
+
+  /* The Driver Hub is hardware: one look in both themes */
+  --bezel: #121416;
+  --bezel-edge: #2a2e33;
+  --ds-bar: #263039;
+  --ds-side: #1c2228;
+  --ds-ink: #e8ecef;
+  --ds-dim: #8d99a4;
+  --stop: #c62828;
+
+  --display: "Barlow Condensed", "Arial Narrow", sans-serif;
+  --body: "Barlow", "Segoe UI", system-ui, sans-serif;
+  --android: "Roboto", "Segoe UI", system-ui, sans-serif;
+  --mono: "Roboto Mono", ui-monospace, "SF Mono", Menlo, monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #0e1114; --panel: #161a1f; --ink: #e5e9ed; --muted: #8d97a2; --line: #2a3139;
+    --accent: #e7ac45; --accent-soft: #3a2c14; --code-bg: #11151a;
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #0e1114; --panel: #161a1f; --ink: #e5e9ed; --muted: #8d97a2; --line: #2a3139;
+  --accent: #e7ac45; --accent-soft: #3a2c14; --code-bg: #11151a;
+  color-scheme: dark;
+}
+
+* { box-sizing: border-box; }
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--ink);
+  font: 15px/1.5 var(--body);
+}
+.wrap {
+  max-width: 1240px;
+  margin: 0 auto;
+  padding-inline: 16px;
+  padding-block: 24px 48px;
+  display: grid;
+  gap: 24px;
+}
+
+header h1 {
+  font: 700 2rem/1.1 var(--display);
+  letter-spacing: 0.01em;
+  margin: 0;
+  text-wrap: balance;
+}
+header p { margin: 6px 0 0; color: var(--muted); max-width: 70ch; }
+header code { font-family: var(--mono); font-size: 0.85em; }
+
+.main {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 340px;
+  gap: 24px;
+  align-items: start;
+}
+@media (max-width: 1100px) { .main { grid-template-columns: minmax(0, 1fr); } }
+
+/* ---------- Device ---------- */
+.device-scroll { overflow-x: auto; padding-bottom: 4px; }
+.device {
+  width: 780px;
+  background: var(--bezel);
+  border: 1px solid var(--bezel-edge);
+  border-radius: 28px;
+  padding: 22px 34px;
+  box-shadow: 0 18px 40px -18px rgba(0, 0, 0, 0.55);
+  position: relative;
+}
+.device .brand {
+  position: absolute; left: 50%; bottom: 5px; transform: translateX(-50%);
+  font: 600 10px/1 var(--body); letter-spacing: 0.2em; color: #4a5058; text-transform: uppercase;
+}
+.screen {
+  height: 420px;
+  border-radius: 6px;
+  overflow: hidden;
+  display: grid;
+  grid-template-rows: 34px 1fr;
+  background: var(--ds-side);
+  font-family: var(--android);
+}
+.ds-bar {
+  background: var(--ds-bar);
+  color: var(--ds-ink);
+  display: flex; align-items: center; gap: 14px;
+  padding: 0 12px;
+  font-size: 12px;
+}
+.ds-bar .grow { flex: 1; }
+.ds-bar .dim { color: var(--ds-dim); }
+.pad-dot { width: 9px; height: 9px; border-radius: 50%; background: #3fbf5a; display: inline-block; margin-right: 4px; }
+.ds-body { display: grid; grid-template-columns: 170px 1fr; min-height: 0; }
+.ds-side {
+  background: var(--ds-side);
+  color: var(--ds-ink);
+  padding: 12px;
+  display: flex; flex-direction: column; gap: 12px; align-items: stretch;
+  border-right: 1px solid #10151a;
+}
+.ds-side .label { font-size: 11px; color: var(--ds-dim); text-transform: uppercase; letter-spacing: 0.08em; }
+.ds-side .opmode { font-size: 15px; font-weight: 700; }
+.ds-stop {
+  height: 72px; border-radius: 6px; background: var(--stop);
+  display: grid; place-items: center;
+}
+.ds-stop span { width: 26px; height: 26px; background: #fff; border-radius: 2px; }
+.ds-timer { font: 700 30px/1 var(--mono); text-align: center; letter-spacing: 0.02em; }
+.led-row { display: flex; align-items: center; gap: 8px; font-size: 12px; color: var(--ds-dim); margin-top: auto; }
+.led {
+  width: 18px; height: 18px; border-radius: 50%;
+  border: 2px solid #3a4148;
+  transition: background-color 120ms, box-shadow 120ms;
+}
+
+/* The telemetry pane: Android-ish text rendering of the HTML TeleOp sends */
+.telemetry {
+  --tm-bg: #000000; --tm-ink: #ffffff;
+  background: var(--tm-bg);
+  color: var(--tm-ink);
+  padding: 10px 12px;
+  font: 15px/normal var(--android); /* Android TextView default: the font's own line height, about 1.17 for Roboto */
+  overflow-y: auto;
+  min-width: 0;
+}
+.telemetry.light { --tm-bg: #ffffff; --tm-ink: #000000; }
+.telemetry .tl { white-space: normal; }
+.telemetry tt { font-family: var(--mono); font-size: 1em; }
+.telemetry big { font-size: 1.25em; }
+.telemetry b { font-weight: 700; }
+
+.device-note { color: var(--muted); font-size: 13px; margin: 10px 2px 0; max-width: 780px; }
+
+/* ---------- Controls ---------- */
+.panel {
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 16px;
+  display: grid;
+  gap: 18px;
+  min-width: 0;
+}
+.panel h2, .code h2 {
+  font: 700 1.15rem/1.2 var(--display);
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+  margin: 0;
+}
+fieldset { border: 0; margin: 0; padding: 0; display: grid; gap: 8px; min-width: 0; }
+legend {
+  font: 600 12px/1 var(--body); text-transform: uppercase; letter-spacing: 0.1em;
+  color: var(--muted); padding: 0; margin-bottom: 8px;
+}
+.scenarios { display: flex; flex-wrap: wrap; gap: 6px; }
+.scenarios button {
+  font: 500 13px/1 var(--body);
+  padding: 7px 10px;
+  border-radius: 999px;
+  border: 1px solid var(--line);
+  background: transparent;
+  color: var(--ink);
+  cursor: pointer;
+}
+.scenarios button:hover { border-color: var(--accent); }
+.scenarios button[aria-pressed="true"] { background: var(--accent-soft); border-color: var(--accent); color: var(--ink); }
+.row {
+  display: grid;
+  grid-template-columns: 118px minmax(0, 1fr) 64px;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+}
+.row label { color: var(--muted); }
+.row output { font: 12px var(--mono); text-align: right; font-variant-numeric: tabular-nums; }
+.row input[type="range"] { width: 100%; accent-color: var(--accent); }
+.row select { font: 13px var(--body); padding: 3px 4px; background: var(--panel); color: var(--ink); border: 1px solid var(--line); border-radius: 4px; grid-column: 2 / 4; }
+.checks { display: flex; flex-wrap: wrap; gap: 6px 16px; font-size: 13px; }
+.checks label { display: inline-flex; gap: 6px; align-items: center; cursor: pointer; }
+.checks input { accent-color: var(--accent); }
+.seg { display: inline-flex; justify-self: start; border: 1px solid var(--line); border-radius: 6px; overflow: hidden; }
+.seg button { font: 500 12px var(--body); border: 0; padding: 5px 10px; background: transparent; color: var(--muted); cursor: pointer; }
+.seg button[aria-pressed="true"] { background: var(--accent-soft); color: var(--ink); }
+button:focus-visible, input:focus-visible, select:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+/* ---------- Code ---------- */
+.code { display: grid; gap: 10px; min-width: 0; }
+.code-head { display: flex; align-items: baseline; gap: 12px; flex-wrap: wrap; }
+.code-head p { margin: 0; color: var(--muted); font-size: 13px; flex: 1; min-width: 220px; }
+.copy {
+  font: 500 13px var(--body); padding: 6px 12px; border-radius: 6px; cursor: pointer;
+  border: 1px solid var(--line); background: var(--panel); color: var(--ink);
+}
+.copy:hover { border-color: var(--accent); }
+pre {
+  margin: 0;
+  background: var(--code-bg);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 12px 0;
+  overflow-x: auto;
+  font: 12px/1.6 var(--mono);
+}
+pre .ln { display: block; padding: 0 14px; white-space: pre; }
+pre .n { color: var(--muted); display: inline-block; width: 2.5ch; text-align: right; margin-right: 1.5ch; user-select: none; }
+pre .fold { color: var(--muted); }
+
+.notes { color: var(--muted); font-size: 13px; max-width: 80ch; margin: 0; padding-left: 18px; display: grid; gap: 4px; }
+.notes code { font-family: var(--mono); font-size: 0.92em; color: var(--ink); }
+
+@media (prefers-reduced-motion: reduce) { .led { transition: none; } }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1>BIOBUZZ Driver Hub Preview</h1>
+    <p>What the drivers see in <code>TeleOp</code>. Pick a robot state or drag the sliders (the robot's position moves it on the field diagram); the telemetry pane is built from the same HTML strings <code>TeleOp.showTelemetry()</code> sends, and the dot next to the timer is the LED on the robot.</p>
+  </header>
+
+  <div class="main">
+    <section aria-label="Driver Hub">
+      <div class="device-scroll">
+        <div class="device">
+          <div class="screen">
+            <div class="ds-bar">
+              <span><b>Driver Station</b></span>
+              <span class="dim">Robot: connected</span>
+              <span class="grow"></span>
+              <span><span class="pad-dot"></span>User 1</span>
+              <span><span class="pad-dot"></span>User 2</span>
+              <span class="dim">RC 13.2 V</span>
+            </div>
+            <div class="ds-body">
+              <div class="ds-side">
+                <div>
+                  <div class="label">TeleOp</div>
+                  <div class="opmode">TeleOp</div>
+                </div>
+                <div class="ds-stop" aria-label="Stop"><span></span></div>
+                <div class="ds-timer">1:47</div>
+                <div class="led-row"><span class="led" id="led"></span><span id="led-label">LED</span></div>
+              </div>
+              <div class="telemetry" id="telemetry" aria-live="polite"></div>
+            </div>
+          </div>
+          <div class="brand">Driver Hub</div>
+        </div>
+      </div>
+      <p class="device-note">The Driver Station around the telemetry is a sketch. Text size and where long lines wrap are close, not exact: check on the real Driver Hub before a match.</p>
+    </section>
+
+    <aside class="panel" aria-label="Robot state">
+      <h2>Robot state</h2>
+
+      <fieldset>
+        <legend>Situations</legend>
+        <div class="scenarios" id="scenarios"></div>
+      </fieldset>
+
+      <fieldset>
+        <legend>Robot position (Pedro, inches)</legend>
+        <div class="row"><label for="px">x</label><input type="range" id="px" min="9" max="135" step="0.5"><output for="px" id="px-out"></output></div>
+        <div class="row"><label for="py">y</label><input type="range" id="py" min="9" max="135" step="0.5"><output for="py" id="py-out"></output></div>
+        <div class="row"><label for="ph">Heading</label><input type="range" id="ph" min="-180" max="180" step="1"><output for="ph" id="ph-out"></output></div>
+      </fieldset>
+
+      <fieldset>
+        <legend>Flywheel</legend>
+        <div class="checks"><label><input type="checkbox" id="spinning"> Flywheel on (RB)</label></div>
+        <div class="row"><label for="target">Target</label><input type="range" id="target" min="500" max="2800" step="10"><output for="target" id="target-out"></output></div>
+        <div class="row"><label for="actual">Actual</label><input type="range" id="actual" min="0" max="2800" step="10"><output for="actual" id="actual-out"></output></div>
+        <div class="row"><label for="flyTol">Margin ±</label><input type="range" id="flyTol" min="10" max="150" step="5"><output for="flyTol" id="flyTol-out"></output></div>
+        <div class="row"><label for="velNudge">Nudge</label><input type="range" id="velNudge" min="-100" max="100" step="25"><output for="velNudge" id="velNudge-out"></output></div>
+      </fieldset>
+
+      <fieldset>
+        <legend>Turret (+ = left)</legend>
+        <div class="row"><label for="turret">Actual</label><input type="range" id="turret" min="-90" max="90" step="0.5"><output for="turret" id="turret-out"></output></div>
+        <div class="row"><label for="turretTarget">Target</label><input type="range" id="turretTarget" min="-90" max="90" step="0.5"><output for="turretTarget" id="turretTarget-out"></output></div>
+        <div class="row"><label for="turTol">Margin ±</label><input type="range" id="turTol" min="0.2" max="5" step="0.1"><output for="turTol" id="turTol-out"></output></div>
+        <div class="row"><label for="turNudge">Nudge</label><input type="range" id="turNudge" min="-5" max="5" step="1"><output for="turNudge" id="turNudge-out"></output></div>
+      </fieldset>
+
+      <fieldset>
+        <legend>Shot solver</legend>
+        <div class="checks">
+          <label><input type="checkbox" id="aiming"> Aiming</label>
+          <label><input type="checkbox" id="feasible"> Can reach</label>
+          <label><input type="checkbox" id="sotm"> SHOOT_ON_THE_MOVE</label>
+        </div>
+        <div class="row"><label for="lead">Aim ahead</label><input type="range" id="lead" min="-15" max="15" step="0.1"><output for="lead" id="lead-out"></output></div>
+      </fieldset>
+
+      <fieldset>
+        <legend>Match</legend>
+        <div class="row"><label for="alliance">Alliance</label><select id="alliance"><option>RED</option><option>BLUE</option></select></div>
+        <div class="row"><label for="hive">Hive up</label><select id="hive"><option>LEFT</option><option>RIGHT</option></select></div>
+        <div class="row"><label for="intake">Intake</label><select id="intake"><option>OFF</option><option>INTAKE</option><option>OUTTAKE</option></select></div>
+        <div class="checks">
+          <label><input type="checkbox" id="feeding"> Feeding (RT held)</label>
+          <label><input type="checkbox" id="gate"> Gate open</label>
+        </div>
+        <div class="row"><label for="loopMs">Loop time</label><input type="range" id="loopMs" min="4" max="60" step="0.5"><output for="loopMs" id="loopMs-out"></output></div>
+      </fieldset>
+
+      <fieldset>
+        <legend>Telemetry pane</legend>
+        <div class="seg" role="group" aria-label="Telemetry background">
+          <button type="button" id="bg-dark" aria-pressed="true">Dark</button>
+          <button type="button" id="bg-light" aria-pressed="false">Light</button>
+        </div>
+        <div class="row"><label for="textSize">Text size</label><input type="range" id="textSize" min="12" max="18" step="0.5"><output for="textSize" id="textSize-out"></output></div>
+      </fieldset>
+    </aside>
+  </div>
+
+  <section class="code" aria-label="HTML sent to the Driver Station">
+    <div class="code-head">
+      <h2>What TeleOp sends</h2>
+      <p>One <code>telemetry.addLine()</code> or <code>addData()</code> per row, in this state.</p>
+      <button type="button" class="copy" id="copy">Copy</button>
+    </div>
+    <pre id="code"></pre>
+  </section>
+
+  <ul class="notes">
+    <li>The Driver Station draws HTML telemetry with Android's <code>Html.fromHtml</code>: <code>&lt;b&gt;</code>, <code>&lt;tt&gt;</code> and <code>&lt;font color&gt;</code> work, and runs of spaces collapse to one, so padding uses <code>&amp;nbsp;</code>.</li>
+    <li>The Driver Station has no tables or columns, so each field row and the readout beside it are one telemetry line, and the side-by-side numbers are one monospace line. If a line is too long for the screen it wraps and the field breaks up; shrink <code>FieldDiagram.COLS</code> or the side text if that happens on the real Driver Hub.</li>
+    <li>Field: seen from our driver station, our wall at the bottom. Each row is 12 in and each column 6 in. The arrow is the robot, pointing the way it faces (8 directions). Each hive is a <code>======</code> bar in its alliance's color; ours has a bold <code>O</code> on the up cell, the one to shoot at. Orange <code>@</code> marks the four flowers on the walls.</li>
+    <li>If the robot's row looks shifted on the Driver Hub, its monospace font has no arrow characters. Switch <code>FieldDiagram.ARROWS</code> to <code>^ &lt; v &gt;</code>.</li>
+  </ul>
+</div>
+
+<script>
+// ---- Constants that match the robot code ----
+const HTML = { RED: "#FF5555", BLUE: "#5599FF", GREEN: "#55DD55", YELLOW: "#FFCC33", GRAY: "#999999",
+               DARK_GRAY: "#444444", PINK: "#FF77CC", CYAN: "#44DDEE" };
+const NBSP = "&nbsp;";
+const GAP = NBSP + NBSP + NBSP;
+const FLYWHEEL_TICKS_PER_EXIT_SPEED = 8.0;
+const LED = { OFF: "#1b1f23", GREEN: "#35e05a", YELLOW: "#ffd23a", RED: "#ff4040" };
+
+// ---- util/Html.java ----
+const bold = t => `<b>${t}</b>`;
+const mono = t => `<tt>${t}</tt>`;
+const color = (t, c) => `<font color='${c}'>${t}</font>`;
+const allianceTag = a => bold(color(a, a === "RED" ? HTML.RED : HTML.BLUE));
+
+// String.format helpers
+const f = (v, d) => (Math.round(v * 10 ** d) / 10 ** d).toFixed(d);
+const fs = (v, d) => (v >= 0 ? "+" : "-") + f(Math.abs(v), d);
+const clip = (v, lo, hi) => Math.min(hi, Math.max(lo, v));
+
+// ---- Launcher state ----
+function launcher(s) {
+  const target = s.spinning ? s.target + s.velNudge : 0;
+  const spinning = target !== 0;
+  const atSpeed = spinning && Math.abs(target - s.actual) <= s.flyTol;
+  const onTarget = Math.abs(s.turretTarget - s.turret) <= s.turTol;
+  const hasShot = !s.aiming || s.feasible;
+  const ready = hasShot && atSpeed && onTarget;
+  let status;
+  if (!spinning) status = "OFF";
+  else if (ready) status = "READY";
+  else if (!hasShot) status = "NO_SHOT";
+  else status = atSpeed ? "AIMING" : "SPINNING_UP";
+  return { target, spinning, atSpeed, onTarget, hasShot, ready, status };
+}
+
+// ---- util/FieldDiagram.java ----
+const FD = { ROWS: 12, COLS: 24, FLOOR: HTML.DARK_GRAY, FLOWER: "#FFA000" };
+const FLOWERS = [{ x: 48, y: 140.5 }, { x: 96, y: 3.5 }, { x: 3.5, y: 48 }, { x: 140.5, y: 96 }];
+const allianceColor = a => a === "RED" ? HTML.RED : HTML.BLUE;
+const ARROWS = ["↑", "↖", "←", "↙", "↓", "↘", "→", "↗"];
+const FIELD = 144;
+const RED_HIVE_LEFT_CELL = { x: 59.25, y: 87.7 }, RED_HIVE_RIGHT_CELL = { x: 59.25, y: 56.3 };
+const applyAlliance = (a, p) => a === "RED" ? { ...p } : { x: FIELD - p.x, y: FIELD - p.y, h: p.h + 180 };
+const fdClamp = (i, n) => Math.max(0, Math.min(n - 1, i));
+const fdRow = x => fdClamp(Math.floor((FIELD - x) / FIELD * FD.ROWS), FD.ROWS);
+const fdCol = y => fdClamp(Math.floor((FIELD - y) / FIELD * FD.COLS), FD.COLS);
+
+function drawField(pose, alliance, hive) {
+  const ours = allianceColor(alliance), theirs = allianceColor(alliance === "RED" ? "BLUE" : "RED");
+  const text = [], col = [];
+  for (let r = 0; r < FD.ROWS; r++) { text.push(Array(FD.COLS).fill("#")); col.push(Array(FD.COLS).fill(FD.FLOOR)); }
+  const set = (r, c, ch, color) => { text[r][c] = ch; col[r][c] = color; };
+  const robot = applyAlliance(alliance, pose);
+
+  const drawHive = (x, y1, y2, color) => {
+    const r = fdRow(x), from = Math.min(fdCol(y1), fdCol(y2)), to = Math.max(fdCol(y1), fdCol(y2));
+    for (let c = from; c <= to; c++) set(r, c, "=", color);
+  };
+  drawHive(FIELD - RED_HIVE_LEFT_CELL.x, FIELD - RED_HIVE_LEFT_CELL.y, FIELD - RED_HIVE_RIGHT_CELL.y, theirs);
+  drawHive(RED_HIVE_LEFT_CELL.x, RED_HIVE_LEFT_CELL.y, RED_HIVE_RIGHT_CELL.y, ours);
+  const up = hive === "LEFT" ? RED_HIVE_LEFT_CELL : RED_HIVE_RIGHT_CELL;
+  set(fdRow(up.x), fdCol(up.y), bold("O"), ours);
+
+  for (const flower of FLOWERS) set(fdRow(flower.x), fdCol(flower.y), bold("@"), FD.FLOWER);
+
+  const direction = Math.round(robot.h / 45);
+  set(fdRow(robot.x), fdCol(robot.y), bold(ARROWS[((direction % 8) + 8) % 8]), ours);
+
+  return text.map((chars, r) => {
+    let out = "", start = 0;
+    for (let c = 1; c <= FD.COLS; c++) {
+      if (c === FD.COLS || col[r][c] !== col[r][start]) { out += color(chars.slice(start, c).join(""), col[r][start]); start = c; }
+    }
+    return out;
+  });
+}
+
+// Distance from the turret pivot (robot center: TURRET_OFFSET is 0) to our up cell, as the shot solver reports it
+function hiveDistance(s) {
+  const robot = applyAlliance(s.alliance, s.pose);
+  const t = s.hive === "LEFT" ? RED_HIVE_LEFT_CELL : RED_HIVE_RIGHT_CELL;
+  return Math.hypot(t.x - robot.x, t.y - robot.y);
+}
+
+// ---- TeleOp.showTelemetry() ----
+const LEFT_COLUMN = 22;
+
+function reachLine(s) {
+  const label = s.sotm ? "SOTM " : "Shot (standing) ";
+  if (!s.aiming) return label + color("not aiming", HTML.GRAY);
+  const verdict = s.feasible ? bold(color("can reach", HTML.GREEN)) : bold(color("can't reach", HTML.RED));
+  return label + verdict + ` ${f(hiveDistance(s), 0)} in`;
+}
+
+const nudgeText = (v, unit) => v !== 0 ? ` (${fs(v, 0)}${unit})` : "";
+
+function flywheelLine(s, L) {
+  if (!L.spinning) return "Flywheel " + color("off", HTML.GRAY);
+  let word;
+  if (L.atSpeed) word = bold(color("ok", HTML.GREEN));
+  else if (s.actual < L.target) word = bold(color("low", HTML.YELLOW));
+  else word = bold(color("high", HTML.RED));
+  return `Flywheel ${f(s.actual, 0)}/${f(L.target, 0)} ` + word + nudgeText(s.velNudge, "");
+}
+
+function turretLine(s, L) {
+  const word = L.onTarget ? bold(color("ok", HTML.GREEN)) : bold(color("turning", HTML.YELLOW));
+  return `Turret ${fs(s.turret, 0)}°/${fs(s.turretTarget, 0)}° ` + word + nudgeText(s.turNudge, "°");
+}
+
+const columns = (left, right) => mono(left + NBSP.repeat(Math.max(0, LEFT_COLUMN - left.length)) + NBSP + right);
+
+function lines(s) {
+  const L = launcher(s);
+  const out = [];
+  const tiers = [];
+  const add = html => out.push(html);
+  const data = (k, v) => out.push(`${k} : ${v}`);
+  const distance = hiveDistance(s);
+  const exit = (L.target || s.target) / FLYWHEEL_TICKS_PER_EXIT_SPEED;
+  const flight = 0.35 + distance / 280;
+
+  // 1. Field + what the drivers need mid-match
+  const field = drawField(s.pose, s.alliance, s.hive);
+  const side = [
+    reachLine(s),
+    flywheelLine(s, L),
+    turretLine(s, L),
+    "",
+    "Alliance " + allianceTag(s.alliance),
+    "Hive " + bold(color(s.hive, s.hive === "LEFT" ? HTML.PINK : HTML.CYAN)),
+    "Intake " + { INTAKE: bold(color("in", HTML.GREEN)), OUTTAKE: bold(color("out", HTML.YELLOW)), OFF: bold(color("off", HTML.GRAY)) }[s.intake]
+      + (s.feeding ? " (feeding)" : ""),
+    "Gate " + (s.gate ? bold(color("open", HTML.GREEN)) : bold(color("closed", HTML.GRAY))),
+  ];
+  for (let r = 0; r < FD.ROWS; r++) add(mono(field[r]) + NBSP + NBSP + (r < side.length ? side[r] : ""));
+  tiers.push(out.length);
+
+  // 2. Numbers, side by side
+  if (s.aiming && s.feasible) {
+    add(columns(`Ball speed ${f(exit, 0)} in/s`, `Flight time ${f(flight, 2)} s`));
+    add(columns(`Speed margin ±${f(s.flyTol / FLYWHEEL_TICKS_PER_EXIT_SPEED / exit * 100 * 2, 1)}%`, `Aim margin ±${f(s.turTol * 2, 1)}°`));
+    add(mono(`Aim ahead ${fs(s.lead, 1)}°`));
+  }
+  add(columns(`Pose ${f(s.pose.x, 1)}, ${f(s.pose.y, 1)}`, `Heading ${f(s.pose.h, 0)}°`));
+  add(columns(`Loop ${f(s.loopMs, 1)} ms ${f(1000 / s.loopMs, 0)} Hz`, "Follower MANUAL"));
+  tiers.push(out.length);
+
+  // 3. Everything else: Robot.telemetry() -> drivebase, intake, gate, launcher, led
+  add(color("──── details ────", HTML.GRAY));
+  data("Pose", `(${f(s.pose.x, 3)}, ${f(s.pose.y, 3)}, ${f(s.pose.h * Math.PI / 180, 3)})`);
+  const intakePower = s.feeding || s.intake === "INTAKE" ? 1 : s.intake === "OUTTAKE" ? -1 : 0;
+  data("Intake power", f(intakePower, 2));
+  data("Gate", s.gate ? "OPEN" : "CLOSED");
+  data("Launcher ready", String(L.ready));
+  data("Flywheel target / actual", `${f(L.target, 0)} / ${f(s.actual, 0)}`);
+  data("Turret target / actual (deg)", `${f(s.turretTarget, 1)} / ${f(s.turret, 1)}`);
+  data("Turret turn speed target / actual (deg/s)", "14 / 13");
+  data("Turret power", f(clip((s.turretTarget - s.turret) * Math.PI / 180, -0.8, 0.8) + 0.03, 2));
+  if (s.aiming) {
+    if (!s.feasible) {
+      data("Planned shot", `none from here (${f(distance, 0)} in)`);
+    } else {
+      data("Planned shot", `ball ${f(exit, 0)} in/s, flight ${f(flight, 2)} s, aim ahead ${fs(s.lead, 1)}°, ${f(distance, 0)} in`);
+      data("Shot margins", `speed ±${f(s.flyTol / FLYWHEEL_TICKS_PER_EXIT_SPEED / exit * 100 * 2, 1)}%, aim ±${f(s.turTol * 2, 1)}°`);
+      if (L.spinning) data("Calibration (ticks/sec per in/s)", f(L.target / exit, 2));
+    }
+  }
+  const ledPos = { READY: 0.5, NO_SHOT: 0.28, SPINNING_UP: 0.388, AIMING: 0.388, OFF: 0 }[L.status];
+  data("LED position", f(ledPos, 3));
+  return { out, tiers, L };
+}
+
+// ---- Situations ----
+const base = {
+  spinning: true, target: 1980, actual: 1972, flyTol: 40, velNudge: 0,
+  turret: 12.4, turretTarget: 12.9, turTol: 1.5, turNudge: 0,
+  aiming: true, feasible: true, sotm: true, lead: 3.1,
+  alliance: "RED", hive: "RIGHT", intake: "INTAKE", feeding: false, gate: false, loopMs: 11.5,
+  pose: { x: 26, y: 104, h: -30 },
+};
+const scenarios = [
+  ["Ready to shoot", {}],
+  ["Shooting on the move", { feeding: true, gate: true, lead: 7.8, turret: 21.0, turretTarget: 21.6, actual: 1905, target: 1920, pose: { x: 40, y: 118, h: 0 } }],
+  ["Flywheel spinning up", { actual: 1310 }],
+  ["Turret catching up", { turret: 4.0, turretTarget: 18.5, pose: { x: 20, y: 30, h: 45 } }],
+  ["Flywheel over speed", { actual: 2110, target: 1860, pose: { x: 36, y: 76, h: 0 } }],
+  ["Too close to reach", { feasible: false, lead: 0, turret: -35, turretTarget: -35.5, pose: { x: 50, y: 40, h: 90 } }],
+  ["Flywheel off", { spinning: false, actual: 0, pose: { x: 100, y: 110, h: 180 } }],
+  ["Operator nudged", { velNudge: 50, turNudge: -2, turretTarget: 10.9, turret: 10.6, actual: 2020, target: 1980 }],
+];
+let state = structuredClone(base);
+let current = 0;
+
+// ---- Wiring ----
+const $ = id => document.getElementById(id);
+const ranges = {
+  target: v => f(v, 0), actual: v => f(v, 0), flyTol: v => f(v, 0), velNudge: v => fs(v, 0),
+  turret: v => fs(v, 1) + "°", turretTarget: v => fs(v, 1) + "°", turTol: v => f(v, 1) + "°", turNudge: v => fs(v, 0) + "°",
+  lead: v => fs(v, 1) + "°", loopMs: v => f(v, 1) + " ms",
+};
+const poseRanges = { px: ["x", v => f(v, 1)], py: ["y", v => f(v, 1)], ph: ["h", v => fs(v, 0) + "°"] };
+const checks = ["spinning", "aiming", "feasible", "sotm", "feeding", "gate"];
+const selects = ["alliance", "hive", "intake"];
+
+function syncInputs() {
+  for (const k in ranges) { $(k).value = state[k]; $(k + "-out").textContent = ranges[k](state[k]); }
+  for (const k in poseRanges) {
+    const [field, fmt] = poseRanges[k];
+    $(k).value = state.pose[field]; $(k + "-out").textContent = fmt(state.pose[field]);
+  }
+  for (const k of checks) $(k).checked = state[k];
+  for (const k of selects) $(k).value = state[k];
+  $("feasible").disabled = !state.aiming;
+}
+
+function escapeHtml(t) {
+  return t.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+}
+
+function render() {
+  const { out, tiers, L } = lines(state);
+  $("telemetry").innerHTML = out.join("<br>");
+  $("code").innerHTML = out.map((l, i) =>
+    `<span class="ln${i >= tiers[1] ? " fold" : ""}"><span class="n">${i + 1}</span>${escapeHtml(l)}</span>`).join("");
+  const ledColor = { READY: LED.GREEN, NO_SHOT: LED.RED, SPINNING_UP: LED.YELLOW, AIMING: LED.YELLOW, OFF: LED.OFF }[L.status];
+  $("led").style.backgroundColor = ledColor;
+  $("led").style.boxShadow = L.status === "OFF" ? "none" : `0 0 12px 2px ${ledColor}`;
+  $("led-label").textContent = "LED " + { READY: "green", NO_SHOT: "red", SPINNING_UP: "yellow", AIMING: "yellow", OFF: "off" }[L.status];
+  document.querySelectorAll("#scenarios button").forEach((b, i) => b.setAttribute("aria-pressed", String(i === current)));
+}
+
+function pick(i) {
+  current = i;
+  state = Object.assign(structuredClone(base), structuredClone(scenarios[i][1]));
+  syncInputs();
+  render();
+}
+
+scenarios.forEach(([name], i) => {
+  const b = document.createElement("button");
+  b.type = "button";
+  b.textContent = name;
+  b.addEventListener("click", () => pick(i));
+  $("scenarios").appendChild(b);
+});
+for (const k in ranges) $(k).addEventListener("input", e => {
+  state[k] = parseFloat(e.target.value); current = -1;
+  $(k + "-out").textContent = ranges[k](state[k]); render();
+});
+for (const k of checks) $(k).addEventListener("change", e => {
+  state[k] = e.target.checked; current = -1;
+  if (k === "spinning" && state.spinning && state.actual === 0) { state.actual = 1310; }
+  syncInputs(); render();
+});
+for (const k in poseRanges) $(k).addEventListener("input", e => {
+  const [field, fmt] = poseRanges[k];
+  state.pose[field] = parseFloat(e.target.value); current = -1;
+  $(k + "-out").textContent = fmt(state.pose[field]); render();
+});
+for (const k of selects) $(k).addEventListener("change", e => {
+  // Switching alliance keeps the robot in the same spot as seen from the driver station
+  if (k === "alliance" && e.target.value !== state.alliance) {
+    const p = applyAlliance("BLUE", state.pose);
+    state.pose = { x: p.x, y: p.y, h: ((p.h + 540) % 360) - 180 };
+  }
+  state[k] = e.target.value; current = -1; syncInputs(); render();
+});
+function setTextSize(px) {
+  $("telemetry").style.fontSize = px + "px";
+  $("textSize").value = px; $("textSize-out").textContent = f(px, 1) + " px";
+}
+$("textSize").addEventListener("input", e => setTextSize(parseFloat(e.target.value)));
+setTextSize(15);
+
+function setBg(light) {
+  $("telemetry").classList.toggle("light", light);
+  $("bg-dark").setAttribute("aria-pressed", String(!light));
+  $("bg-light").setAttribute("aria-pressed", String(light));
+  try { localStorage.setItem("tm-bg", light ? "light" : "dark"); } catch (e) {}
+}
+$("bg-dark").addEventListener("click", () => setBg(false));
+$("bg-light").addEventListener("click", () => setBg(true));
+try { if (localStorage.getItem("tm-bg") === "light") setBg(true); } catch (e) {}
+
+$("copy").addEventListener("click", async () => {
+  const text = lines(state).out.join("\n");
+  try {
+    await navigator.clipboard.writeText(text);
+    $("copy").textContent = "Copied";
+  } catch (e) {
+    const range = document.createRange();
+    range.selectNodeContents($("code"));
+    const sel = getSelection(); sel.removeAllRanges(); sel.addRange(range);
+    $("copy").textContent = "Selected";
+  }
+  setTimeout(() => { $("copy").textContent = "Copy"; }, 1400);
+});
+
+pick(0);
+</script>
+</body>
+</html>

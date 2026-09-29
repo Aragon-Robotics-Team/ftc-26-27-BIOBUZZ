@@ -82,12 +82,13 @@ public class Auto extends OpMode {
         MatchState.turretAngle = robot.launcher.getTurretAngle();
 
         Pose pose = follower.pose();
-        telemetry.addLine(bold(selected.toString()) + " · " + Html.alliance(MatchState.alliance)
-                + bold(" · Hive: " + MatchState.hive));
+        telemetry.addLine(bold(selected.toString()) + Html.GAP + Html.alliance(MatchState.alliance)
+                + Html.GAP + bold("Hive: " + MatchState.hive));
         telemetry.addLine(String.format("Pose  x %.1f  y %.1f  h %.0f°", pose.x(), pose.y(), Math.toDegrees(pose.heading())));
         telemetry.addLine("Follower " + follower.mode());
-        telemetry.addLine(String.format("Loop  %.0f ms", loopTimer.milliseconds()));
+        double loopMs = loopTimer.milliseconds();
         loopTimer.reset();
+        telemetry.addLine(String.format("Loop  %.1f ms  (%.0f Hz)", loopMs, 1000 / loopMs));
 
         telemetry.addLine(Html.color("──── details ────", Html.GRAY));
         robot.telemetry(telemetry);

@@ -9,6 +9,7 @@ import static org.firstinspires.ftc.teamcode.RobotConstants.Gate.AUTO_SHOOT_MS;
 
 import com.pedropathing.ivy.Command;
 import com.pedropathing.math.Pose;
+import com.qualcomm.hardware.lynx.LynxModule;
 import com.qualcomm.robotcore.hardware.HardwareMap;
 
 import org.firstinspires.ftc.robotcore.external.Telemetry;
@@ -18,6 +19,8 @@ import org.firstinspires.ftc.teamcode.subsystems.Intake;
 import org.firstinspires.ftc.teamcode.subsystems.Launcher;
 import org.firstinspires.ftc.teamcode.subsystems.Led;
 import org.firstinspires.ftc.teamcode.subsystems.Subsystem;
+
+import java.util.List;
 
 /**
  * Owns every subsystem so TeleOp and Auto build the robot the same way.
@@ -30,16 +33,21 @@ public class Robot {
     public final Launcher launcher;
     public final Led led;
 
+    private final List<LynxModule> hubs;
     private final Subsystem[] subsystems;
 
     public Robot(HardwareMap hardwareMap) {
+        // Bulk reads: every encoder / velocity read in a loop comes from one read per hub, refreshed in update()
+        hubs = hardwareMap.getAll(LynxModule.class);
+        for (LynxModule hub : hubs) hub.setBulkCachingMode(LynxModule.BulkCachingMode.MANUAL);
+
         drivebase = new Drivetrain(hardwareMap);
         intake = new Intake(hardwareMap);
         gate = new Gate(hardwareMap);
         launcher = new Launcher(hardwareMap);
         led = new Led(hardwareMap, launcher);
 
-        // Launcher before Led, so the light shows this loop's flywheel speed
+        // Launcher before Led, so the light shows this loop's launcher state
         subsystems = new Subsystem[]{drivebase, intake, gate, launcher, led};
     }
 
@@ -106,7 +114,9 @@ public class Robot {
         for (Subsystem subsystem : subsystems) subsystem.start();
     }
 
+    /** Refreshes the bulk-read cache, then updates every subsystem. Call once at the top of each loop. */
     public void update() {
+        for (LynxModule hub : hubs) hub.clearBulkCache();
         for (Subsystem subsystem : subsystems) subsystem.update();
     }
 

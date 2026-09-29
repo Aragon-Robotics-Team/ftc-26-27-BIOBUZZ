@@ -31,6 +31,15 @@ import java.util.function.Supplier;
  * spinning up can run at the same time. The gate and intake do the actual feeding (see Robot).
  */
 public class Launcher implements Subsystem {
+    /** What the launcher is waiting on. The LED shows this. */
+    public enum Status {
+        OFF,         // flywheel off
+        NO_SHOT,     // no flywheel speed reaches the target from here
+        SPINNING_UP, // flywheel not at speed yet (spinning up, or settling to a new target)
+        AIMING,      // flywheel at speed, turret not on target yet
+        READY
+    }
+
     private final DcMotorEx flywheel;
     private final DcMotorEx turret;
     private final double turretTicksPerRadian = TURRET_MOTOR_TICKS_PER_REV * TURRET_GEAR_RATIO / (2 * Math.PI);
@@ -207,6 +216,18 @@ public class Launcher implements Subsystem {
         return hasShot() && isFlywheelAtSpeed() && isTurretOnTarget();
     }
 
+    public Status getStatus() {
+        if (!isSpinning()) return Status.OFF;
+        if (isReady()) return Status.READY;
+        if (!hasShot()) return Status.NO_SHOT;
+        return isFlywheelAtSpeed() ? Status.AIMING : Status.SPINNING_UP;
+    }
+
+    /** The shot the turret (else the flywheel) is following, or null when neither is aiming at a target. */
+    public Shot getShot() {
+        return turretShot != null ? turretShot : flywheelShot;
+    }
+
     // ---- Setup ----
 
     /** Push new velocity PIDF to the motor controller. Used by the tuning OpMode. */
@@ -283,18 +304,18 @@ public class Launcher implements Subsystem {
         telemetry.addData("Flywheel target / actual", "%.0f / %.0f", targetVelocity, flywheelVelocity);
         telemetry.addData("Turret target / actual (deg)", "%.1f / %.1f",
                 Math.toDegrees(turretTargetAngle), Math.toDegrees(getTurretAngle()));
-        telemetry.addData("Turret rate target / actual (deg/s)", "%.0f / %.0f",
+        telemetry.addData("Turret turn speed target / actual (deg/s)", "%.0f / %.0f",
                 Math.toDegrees(turretTargetRate), Math.toDegrees(turretVelocity));
         telemetry.addData("Turret power", "%.2f", turret.getPower());
-        Shot shot = turretShot != null ? turretShot : flywheelShot;
+        Shot shot = getShot();
         if (shot == null) return;
         if (!shot.feasible) {
-            telemetry.addData("Shot", "none from here (%.0f in)", shot.distance);
+            telemetry.addData("Planned shot", "none from here (%.0f in)", shot.distance);
             return;
         }
-        telemetry.addData("Shot", "%.0f in/s  %.2f s flight  lead %+.1f°  (%.0f in)",
+        telemetry.addData("Planned shot", "ball %.0f in/s, flight %.2f s, aim ahead %+.1f°, %.0f in",
                 shot.exitSpeed, shot.timeOfFlight, Math.toDegrees(shot.leadAngle), shot.distance);
-        telemetry.addData("Shot can take", "speed ±%.1f%%  turret ±%.1f°",
+        telemetry.addData("Shot margins", "speed ±%.1f%%, aim ±%.1f°",
                 shot.speedTolerance / shot.exitSpeed * 100, Math.toDegrees(shot.angleTolerance));
         if (flywheelShot != null && flywheelShot.feasible) {
             // With the nudge set so standing shots go through the middle, this is FLYWHEEL_TICKS_PER_EXIT_SPEED
