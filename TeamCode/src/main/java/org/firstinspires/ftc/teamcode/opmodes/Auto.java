@@ -1,53 +1,25 @@
 package org.firstinspires.ftc.teamcode.opmodes;
 
-import static com.pedropathing.api.Paths.line;
 import static com.pedropathing.ivy.Scheduler.schedule;
-import static com.pedropathing.ivy.groups.Groups.sequential;
-import static com.pedropathing.ivy.pedro.PedroCommands.follow;
 
-import com.pedropathing.api.PoseFactory;
 import com.pedropathing.follower.Follower;
-import com.pedropathing.ivy.Command;
 import com.pedropathing.ivy.Scheduler;
-import com.pedropathing.math.Pose;
-import com.pedropathing.paths.Path;
 import com.qualcomm.robotcore.eventloop.opmode.Autonomous;
 import com.qualcomm.robotcore.eventloop.opmode.OpMode;
 
 import org.firstinspires.ftc.teamcode.MatchState;
 import org.firstinspires.ftc.teamcode.Robot;
+import org.firstinspires.ftc.teamcode.routines.AutoRoutine;
+import org.firstinspires.ftc.teamcode.routines.Routines;
 
+/** The only competition auto. Pick the alliance and routine during init; the routines live in {@link Routines}. */
 @Autonomous(name = "Auto", group = "Competition")
 public class Auto extends OpMode {
+    // Static so the last pick is remembered between runs
+    private static Routines selected = Routines.values()[0];
+
     private Robot robot;
     private Follower follower;
-    private final PoseFactory poseFactory = PoseFactory.degrees();
-
-    // Poses (red side, blue is mirrored in start())
-    // TODO: real poses
-    private final Pose redLaunchPose = poseFactory.of(0, 0, 0);
-    private final Pose redParkPose = poseFactory.of(0, 0, 0);
-
-    private Pose startPose;
-    private Pose launchPose;
-    private Pose parkPose;
-
-    // Path methods
-    private Path startToLaunch() {
-        return line(startPose, launchPose).linear(startPose, launchPose);
-    }
-
-    private Path park() {
-        return line(launchPose, parkPose).linear(launchPose, parkPose);
-    }
-
-    private Command autoRoutine() {
-        return sequential(
-                follow(follower, startToLaunch()),
-                // TODO: launch
-                follow(follower, park())
-        );
-    }
 
     @Override
     public void init() {
@@ -60,20 +32,21 @@ public class Auto extends OpMode {
     @Override
     public void init_loop() {
         MatchState.selectAlliance(gamepad1, telemetry);
-        MatchState.selectStartPosition(gamepad1, telemetry);
+        if (gamepad1.dpadDownWasPressed()) selected = selected.next();
+        if (gamepad1.dpadUpWasPressed()) selected = selected.previous();
+        telemetry.addData("Routine", "%s   (%d/%d, dpad ↑↓)", selected, selected.ordinal() + 1, Routines.values().length);
+        telemetry.addData("Place robot at", selected.create(robot, MatchState.alliance).startPose());
         telemetry.update();
     }
 
     @Override
     public void start() {
-        // Alliance and start position are picked in init_loop, so poses are set here instead of init()
-        startPose = MatchState.startPosition.pose(MatchState.alliance);
-        launchPose = MatchState.alliance.apply(redLaunchPose);
-        parkPose = MatchState.alliance.apply(redParkPose);
-        follower.setPose(startPose);
+        // Alliance and routine are picked in init_loop, so the routine is built here instead of init()
+        AutoRoutine routine = selected.create(robot, MatchState.alliance);
+        follower.setPose(routine.startPose());
 
         robot.start();
-        schedule(autoRoutine());
+        schedule(routine.autoRoutine());
     }
 
     @Override
@@ -86,7 +59,7 @@ public class Auto extends OpMode {
         MatchState.turretAngle = robot.launcher.getTurretAngle();
 
         telemetry.addData("Alliance", MatchState.alliance);
-        telemetry.addData("Start", MatchState.startPosition);
+        telemetry.addData("Routine", selected);
         telemetry.addData("X", follower.pose().x());
         telemetry.addData("Y", follower.pose().y());
         telemetry.addData("Heading", Math.toDegrees(follower.pose().heading()));
