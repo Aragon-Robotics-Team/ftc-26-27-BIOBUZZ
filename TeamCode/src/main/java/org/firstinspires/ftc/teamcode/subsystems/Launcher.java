@@ -7,6 +7,7 @@ import static org.firstinspires.ftc.teamcode.RobotConstants.Launcher.*;
 
 import com.pedropathing.ivy.Command;
 import com.pedropathing.math.Pose;
+import com.pedropathing.math.Velocity;
 import com.pedropathing.utils.Angle;
 import com.qualcomm.robotcore.hardware.DcMotor;
 import com.qualcomm.robotcore.hardware.DcMotorEx;
@@ -20,7 +21,10 @@ import org.firstinspires.ftc.robotcore.external.Telemetry;
 import java.util.function.Supplier;
 
 /**
- * Turreted flywheel shooter. The flywheel is velocity-controlled; the turret runs a PID loop on its encoder angle.
+ * Turreted flywheel shooter. The flywheel is velocity-controlled; the turret runs a PID loop on its encoder angle,
+ * plus a velocity feedforward so it can track a target while the robot moves.
+ * Aiming allows for the robot's motion (see {@link #solve}): the ball keeps the robot's velocity, so while driving
+ * the turret leads the target and the flywheel is set for the distance to that lead point.
  * Flywheel commands require the flywheel motor and turret commands require the turret motor, so aiming and
  * spinning up can run at the same time. The gate and intake do the actual feeding (see Robot).
  */
@@ -32,6 +36,7 @@ public class Launcher implements Subsystem {
     private double targetVelocity = 0;
     private double flywheelVelocity = 0;
     private double turretTargetAngle = 0;
+    private double turretTargetRate = 0; // rad/s the target is moving at, for the feedforward
     private double turretAngle = 0;
     private double turretAngleOffset = 0;
 
@@ -43,6 +48,9 @@ public class Launcher implements Subsystem {
     private double turretIntegral = 0;
     private double lastTurretError = 0;
     private double lastTurretAngle = 0;
+    private double turretVelocity = 0; // rad/s, measured
+
+    private Shot lastShot = null; // for telemetry
 
     public Launcher(HardwareMap hardwareMap) {
         flywheel = hardwareMap.get(DcMotorEx.class, FLYWHEEL_MOTOR_NAME);
@@ -63,12 +71,14 @@ public class Launcher implements Subsystem {
     // ---- Flywheel commands ----
 
     /**
-     * Keep the flywheel at the speed the velocity table gives for the current distance to the target, plus the
-     * operator's nudge. Runs until {@link #idle()}.
+     * Keep the flywheel at the speed the velocity table gives for the distance to the target (led for the robot's
+     * motion), plus the operator's nudge. Runs until {@link #idle()}.
      */
-    public Command enableFlywheel(Supplier<Pose> robotPose, Supplier<Pose> target) {
-        return infinite(() -> targetVelocity = velocityFor(distanceTo(robotPose.get(), target.get())) + velocityNudge)
-                .requiring(flywheel);
+    public Command enableFlywheel(Supplier<Pose> robotPose, Supplier<Velocity> robotVelocity, Supplier<Pose> target) {
+        return infinite(() -> {
+            Shot shot = solve(robotPose.get(), robotVelocity.get(), target.get());
+            targetVelocity = velocityFor(shot.distance) + velocityNudge;
+        }).requiring(flywheel);
     }
 
     /** Spin the flywheel at the fixed TARGET_VELOCITY. Used by the Flywheel Tuner. */
@@ -94,19 +104,24 @@ public class Launcher implements Subsystem {
     /** Turn to a robot-relative angle (radians, 0 = forward, CCW positive). Finishes once on target. */
     public Command turnTurretTo(double angle) {
         return Command.build()
-                .setStart(() -> setTurretTarget(angle))
+                .setStart(() -> setTurretTarget(angle, 0))
                 .setDone(this::isTurretOnTarget)
                 .requiring(turret);
     }
 
-    /** Keep the turret pointed at a field position (which may move), plus the operator's nudge. Runs until interrupted. */
-    public Command aimAt(Supplier<Pose> robotPose, Supplier<Pose> target) {
+    /**
+     * Keep the turret pointed at a field position (which may move), led for the robot's motion, plus the operator's
+     * nudge. Runs until interrupted.
+     */
+    public Command aimAt(Supplier<Pose> robotPose, Supplier<Velocity> robotVelocity, Supplier<Pose> target) {
         return infinite(() -> {
-            Pose pose = robotPose.get();
-            Pose pivot = turretPivot(pose);
-            Pose goal = target.get();
-            double fieldAngle = Math.atan2(goal.y() - pivot.y(), goal.x() - pivot.x());
-            setTurretTarget(fieldAngle - pose.heading() + turretNudge);
+            Shot shot = solve(robotPose.get(), robotVelocity.get(), target.get());
+            lastShot = shot;
+            setTurretTarget(shot.turretAngle + turretNudge, shot.turretRate);
+        }).setEnd(end -> {
+            // Hold the last angle; a leftover feedforward would drag the turret off it
+            turretTargetRate = 0;
+            lastShot = null;
         }).requiring(turret);
     }
 
@@ -117,13 +132,91 @@ public class Launcher implements Subsystem {
 
     // ---- Aiming math ----
 
+    /** Where to aim so a ball launched now reaches the target. Built by {@link #solve}. */
+    public static class Shot {
+        /** Field position to aim at: the target, moved back against the ball's inherited velocity. */
+        public final Pose aimPoint;
+        /** Inches from the turret pivot to the aim point. Use this for the flywheel speed. */
+        public final double distance;
+        /** Seconds from launch to the target, from TIME_OF_FLIGHT_TABLE. */
+        public final double timeOfFlight;
+        /** Robot-relative turret angle (radians) that points at the aim point. */
+        public final double turretAngle;
+        /** How fast turretAngle is changing (radians/sec) as the robot moves, for the turret feedforward. */
+        public final double turretRate;
+        /** Inches between the aim point and the real target. */
+        public final double lead;
+
+        Shot(Pose aimPoint, double distance, double timeOfFlight, double turretAngle, double turretRate, double lead) {
+            this.aimPoint = aimPoint;
+            this.distance = distance;
+            this.timeOfFlight = timeOfFlight;
+            this.turretAngle = turretAngle;
+            this.turretRate = turretRate;
+            this.lead = lead;
+        }
+    }
+
+    /**
+     * Aim at a target from a moving robot.
+     * 1. Predict the pose AIM_LOOKAHEAD seconds ahead, so the turret isn't aiming from where the robot was.
+     * 2. The ball leaves with the turret pivot's velocity (the robot's velocity, plus the spin swinging an off-center
+     *    pivot around). Over its time of flight that carries it velocity × time past wherever it was aimed, so aim
+     *    that far short of the target. The time of flight depends on the distance to the aim point, so iterate.
+     * 3. Differentiate the angle to the aim point to get how fast the turret has to turn to stay on it.
+     *
+     * @param robotVelocity field-relative (inches/sec and radians/sec), as {@code Follower.velocity()} gives it
+     */
+    public static Shot solve(Pose robotPose, Velocity robotVelocity, Pose target) {
+        double vx = robotVelocity.vx;
+        double vy = robotVelocity.vy;
+        double omega = robotVelocity.omega;
+
+        Pose pose = new Pose(
+                robotPose.x() + vx * AIM_LOOKAHEAD,
+                robotPose.y() + vy * AIM_LOOKAHEAD,
+                robotPose.heading() + omega * AIM_LOOKAHEAD);
+        Pose pivot = turretPivot(pose);
+
+        // Pivot velocity = robot velocity + omega × (pivot - robot center)
+        double pivotVx = vx - omega * (pivot.y() - pose.y());
+        double pivotVy = vy + omega * (pivot.x() - pose.x());
+
+        double aimX = target.x();
+        double aimY = target.y();
+        double timeOfFlight = 0;
+        if (SHOOT_ON_THE_MOVE) {
+            // Converges in a few passes: time of flight changes slowly with distance
+            for (int i = 0; i < 3; i++) {
+                timeOfFlight = interpolate(TIME_OF_FLIGHT_TABLE, Math.hypot(aimX - pivot.x(), aimY - pivot.y()));
+                aimX = target.x() - pivotVx * timeOfFlight;
+                aimY = target.y() - pivotVy * timeOfFlight;
+            }
+        }
+
+        double dx = aimX - pivot.x();
+        double dy = aimY - pivot.y();
+        double distanceSquared = Math.max(dx * dx + dy * dy, 1); // no blow-up when right on top of the target
+        double fieldAngle = Math.atan2(dy, dx);
+        // d/dt atan2(dy, dx) with the aim point still and the pivot moving; the robot's own turn takes the turret with it
+        double fieldRate = (dy * pivotVx - dx * pivotVy) / distanceSquared;
+
+        return new Shot(
+                new Pose(aimX, aimY, 0),
+                Math.sqrt(distanceSquared),
+                timeOfFlight,
+                Angle.normalizeSigned(fieldAngle - pose.heading()),
+                fieldRate - omega,
+                Math.hypot(aimX - target.x(), aimY - target.y()));
+    }
+
     /** Inches from the turret pivot to a field position. */
     public double distanceTo(Pose robotPose, Pose target) {
         Pose pivot = turretPivot(robotPose);
         return Math.hypot(target.x() - pivot.x(), target.y() - pivot.y());
     }
 
-    private Pose turretPivot(Pose robotPose) {
+    private static Pose turretPivot(Pose robotPose) {
         double cos = Math.cos(robotPose.heading());
         double sin = Math.sin(robotPose.heading());
         return new Pose(
@@ -132,13 +225,16 @@ public class Launcher implements Subsystem {
                 robotPose.heading());
     }
 
-    /** Linear interpolation over VELOCITY_TABLE, held at the end rows. */
     static double velocityFor(double distance) {
-        double[][] table = VELOCITY_TABLE;
-        if (distance <= table[0][0]) return table[0][1];
+        return interpolate(VELOCITY_TABLE, distance);
+    }
+
+    /** Linear interpolation over rows of {x, y} sorted by x, held at the end rows. */
+    static double interpolate(double[][] table, double x) {
+        if (x <= table[0][0]) return table[0][1];
         for (int i = 1; i < table.length; i++) {
-            if (distance <= table[i][0]) {
-                double t = (distance - table[i - 1][0]) / (table[i][0] - table[i - 1][0]);
+            if (x <= table[i][0]) {
+                double t = (x - table[i - 1][0]) / (table[i][0] - table[i - 1][0]);
                 return table[i - 1][1] + t * (table[i][1] - table[i - 1][1]);
             }
         }
@@ -203,9 +299,15 @@ public class Launcher implements Subsystem {
         lastTurretAngle = angle;
     }
 
-    /** Clamped to [TURRET_MIN_ANGLE, TURRET_MAX_ANGLE], so targets past the limits need the drivetrain to turn. */
-    private void setTurretTarget(double angle) {
-        turretTargetAngle = Range.clip(Angle.normalizeSigned(angle), TURRET_MIN_ANGLE, TURRET_MAX_ANGLE);
+    /**
+     * Clamped to [TURRET_MIN_ANGLE, TURRET_MAX_ANGLE], so targets past the limits need the drivetrain to turn.
+     * @param rate how fast the target is moving (radians/sec), for the feedforward
+     */
+    private void setTurretTarget(double angle, double rate) {
+        double normalized = Angle.normalizeSigned(angle);
+        turretTargetAngle = Range.clip(normalized, TURRET_MIN_ANGLE, TURRET_MAX_ANGLE);
+        // Parked on a soft limit: don't push into it
+        turretTargetRate = turretTargetAngle == normalized ? rate : 0;
     }
 
     @Override
@@ -235,12 +337,14 @@ public class Launcher implements Subsystem {
         // Anti-windup: dump the integral when the error crosses zero
         if (Math.signum(error) != Math.signum(lastTurretError)) turretIntegral = 0;
         turretIntegral += error * dt;
-        // Derivative on measurement, so a new target doesn't kick the output
-        double velocity = (turretAngle - lastTurretAngle) / dt;
+        // Derivative of the error from the measured speed and the target's known rate (not by differencing the
+        // error), so a new target doesn't kick the output
+        turretVelocity = (turretAngle - lastTurretAngle) / dt;
         lastTurretError = error;
         lastTurretAngle = turretAngle;
 
-        double power = TURRET_KP * error + TURRET_KI * turretIntegral - TURRET_KD * velocity;
+        double power = TURRET_KP * error + TURRET_KI * turretIntegral + TURRET_KD * (turretTargetRate - turretVelocity)
+                + TURRET_KV * turretTargetRate;
         turret.setPower(Range.clip(power, -TURRET_MAX_POWER, TURRET_MAX_POWER));
     }
 
@@ -257,6 +361,11 @@ public class Launcher implements Subsystem {
         telemetry.addData("Flywheel target / actual", "%.0f / %.0f", targetVelocity, flywheelVelocity);
         telemetry.addData("Turret target / actual (deg)", "%.1f / %.1f",
                 Math.toDegrees(turretTargetAngle), Math.toDegrees(getTurretAngle()));
+        telemetry.addData("Turret rate target / actual (deg/s)", "%.0f / %.0f",
+                Math.toDegrees(turretTargetRate), Math.toDegrees(turretVelocity));
         telemetry.addData("Turret power", "%.2f", turret.getPower());
+        if (lastShot != null) {
+            telemetry.addData("Shot lead / flight", "%.1f in / %.2f s", lastShot.lead, lastShot.timeOfFlight);
+        }
     }
 }

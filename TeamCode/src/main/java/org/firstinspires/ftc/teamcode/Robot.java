@@ -63,14 +63,14 @@ public class Robot {
         return parallel(instant(() -> MatchState.hive = MatchState.hive.flipped()), led.flash());
     }
 
-    /** Keep the turret on the hive's up cell. Runs until interrupted. */
+    /** Keep the turret on the hive's up cell, leading it while the robot moves. Runs until interrupted. */
     public Command aimAtHive() {
-        return launcher.aimAt(drivebase::getPose, this::hiveTarget);
+        return launcher.aimAt(drivebase::getPose, drivebase::getVelocity, this::hiveTarget);
     }
 
-    /** Flywheel speed follows the distance to the hive's up cell. Runs until launcher.idle(). */
+    /** Flywheel speed follows the distance to the hive's up cell (led while moving). Runs until launcher.idle(). */
     public Command enableFlywheel() {
-        return launcher.enableFlywheel(drivebase::getPose, this::hiveTarget);
+        return launcher.enableFlywheel(drivebase::getPose, drivebase::getVelocity, this::hiveTarget);
     }
 
     // ---- Shooting ----

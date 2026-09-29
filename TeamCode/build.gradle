@@ -38,6 +38,36 @@ android {
     }
 }
 
+// Redraw doc/controls/<opmode>.png (the gamepad diagrams) from the OpMode source on every build.
+// Runs tools/ControlLayout.java on the JDK Gradle itself uses. A problem there only prints a warning,
+// so it can never stop a deploy.
+def controlLayoutSource = rootProject.file('tools/ControlLayout.java')
+def controlLayoutJava = new File(System.getProperty('java.home'), 'bin/java').absolutePath
+def controlLayoutRoot = rootProject.projectDir
+tasks.register('controlLayout') {
+    group = 'documentation'
+    description = 'Redraws doc/controls/<opmode>.png from the gamepad bindings in TeamCode.'
+    inputs.dir('src/main/java')
+    inputs.files(controlLayoutSource, rootProject.file('tools/control-labels.json'))
+    outputs.dir(rootProject.file('doc/controls'))
+    doLast {
+        try {
+            def proc = new ProcessBuilder(controlLayoutJava, '-Djava.awt.headless=true',
+                    controlLayoutSource.absolutePath, '--quiet')
+                    .directory(controlLayoutRoot).redirectErrorStream(true).start()
+            def output = proc.inputStream.text.trim()
+            if (proc.waitFor() == 0) {
+                if (output) println output
+            } else {
+                logger.warn("Couldn't draw the control diagrams (tools/ControlLayout.java):\n${output}")
+            }
+        } catch (IOException e) {
+            logger.warn("Couldn't draw the control diagrams (tools/ControlLayout.java): ${e.message}")
+        }
+    }
+}
+tasks.named('preBuild') { dependsOn 'controlLayout' }
+
 dependencies {
     implementation project(':FtcRobotController')
 

@@ -7,6 +7,7 @@ import com.pedropathing.follower.ManualDrive;
 import com.pedropathing.ivy.Command;
 import com.pedropathing.ivy.behaviors.InterruptedBehavior;
 import com.pedropathing.math.Pose;
+import com.pedropathing.math.Velocity;
 import com.qualcomm.robotcore.hardware.HardwareMap;
 
 import org.firstinspires.ftc.robotcore.external.Telemetry;
@@ -37,6 +38,11 @@ public class Drivetrain implements Subsystem {
 
     public void setPose(Pose pose) {
         follower.setPose(pose);
+    }
+
+    /** Field-relative velocity: inches/sec in x and y, radians/sec CCW. */
+    public Velocity getVelocity() {
+        return follower.velocity();
     }
 
     // ---- Commands ----

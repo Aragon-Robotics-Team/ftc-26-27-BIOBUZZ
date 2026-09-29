@@ -1,0 +1,1217 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>PID Practice Bench</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;700&display=swap">
+<style>
+/*
+  Styled and laid out after FTC Dashboard (acmerobotics), default layout:
+  blue header bar, then three full-height columns of views.
+    left:   Op Mode (test, actions, how to tune) over Replay (where Dashboard has Camera)
+    middle: Graph
+    right:  Configuration (typed gains) over Telemetry (readings)
+*/
+:root {
+  color-scheme: light;
+  --primary-600: #2563eb;
+  --primary-500: #3b82f6;
+  --primary-300: #93c5fd;
+  --primary-100: #dbeafe;
+  --page: #e5e7eb;          /* shows between views as the dividing lines */
+  --view: #ffffff;
+  --text: #000000;
+  --dim: #6b7280;
+  --line: #e5e7eb;
+  --outline: #9ca3af;
+  --input-bg: #f3f4f6;
+  --input-border: #e5e7eb;
+  --select-bg: #e5e7eb;
+  --select-border: #d1d5db;
+  --target: #111827;
+  --trace: #2563eb;
+  --band: rgba(37, 99, 235, 0.12);
+  --power: #d97706;
+  --good: #16a34a;
+  --bad: #dc2626;
+  --init-bg: #bfdbfe; --init-border: #93c5fd;
+  --start-bg: #dcfce7; --start-border: #bbf7d0;
+  --stop-bg: #fee2e2; --stop-border: #fecaca;
+  --font: "Roboto", -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
+  --mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    color-scheme: dark;
+    --page: #1e293b; --view: #0f172a; --text: #ffffff; --dim: #94a3b8; --line: #1e293b; --outline: #475569;
+    --input-bg: #334155; --input-border: rgba(100, 116, 139, 0.8); --select-bg: #334155; --select-border: rgba(100, 116, 139, 0.8);
+    --target: #f8fafc; --trace: #60a5fa; --band: rgba(96, 165, 250, 0.16); --power: #fbbf24; --good: #4ade80; --bad: #f87171;
+    --init-bg: #2563eb; --init-border: transparent; --start-bg: #22c55e; --start-border: transparent; --stop-bg: #ef4444; --stop-border: transparent;
+  }
+}
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --page: #1e293b; --view: #0f172a; --text: #ffffff; --dim: #94a3b8; --line: #1e293b; --outline: #475569;
+  --input-bg: #334155; --input-border: rgba(100, 116, 139, 0.8); --select-bg: #334155; --select-border: rgba(100, 116, 139, 0.8);
+  --target: #f8fafc; --trace: #60a5fa; --band: rgba(96, 165, 250, 0.16); --power: #fbbf24; --good: #4ade80; --bad: #f87171;
+  --init-bg: #2563eb; --init-border: transparent; --start-bg: #22c55e; --start-border: transparent; --stop-bg: #ef4444; --stop-border: transparent;
+}
+
+*, *::before, *::after { box-sizing: border-box; }
+[hidden] { display: none !important; }
+html, body { height: 100%; margin: 0; }
+body {
+  display: flex; flex-direction: column;
+  background: var(--page); color: var(--text);
+  font: 400 16px/1.5 var(--font);
+}
+button, input, select { font: inherit; color: inherit; margin: 0; }
+svg.icon { width: 24px; height: 24px; fill: currentColor; display: block; }
+
+/* ---- Header bar ---- */
+.topbar {
+  display: flex; align-items: center; justify-content: space-between; gap: 12px;
+  background: var(--primary-600); color: #fff; padding: 4px 12px;
+}
+.topbar h1 { margin: 0; font-size: 1.5rem; line-height: 2rem; font-weight: 500; }
+.topbar-right { display: flex; align-items: center; gap: 4px; }
+.preset {
+  margin: 0 8px; border: 1px solid var(--primary-300); border-radius: 4px; background-color: var(--primary-100);
+  color: #000; font-size: 0.875rem; padding: 4px 28px 4px 10px; appearance: none; -webkit-appearance: none; cursor: pointer;
+  background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 20 20'%3e%3cpath stroke='%236b7280' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.5' d='M6 8l4 4 4-4'/%3e%3c/svg%3e");
+  background-position: right 6px center; background-repeat: no-repeat; background-size: 18px;
+}
+.icon-btn {
+  display: flex; align-items: center; justify-content: center; width: 32px; height: 32px; padding: 0;
+  border: 1px solid transparent; border-radius: 6px; background: transparent; cursor: pointer;
+  transition: border-color 0.15s, background-color 0.15s;
+}
+.icon-btn:hover { border-color: var(--outline); }
+.topbar .icon-btn:hover { border-color: rgba(255, 255, 255, 0.5); }
+.icon-btn:focus-visible, button:focus-visible, input:focus-visible, select:focus-visible, summary:focus-visible {
+  outline: 2px solid var(--primary-500); outline-offset: 1px;
+}
+
+/* ---- Views ---- */
+.layout { flex: 1; min-height: 0; display: grid; grid-template-columns: 3fr 4fr 3fr; gap: 1px; }
+.col { display: flex; flex-direction: column; gap: 1px; min-height: 0; min-width: 0; }
+.view { background: var(--view); display: flex; flex-direction: column; min-height: 0; overflow: hidden; }
+.view-head { display: flex; align-items: center; }
+.view-head h2 { flex: 1; margin: 0; padding: 8px 16px; font-size: 1.25rem; line-height: 1.75rem; font-weight: 500; }
+.view-icons { display: flex; align-items: center; gap: 4px; margin-right: 12px; }
+.view-body { flex: 1; min-height: 0; overflow: auto; padding: 0 16px 12px; }
+
+/* Op Mode */
+.opmode-row { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 0; }
+.opmode-select {
+  margin: 4px 8px 4px 4px; border: 1px solid var(--select-border); border-radius: 4px; background-color: var(--select-bg);
+  padding: 4px 28px 4px 8px; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -2px rgba(0, 0, 0, 0.1);
+  appearance: none; -webkit-appearance: none; cursor: pointer;
+  background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 20 20'%3e%3cpath stroke='%236b7280' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.5' d='M6 8l4 4 4-4'/%3e%3c/svg%3e");
+  background-position: right 4px center; background-repeat: no-repeat; background-size: 18px;
+}
+.op-btn {
+  margin-left: 8px; border-radius: 6px; border: 1px solid; padding: 4px 12px; cursor: pointer;
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -2px rgba(0, 0, 0, 0.1); transition: filter 0.15s;
+}
+.op-btn:hover { filter: brightness(0.96); }
+.op-btn.init { background: var(--init-bg); border-color: var(--init-border); }
+.op-btn.start { background: var(--start-bg); border-color: var(--start-border); }
+.op-btn.stop { background: var(--stop-bg); border-color: var(--stop-border); }
+.status-line { margin: 16px 0 0 4px; font-weight: 500; }
+.status-line.pass { color: var(--good); }
+.status-line.fail { color: var(--bad); }
+.link { background: none; border: 0; padding: 0; color: var(--trace); text-decoration: underline; cursor: pointer; }
+.guide { margin-top: 16px; padding-top: 12px; border-top: 1px solid var(--line); }
+.guide h3 { margin: 0 0 6px; font-size: 1rem; font-weight: 500; }
+.guide ol { margin: 0; padding-left: 20px; font-size: 0.875rem; line-height: 1.45; display: grid; gap: 4px; }
+.guide p { margin: 8px 0 0; font-size: 0.8rem; color: var(--dim); }
+
+/* Graph */
+.graph-body { display: flex; flex-direction: column; gap: 6px; }
+#chart { flex: 1; min-height: 240px; width: 100%; display: block; }
+.legend { display: flex; flex-wrap: wrap; gap: 4px 16px; font-size: 0.8rem; color: var(--dim); }
+.legend span { display: inline-flex; align-items: center; gap: 6px; }
+.swatch { width: 18px; height: 0; border-top: 2px solid; display: inline-block; }
+
+/* Replay (Dashboard's Camera slot) */
+.replay-body { display: flex; flex-direction: column; align-items: center; }
+#mech { flex: 1; min-height: 160px; width: 100%; display: block; }
+.replay-time { font-size: 0.8rem; color: var(--dim); align-self: flex-start; }
+
+/* Configuration: typed values, grouped like Dashboard's config classes */
+details.group { margin-bottom: 6px; }
+details.group summary {
+  list-style: none; display: flex; align-items: center; gap: 2px; cursor: pointer; font-weight: 500; padding: 2px 0;
+  user-select: none;
+}
+details.group summary::-webkit-details-marker { display: none; }
+details.group summary svg { width: 22px; height: 22px; fill: currentColor; transition: transform 0.15s; transform: rotate(-90deg); }
+details.group[open] summary svg { transform: none; }
+.config { border-collapse: collapse; margin-left: 24px; width: calc(100% - 24px); max-width: 26rem; table-layout: fixed; }
+.config td { padding: 3px 0; vertical-align: middle; }
+.config td:first-child { width: 58%; padding-right: 12px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.config label { cursor: pointer; }
+.config small { color: var(--dim); font-size: 0.75rem; margin-left: 6px; }
+.config input[type="text"] {
+  width: 100%; border: 1px solid var(--input-border); border-radius: 4px; background: var(--input-bg);
+  padding: 4px 12px; transition: border-color 0.15s;
+}
+.config input[type="text"]:focus { border-color: var(--primary-500); outline: 1px solid var(--primary-500); }
+.config input[type="text"].invalid { border-color: var(--bad); outline-color: var(--bad); }
+.config input[type="checkbox"] { width: 16px; height: 16px; accent-color: var(--primary-600); cursor: pointer; }
+.config-actions { display: flex; gap: 8px; margin: 4px 0 0 24px; }
+.config-note { margin: 4px 0 0 24px; font-size: 0.8rem; color: var(--dim); max-width: 40ch; }
+.small-btn { border: 1px solid var(--select-border); border-radius: 6px; background: var(--select-bg); padding: 2px 10px; font-size: 0.85rem; cursor: pointer; }
+
+/* Telemetry: key: value lines */
+.telemetry { margin: 0 0 10px; }
+.telemetry .pass { color: var(--good); }
+.telemetry .fail { color: var(--bad); }
+.telemetry .dim { color: var(--dim); }
+.log { margin: 0 0 10px; }
+pre.code { margin: 0; font: 0.8rem/1.5 var(--mono); white-space: pre; overflow-x: auto; }
+
+/* Narrow screens: stack the columns and let the page scroll */
+@media (max-width: 1000px) {
+  html, body { height: auto; }
+  .layout { grid-template-columns: minmax(0, 1fr); }
+  .view { overflow: visible; }
+  .view-body { overflow: visible; }
+  #chart { height: 360px; flex: none; }
+  #mech { height: 260px; flex: none; }
+}
+@media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
+</style>
+</head>
+<body>
+<header class="topbar">
+  <h1>PID Practice Bench</h1>
+  <div class="topbar-right">
+    <select class="preset" id="mechanism" aria-label="Mechanism"></select>
+    <button class="icon-btn" id="theme" type="button" title="Switch light / dark" aria-label="Switch light / dark">
+      <svg class="icon" viewBox="0 0 48 48" id="themeIcon"><path d=""/></svg>
+    </button>
+  </div>
+</header>
+
+<div class="layout">
+  <div class="col">
+    <section class="view" style="flex: 1.3" aria-label="Op Mode">
+      <div class="view-head"><h2>Op Mode</h2></div>
+      <div class="view-body">
+        <div class="opmode-row">
+          <select class="opmode-select" id="scenario" aria-label="Test"></select>
+          <button class="op-btn init" id="autotune" type="button">Auto-tune</button>
+          <button class="op-btn start" id="replay" type="button">Replay</button>
+          <button class="op-btn stop" id="reset" type="button">Reset</button>
+        </div>
+        <p class="status-line" id="status"></p>
+        <div class="guide">
+          <h3 id="guideTitle"></h3>
+          <ol id="guideSteps"></ol>
+        </div>
+      </div>
+    </section>
+    <section class="view" style="flex: 1" aria-label="Replay">
+      <div class="view-head">
+        <h2>Replay</h2>
+        <div class="view-icons">
+          <button class="icon-btn" id="playPause" type="button" title="Pause" aria-label="Pause">
+            <svg class="icon" viewBox="0 0 24 24" id="playIcon"><path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z"/></svg>
+          </button>
+        </div>
+      </div>
+      <div class="view-body replay-body">
+        <canvas id="mech" role="img" aria-label="The mechanism moving through the run"></canvas>
+        <span class="replay-time" id="replayTime">0.00 s</span>
+      </div>
+    </section>
+  </div>
+
+  <div class="col">
+    <section class="view" style="flex: 1" aria-label="Graph">
+      <div class="view-head"><h2>Graph</h2></div>
+      <div class="view-body graph-body">
+        <canvas id="chart" role="img" aria-label="Target, measured value and motor power over time"></canvas>
+        <div class="legend">
+          <span><i class="swatch" style="border-top-style:dashed;border-color:var(--target)"></i>Target</span>
+          <span><i class="swatch" style="border-color:var(--trace)"></i>Measured</span>
+          <span><i class="swatch" style="border-top-width:9px;border-color:var(--band)"></i>Close enough</span>
+          <span><i class="swatch" style="border-color:var(--power)"></i>Motor power</span>
+        </div>
+      </div>
+    </section>
+  </div>
+
+  <div class="col">
+    <section class="view" style="flex: 1.35" aria-label="Configuration">
+      <div class="view-head">
+        <h2>Configuration</h2>
+        <div class="view-icons">
+          <button class="icon-btn" id="copy" type="button" title="Copy gains as code" aria-label="Copy gains as code">
+            <svg class="icon" viewBox="0 -960 960 960"><path d="M360-240q-33 0-56.5-23.5T280-320v-480q0-33 23.5-56.5T360-880h360q33 0 56.5 23.5T800-800v480q0 33-23.5 56.5T720-240H360Zm0-80h360v-480H360v480ZM200-80q-33 0-56.5-23.5T120-160v-560h80v560h440v80H200Zm160-240v-480 480Z"/></svg>
+          </button>
+          <button class="icon-btn" id="resetIcon" type="button" title="Reset gains" aria-label="Reset gains">
+            <svg class="icon" viewBox="0 0 24 24"><path d="M17.65 6.35C16.2 4.9 14.21 4 12 4c-4.42 0-7.99 3.58-7.99 8s3.57 8 7.99 8c3.73 0 6.84-2.55 7.73-6h-2.08c-.82 2.33-3.04 4-5.65 4-3.31 0-6-2.69-6-6s2.69-6 6-6c1.66 0 3.14.69 4.22 1.78L13 11h7V4l-2.35 2.35z"/></svg>
+          </button>
+        </div>
+      </div>
+      <div class="view-body">
+        <details class="group" open>
+          <summary><svg viewBox="0 0 24 24"><path d="M16.59 8.59L12 13.17 7.41 8.59 6 10l6 6 6-6z"/></svg><span id="gainsTitle">Turret</span></summary>
+          <table class="config"><tbody id="gains"></tbody></table>
+        </details>
+        <details class="group" open>
+          <summary><svg viewBox="0 0 24 24"><path d="M16.59 8.59L12 13.17 7.41 8.59 6 10l6 6 6-6z"/></svg>Robot</summary>
+          <table class="config"><tbody>
+            <tr><td><label for="loopMs">loopMs</label></td><td><input type="text" id="loopMs" size="15"></td></tr>
+            <tr><td><label for="voltage">batteryVolts</label></td><td><input type="text" id="voltage" size="15"></td></tr>
+            <tr><td><label for="noise">sensorNoise</label></td><td><input type="checkbox" id="noise" checked></td></tr>
+            <tr><td><label for="friction">friction</label></td><td><input type="checkbox" id="friction" checked></td></tr>
+            <tr><td><label for="mystery">mysteryRobot</label></td><td><input type="checkbox" id="mystery"></td></tr>
+          </tbody></table>
+          <div class="config-actions" id="mysteryRow" hidden>
+            <button class="small-btn" id="reroll" type="button">New robot</button>
+            <button class="small-btn" id="reveal" type="button">Reveal</button>
+          </div>
+          <p class="config-note" id="mysteryNote" hidden></p>
+        </details>
+      </div>
+    </section>
+    <section class="view" style="flex: 1" aria-label="Telemetry">
+      <div class="view-head"><h2>Telemetry</h2></div>
+      <div class="view-body">
+        <p class="telemetry" id="telemetry"></p>
+        <p class="log" id="log"></p>
+        <pre class="code" id="code"></pre>
+      </div>
+    </section>
+  </div>
+</div>
+
+<script>
+// SIM-CORE-START
+// Physics: a DC motor through a gearbox driving an inertia, stepped at 0.5 ms.
+//   J * dω/dt = stallTorque * (u * V/12 - ω / freeSpeed) - friction - gravity
+// The controller runs every loopMs (like one OpMode loop) and holds its output in between.
+const TAU = 2 * Math.PI;
+const DEG = Math.PI / 180;
+
+const PLANTS = {
+  turret: {
+    name: 'Turret',
+    kind: 'position',
+    unit: '°',
+    blurb: 'goBILDA 1150 RPM motor, 30T:100T. Same PID as Launcher: power per radian, derivative on measurement, integral reset when the error changes sign.',
+    physics: { J: 0.02, stallTorque: 2.58, freeSpeed: 36.1, friction: 0.04, mass: 0, armLength: 0, ticksPerRad: 145.1 * (100 / 30) / TAU },
+    gains: {
+      kP: { label: 'kP', unit: 'power / rad', min: 0.01, max: 20, def: 0.4 },
+      kI: { label: 'kI', unit: 'power / rad·s', min: 0.001, max: 20, def: 0 },
+      kD: { label: 'kD', unit: 'power / (rad/s)', min: 0.001, max: 2, def: 0 },
+      maxPower: { label: 'Max power', unit: '', min: 0.1, max: 1, def: 0.8, linear: true },
+    },
+    band: 1 * DEG,
+    scenarios: {
+      step: { label: 'Step to 45°', duration: 2, type: 'step', start: 0, target: 45 * DEG, at: 0.1 },
+      track: { label: 'Track while the robot turns', duration: 2.2, type: 'track', start: 0, at: 0.2, rate: -90 * DEG, until: 1.0 },
+    },
+    challenge: { scenario: 'step', settle: 0.4, overshoot: 0.05, sse: 0.5 * DEG },
+    display: v => v / DEG,
+    code: g => [
+      `public static double TURRET_KP = ${g.kP.toFixed(4)};`,
+      `public static double TURRET_KI = ${g.kI.toFixed(4)};`,
+      `public static double TURRET_KD = ${g.kD.toFixed(4)};`,
+      `public static double TURRET_MAX_POWER = ${g.maxPower.toFixed(2)};`,
+    ],
+  },
+  flywheel: {
+    name: 'Flywheel',
+    kind: 'velocity',
+    unit: 'ticks/s',
+    blurb: 'goBILDA 6000 RPM motor (28 ticks/rev) spinning the flywheel and counter-rollers. Feedforward kF × target does most of the work; P cleans up the rest.',
+    physics: { J: 2.2e-4, stallTorque: 0.144, freeSpeed: 628.3, friction: 0.01, mass: 0, armLength: 0, ticksPerRad: 28 / TAU },
+    gains: {
+      kF: { label: 'kF', unit: 'power / (tick/s)', min: 0.00001, max: 0.002, def: 0 },
+      kP: { label: 'kP', unit: 'power / (tick/s)', min: 0.00001, max: 0.05, def: 0.002 },
+      kI: { label: 'kI', unit: 'power / tick', min: 0.000001, max: 0.05, def: 0 },
+      kD: { label: 'kD', unit: 'power / (tick/s²)', min: 0.0000001, max: 0.001, def: 0 },
+    },
+    band: 50,
+    scenarios: {
+      step: { label: 'Spin up to 2000', duration: 3, type: 'step', start: 0, target: 2000, at: 0.1 },
+      shots: { label: 'Recover from 3 shots', duration: 3, type: 'shots', start: 2000, target: 2000, shots: [0.8, 1.4, 2.0], drop: 0.12 },
+    },
+    challenge: { scenario: 'shots', recover: 0.25, sse: 25 },
+    display: v => v,
+    code: g => [
+      `// Power units. The Control Hub's own velocity PIDF uses its own scale:`,
+      `// its F is 32767 × kF = ${(32767 * g.kF).toFixed(2)}; tune its P on the robot.`,
+      `kF = ${g.kF.toExponential(3)}, kP = ${g.kP.toExponential(3)}, kI = ${g.kI.toExponential(3)}, kD = ${g.kD.toExponential(3)}`,
+    ],
+  },
+  arm: {
+    name: 'Arm',
+    kind: 'position',
+    unit: '°',
+    blurb: 'A 1 kg arm, 30 cm long, on a 312 RPM motor with 5:1 gearing. Gravity pulls hardest when it is level, so kG × cos(angle) holds it up and the PID only has to move it.',
+    physics: { J: 0.1, stallTorque: 11.9, freeSpeed: 6.53, friction: 0.02, mass: 1.0, armLength: 0.3, ticksPerRad: 537.7 * 5 / TAU },
+    gains: {
+      kG: { label: 'kG', unit: 'power at level', min: 0.001, max: 1, def: 0 },
+      kP: { label: 'kP', unit: 'power / rad', min: 0.01, max: 20, def: 1 },
+      kI: { label: 'kI', unit: 'power / rad·s', min: 0.001, max: 20, def: 0 },
+      kD: { label: 'kD', unit: 'power / (rad/s)', min: 0.001, max: 2, def: 0 },
+    },
+    band: 2 * DEG,
+    scenarios: {
+      step: { label: 'Raise from −45° to 45°', duration: 2.5, type: 'step', start: -45 * DEG, target: 45 * DEG, at: 0.1 },
+      load: { label: 'Pick up a 0.6 kg game piece', duration: 2.5, type: 'load', start: 45 * DEG, target: 45 * DEG, at: 0.8, extraMass: 0.6 },
+    },
+    challenge: { scenario: 'step', settle: 0.6, overshoot: 0.05, sse: 1 * DEG },
+    display: v => v / DEG,
+    code: g => [
+      `kG = ${g.kG.toFixed(4)}  // power to hold the arm level`,
+      `kP = ${g.kP.toFixed(4)}, kI = ${g.kI.toFixed(4)}, kD = ${g.kD.toFixed(4)}`,
+    ],
+  },
+};
+
+const DEFAULT_REALISM = { loopMs: 15, voltage: 12.5, noise: true, friction: true };
+
+// Small seeded random, so a run with noise looks the same every time the sliders move
+function rng(seed) {
+  let s = seed >>> 0;
+  return () => {
+    s = (s + 0x6D2B79F5) >>> 0;
+    let t = s;
+    t = Math.imul(t ^ (t >>> 15), t | 1);
+    t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+}
+
+function setpointAt(sc, t) {
+  switch (sc.type) {
+    case 'step': return t < sc.at ? sc.start : sc.target;
+    case 'track': return t < sc.at ? sc.start : sc.start + sc.rate * (Math.min(t, sc.until) - sc.at);
+    default: return sc.target;
+  }
+}
+
+/**
+ * Run one scenario. controller(meas, sp, dt, state) returns motor power, or pass gains to use the
+ * standard controller. Returns samples every 5 ms: { t, sp, meas, u } in plant units (rad or ticks/s).
+ */
+function simulate(plantKey, scenarioKey, gains, realism, physicsOverride, controller) {
+  const plant = PLANTS[plantKey];
+  const sc = plant.scenarios[scenarioKey];
+  const ph = Object.assign({}, plant.physics, physicsOverride || {});
+  const rz = Object.assign({}, DEFAULT_REALISM, realism || {});
+  const rand = rng(1234);
+  const dtPhys = 0.0005;
+  const dtCtrl = Math.max(rz.loopMs, 1) / 1000;
+  const vScale = rz.voltage / 12;
+  const g = 9.81;
+  const isVel = plant.kind === 'velocity';
+
+  // State: pos (rad at the output), vel (rad/s at the output)
+  let pos = isVel ? 0 : sc.start;
+  let vel = isVel ? sc.start / ph.ticksPerRad : 0;
+  let u = 0, nextCtrl = 0, sampleT = 0;
+  let mass = ph.mass;
+  const shotsLeft = sc.shots ? sc.shots.slice() : [];
+  const ctrl = controller || standardController(plant, gains);
+  const umax = gains && gains.maxPower != null ? gains.maxPower : 1;
+  const cstate = {};
+  const out = [];
+
+  const measure = () => {
+    if (isVel) {
+      const ticks = vel * ph.ticksPerRad;
+      return rz.noise ? ticks + (rand() - 0.5) * 40 : ticks;
+    }
+    const ticks = Math.round(pos * ph.ticksPerRad); // encoder counts
+    return (ticks + (rz.noise ? Math.round((rand() - 0.5) * 1.2) : 0)) / ph.ticksPerRad;
+  };
+
+  for (let t = 0; t <= sc.duration + 1e-9; t += dtPhys) {
+    const sp = setpointAt(sc, t);
+    if (sc.type === 'load' && t >= sc.at) mass = ph.mass + sc.extraMass;
+    while (shotsLeft.length && t >= shotsLeft[0]) {
+      shotsLeft.shift();
+      vel *= 1 - sc.drop; // a ball takes energy out of the wheel
+    }
+    if (t >= nextCtrl - 1e-9) {
+      u = ctrl(measure(), sp, dtCtrl, cstate, t);
+      u = Math.max(-1, Math.min(1, u));
+      nextCtrl += dtCtrl;
+    }
+    const drive = ph.stallTorque * (u * vScale - vel / ph.freeSpeed);
+    const gravity = mass * g * ph.armLength * Math.cos(pos);
+    const fricMax = rz.friction ? ph.friction * ph.stallTorque : 0;
+    const net = drive - gravity;
+    if (Math.abs(vel) < 1e-3 && Math.abs(net) <= fricMax) {
+      vel = 0; // static friction holds it
+    } else {
+      const fric = fricMax * Math.sign(Math.abs(vel) < 1e-3 ? net : vel);
+      vel += ((net - fric) / ph.J) * dtPhys;
+    }
+    pos += vel * dtPhys;
+    if (t >= sampleT - 1e-9) {
+      out.push({ t, sp, meas: isVel ? vel * ph.ticksPerRad : pos, u, umax });
+      sampleT += 0.005;
+    }
+  }
+  return out;
+}
+
+/** The same math the robot code uses. */
+function standardController(plant, gains) {
+  const maxPower = gains.maxPower != null ? gains.maxPower : 1;
+  if (plant.kind === 'velocity') {
+    return (meas, sp, dt, s) => {
+      const e = sp - meas;
+      const acc = s.last == null ? 0 : (meas - s.last) / dt;
+      s.last = meas;
+      s.i = s.i || 0;
+      const unclamped = gains.kF * sp + gains.kP * e + gains.kI * (s.i + e * dt) - gains.kD * acc;
+      if (Math.abs(unclamped) < 1) s.i += e * dt; // don't wind up while saturated
+      return Math.max(-maxPower, Math.min(maxPower, gains.kF * sp + gains.kP * e + gains.kI * s.i - gains.kD * acc));
+    };
+  }
+  return (meas, sp, dt, s) => {
+    const e = sp - meas;
+    if (s.lastE != null && Math.sign(e) !== Math.sign(s.lastE)) s.i = 0; // anti-windup, as in Launcher
+    s.i = (s.i || 0) + e * dt;
+    const vel = s.last == null ? 0 : (meas - s.last) / dt; // derivative on measurement
+    s.last = meas;
+    s.lastE = e;
+    const kG = gains.kG || 0;
+    const power = kG * Math.cos(meas) + gains.kP * e + gains.kI * s.i - gains.kD * vel;
+    return Math.max(-maxPower, Math.min(maxPower, power));
+  };
+}
+
+/** Numbers that describe a run. Times are seconds from when the target changed or the disturbance hit. */
+function metrics(plantKey, scenarioKey, run) {
+  const plant = PLANTS[plantKey];
+  const sc = plant.scenarios[scenarioKey];
+  const band = plant.band;
+  const last = run[run.length - 1];
+  const tail = run.filter(p => p.t >= last.t - 0.3);
+  const sse = tail.reduce((a, p) => a + Math.abs(p.sp - p.meas), 0) / tail.length;
+  const saturated = run.filter(p => Math.abs(p.u) >= 0.999 * p.umax).length / run.length;
+  const m = { sse, saturated };
+
+  if (sc.type === 'step') {
+    const step = sc.target - sc.start;
+    const dir = Math.sign(step);
+    const after = run.filter(p => p.t >= sc.at);
+    const t10 = after.find(p => (p.meas - sc.start) * dir >= 0.1 * Math.abs(step));
+    const t90 = after.find(p => (p.meas - sc.start) * dir >= 0.9 * Math.abs(step));
+    m.rise = t10 && t90 ? t90.t - t10.t : null;
+    const peak = Math.max(...after.map(p => (p.meas - sc.target) * dir));
+    m.overshoot = Math.max(0, peak) / Math.abs(step);
+    let lastOut = null;
+    for (const p of after) if (Math.abs(p.sp - p.meas) > band) lastOut = p.t;
+    m.settle = lastOut == null ? 0 : lastOut >= last.t - 0.25 ? null : lastOut - sc.at;
+  } else {
+    const start = sc.type === 'shots' ? sc.shots[0] : sc.at;
+    const after = run.filter(p => p.t >= start);
+    m.worst = Math.max(...after.map(p => Math.abs(p.sp - p.meas)));
+    let lastOut = null;
+    for (const p of after) if (Math.abs(p.sp - p.meas) > band) lastOut = p.t;
+    const from = sc.type === 'shots' ? sc.shots[sc.shots.length - 1] : sc.type === 'track' ? sc.until : sc.at;
+    m.recover = lastOut == null ? 0 : lastOut >= last.t - 0.25 ? null : Math.max(0, lastOut - from);
+  }
+  return m;
+}
+
+/** Pass/fail for each part of the practice target. */
+function checkChallenge(plantKey, m) {
+  const c = PLANTS[plantKey].challenge;
+  const checks = [];
+  if (c.settle != null) checks.push({ label: `Settles within ${c.settle} s`, pass: m.settle != null && m.settle <= c.settle });
+  if (c.overshoot != null) checks.push({ label: `Overshoot under ${Math.round(c.overshoot * 100)}%`, pass: m.overshoot != null && m.overshoot <= c.overshoot });
+  if (c.recover != null) checks.push({ label: `Recovers within ${c.recover} s of the last shot`, pass: m.recover != null && m.recover <= c.recover });
+  if (c.sse != null) {
+    const shown = PLANTS[plantKey].display(c.sse);
+    checks.push({ label: `Ends within ${+shown.toFixed(2)} ${PLANTS[plantKey].unit}`, pass: m.sse <= c.sse });
+  }
+  return checks;
+}
+
+/**
+ * Relay test, like TurretAutoTuner: ±relay power around the target (plus kG for an arm), then
+ * Ziegler-Nichols from the swing size and period. Returns null if it never oscillated.
+ */
+function relayTune(plantKey, gains, realism, physicsOverride, relayPower = 0.25) {
+  const plant = PLANTS[plantKey];
+  const sc = plant.scenarios.step;
+  const hysteresis = 0.5 * DEG;
+  const kG = gains.kG || 0;
+  const crossings = [], amps = [];
+  let power = relayPower, hi = -Infinity, lo = Infinity, lastE = 0;
+  const ctrl = (meas, sp, dt, s, t) => {
+    const e = meas - sc.target;
+    if (e < -hysteresis) power = relayPower;
+    else if (e > hysteresis) power = -relayPower;
+    hi = Math.max(hi, e); lo = Math.min(lo, e);
+    if (power > 0 && lastE < 0 && e >= 0) {
+      if (crossings.length) amps.push((hi - lo) / 2);
+      crossings.push(t);
+      hi = -Infinity; lo = Infinity;
+    }
+    lastE = e;
+    return kG * Math.cos(meas) + power;
+  };
+  const longer = Object.assign({}, plant.scenarios.step, { duration: 8, start: sc.target, at: 0 });
+  const saved = plant.scenarios.__relay;
+  plant.scenarios.__relay = longer;
+  simulate(plantKey, '__relay', gains, realism, physicsOverride, ctrl);
+  delete plant.scenarios.__relay;
+  if (saved) plant.scenarios.__relay = saved;
+  if (crossings.length < 9) return null;
+  const use = crossings.slice(3, 9);
+  let period = 0;
+  for (let i = 1; i < use.length; i++) period += use[i] - use[i - 1];
+  const tu = period / (use.length - 1);
+  const a = amps.slice(3, 8).reduce((x, y) => x + y, 0) / 5;
+  const ku = (4 * relayPower) / (Math.PI * Math.sqrt(Math.max(a * a - hysteresis * hysteresis, 1e-9)));
+  return {
+    ku, tu, amplitude: a,
+    gentle: { kP: 0.2 * ku, kI: (0.4 * ku) / tu, kD: 0.0667 * ku * tu },
+    classic: { kP: 0.6 * ku, kI: (1.2 * ku) / tu, kD: 0.075 * ku * tu },
+  };
+}
+
+/** Like FlywheelAutoTuner: F from top speed, then the P that settles a speed step fastest without overshoot. */
+function flywheelTune(realism, physicsOverride) {
+  const plant = PLANTS.flywheel;
+  const full = simulate('flywheel', 'step', {}, realism, physicsOverride, () => 1);
+  const top = full[full.length - 1].meas;
+  const kF = 1 / top;
+  const target = Math.min(2000, 0.85 * top);
+  const low = 0.8 * target;
+  const stepSc = { label: 'tune', duration: 2.5, type: 'step', start: low, target, at: 0.5 };
+  plant.scenarios.__tune = stepSc;
+  let best = null;
+  const tried = [];
+  for (const k of [1, 2, 4, 8, 16, 32, 64, 128]) {
+    const gains = { kF, kP: k * kF, kI: 0, kD: 0 };
+    const run = simulate('flywheel', '__tune', gains, realism, physicsOverride);
+    const m = metrics('flywheel', '__tune', run);
+    tried.push({ kP: gains.kP, m });
+    const good = m.settle != null && m.overshoot <= 0.05;
+    if (good && (!best || m.settle < best.m.settle)) best = { gains, m };
+    if (m.overshoot > 0.15) break;
+  }
+  delete plant.scenarios.__tune;
+  return { top, kF, best, tried };
+}
+// SIM-CORE-END
+
+// ---------------------------------------------------------------- UI
+
+const GUIDES = {
+  turret: {
+    title: 'How to tune',
+    steps: [
+      'kI, kD = 0. Raise kP until it overshoots a little.',
+      'Raise kD until the overshoot is gone.',
+      'Add a little kI if it stops short.',
+      'Check "Track while the robot turns".',
+    ],
+  },
+  flywheel: {
+    title: 'How to tune',
+    steps: [
+      'kP = 0. Raise kF until it levels off just under 2000.',
+      'Raise kP until it reaches 2000 without overshoot.',
+      'Check "Recover from 3 shots".',
+      'Add a small kI if it settles low.',
+    ],
+  },
+  arm: {
+    title: 'How to tune',
+    steps: [
+      'kP, kI, kD = 0. Raise kG until the arm holds still.',
+      'Raise kP until it reaches 45° quickly.',
+      'Add kD to remove overshoot.',
+      'Check "Pick up a 0.6 kg game piece".',
+    ],
+  },
+};
+
+const ICONS = {
+  dark: 'M24 42q-7.5 0-12.75-5.25T6 24q0-7.5 5.25-12.75T24 6q.4 0 .85.025.45.025 1.15.075-1.8 1.6-2.8 3.95-1 2.35-1 4.95 0 4.5 3.15 7.65Q28.5 25.8 33 25.8q2.6 0 4.95-.925T41.9 22.3q.05.6.075.975Q42 23.65 42 24q0 7.5-5.25 12.75T24 42Z',
+  light: 'M24 31q2.9 0 4.95-2.05Q31 26.9 31 24q0-2.9-2.05-4.95Q26.9 17 24 17q-2.9 0-4.95 2.05Q17 21.1 17 24q0 2.9 2.05 4.95Q21.1 31 24 31Zm0 3q-4.15 0-7.075-2.925T14 24q0-4.15 2.925-7.075T24 14q4.15 0 7.075 2.925T34 24q0 4.15-2.925 7.075T24 34ZM3.5 25.5q-.65 0-1.075-.425Q2 24.65 2 24q0-.65.425-1.075Q2.85 22.5 3.5 22.5h5q.65 0 1.075.425Q10 23.35 10 24q0 .65-.425 1.075-.425.425-1.075.425Zm36 0q-.65 0-1.075-.425Q38 24.65 38 24q0-.65.425-1.075.425-.425 1.075-.425h5q.65 0 1.075.425Q46 23.35 46 24q0 .65-.425 1.075-.425.425-1.075.425ZM24 10q-.65 0-1.075-.425Q22.5 9.15 22.5 8.5v-5q0-.65.425-1.075Q23.35 2 24 2q.65 0 1.075.425.425.425.425 1.075v5q0 .65-.425 1.075Q24.65 10 24 10Zm0 36q-.65 0-1.075-.425-.425-.425-.425-1.075v-5q0-.65.425-1.075Q23.35 38 24 38q.65 0 1.075.425.425.425.425 1.075v5q0 .65-.425 1.075Q24.65 46 24 46ZM12 14.1l-2.85-2.8q-.45-.45-.425-1.075.025-.625.425-1.075.45-.45 1.075-.45t1.075.45L14.1 12q.4.45.4 1.05 0 .6-.4 1-.4.45-1.025.45-.625 0-1.075-.4Zm24.7 24.75L33.9 36q-.4-.45-.4-1.075t.45-1.025q.4-.45 1-.45t1.05.45l2.85 2.8q.45.45.425 1.075-.025.625-.425 1.075-.45.45-1.075.45t-1.075-.45ZM33.9 14.1q-.45-.45-.45-1.05 0-.6.45-1.05l2.8-2.85q.45-.45 1.075-.425.625.025 1.075.425.45.45.45 1.075t-.45 1.075L36 14.1q-.4.4-1.025.4-.625 0-1.075-.4ZM9.15 38.85q-.45-.45-.45-1.075t.45-1.075L12 33.9q.45-.45 1.05-.45.6 0 1.05.45.45.45.45 1.05 0 .6-.45 1.05l-2.8 2.85q-.45.45-1.075.425-.625-.025-1.075-.425ZM24 24Z',
+  pause: 'M6 19h4V5H6v14zm8-14v14h4V5h-4z',
+  play: 'M8 5v14l11-7z',
+};
+
+const store = {
+  get(key, fallback) { try { const v = localStorage.getItem('pidbench.' + key); return v == null ? fallback : JSON.parse(v); } catch (e) { return fallback; } },
+  set(key, value) { try { localStorage.setItem('pidbench.' + key, JSON.stringify(value)); } catch (e) { /* storage unavailable */ } },
+};
+
+const state = {
+  plant: store.get('plant', 'turret'),
+  scenario: {},
+  gains: {},
+  realism: Object.assign({}, DEFAULT_REALISM),
+  mystery: null, // physics multipliers when the mystery robot is on
+  run: null,
+  metrics: null,
+};
+if (!PLANTS[state.plant]) state.plant = 'turret';
+for (const key of Object.keys(PLANTS)) {
+  state.scenario[key] = 'step';
+  const saved = store.get('gains.' + key, null);
+  state.gains[key] = {};
+  for (const [g, spec] of Object.entries(PLANTS[key].gains)) state.gains[key][g] = saved && typeof saved[g] === 'number' ? saved[g] : spec.def;
+}
+
+const $ = id => document.getElementById(id);
+const css = name => getComputedStyle(document.documentElement).getPropertyValue(name).trim();
+const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+function fmtGain(v) {
+  if (v === 0) return '0';
+  const a = Math.abs(v);
+  return a >= 100 ? String(+v.toFixed(1)) : a >= 1 ? String(+v.toFixed(4)) : a >= 0.001 ? String(+v.toPrecision(4)) : v.toExponential(3);
+}
+
+/** A typed number field, like a Dashboard config variable: applies while valid, red border while not. */
+function numberField(input, get, set, check) {
+  const valid = text => {
+    if (!/^\s*-?(\d+\.?\d*|\.\d+)([eE][-+]?\d+)?\s*$/.test(text)) return null;
+    const v = Number(text);
+    return check(v) ? v : null;
+  };
+  input.value = get();
+  input.addEventListener('input', () => {
+    const v = valid(input.value);
+    input.classList.toggle('invalid', v == null);
+    if (v != null) set(v);
+  });
+  input.addEventListener('keydown', e => { if (e.key === 'Enter') input.blur(); });
+  input.addEventListener('blur', () => { if (valid(input.value) == null) { input.value = get(); input.classList.remove('invalid'); } });
+}
+
+function buildMechanisms() {
+  const sel = $('mechanism');
+  sel.innerHTML = Object.entries(PLANTS).map(([k, p]) => `<option value="${k}">${p.name}</option>`).join('');
+  sel.value = state.plant;
+  sel.addEventListener('change', () => { state.plant = sel.value; store.set('plant', sel.value); buildAll(); });
+}
+
+function buildScenarios() {
+  const sel = $('scenario');
+  sel.innerHTML = Object.entries(PLANTS[state.plant].scenarios)
+    .filter(([k]) => !k.startsWith('__'))
+    .map(([k, sc]) => `<option value="${k}">${sc.label}</option>`).join('');
+  sel.value = state.scenario[state.plant];
+}
+$('scenario').addEventListener('change', e => { state.scenario[state.plant] = e.target.value; rerun(); });
+
+function buildGains() {
+  const p = PLANTS[state.plant];
+  $('gainsTitle').textContent = p.name;
+  const body = $('gains');
+  body.innerHTML = '';
+  for (const [key, spec] of Object.entries(p.gains)) {
+    const id = `g-${state.plant}-${key}`;
+    const row = document.createElement('tr');
+    row.innerHTML = `<td><label for="${id}">${spec.label}</label></td>
+      <td><input type="text" id="${id}" size="15" spellcheck="false" autocomplete="off"></td>`;
+    body.appendChild(row);
+    const plant = state.plant;
+    numberField(row.querySelector('input'),
+      () => fmtGain(state.gains[plant][key]),
+      v => setGain(key, v),
+      v => v >= 0 && (key !== 'maxPower' || v <= 1));
+  }
+}
+
+function setGain(key, value) {
+  state.gains[state.plant][key] = value;
+  store.set('gains.' + state.plant, state.gains[state.plant]);
+  rerun();
+}
+
+function setGains(values) {
+  Object.assign(state.gains[state.plant], values);
+  store.set('gains.' + state.plant, state.gains[state.plant]);
+  buildGains();
+  rerun();
+}
+
+function buildGuide() {
+  const g = GUIDES[state.plant];
+  $('guideTitle').textContent = g.title;
+  $('guideSteps').innerHTML = g.steps.map(s => `<li>${s}</li>`).join('');
+  $('log').innerHTML = '';
+}
+
+function buildAll() {
+  buildScenarios();
+  buildGains();
+  buildGuide();
+  rerun();
+}
+
+// ---- Mystery robot: scale the hidden physics ----
+function reroll() {
+  const r = () => Math.random();
+  state.mystery = { J: 0.6 + r() * 1.0, friction: 0.5 + r() * 1.5, stallTorque: 0.8 + r() * 0.4 };
+  $('mysteryNote').hidden = true;
+  rerun();
+}
+function physicsOverride() {
+  if (!state.mystery) return null;
+  const base = PLANTS[state.plant].physics;
+  return { J: base.J * state.mystery.J, friction: base.friction * state.mystery.friction, stallTorque: base.stallTorque * state.mystery.stallTorque };
+}
+
+// ---- Run ----
+let pending = false;
+function rerun() {
+  if (pending) return;
+  pending = true;
+  requestAnimationFrame(() => {
+    pending = false;
+    const key = state.plant, sc = state.scenario[key];
+    state.run = simulate(key, sc, state.gains[key], state.realism, physicsOverride());
+    state.metrics = metrics(key, sc, state.run);
+    renderCode();
+    renderTelemetry();
+    drawChartBase();
+    playStart = performance.now();
+    if (pausedAt != null) pausedAt = Math.min(pausedAt, state.run[state.run.length - 1].t);
+    if (reduceMotion) drawFrame(Infinity);
+  });
+}
+
+function renderCode() {
+  $('code').textContent = PLANTS[state.plant].code(state.gains[state.plant]).join('\n');
+}
+
+function fmtValue(v) {
+  const p = PLANTS[state.plant];
+  const d = p.display(v);
+  return p.kind === 'velocity' ? `${d.toFixed(0)} ${p.unit}` : `${d.toFixed(2)}${p.unit}`;
+}
+
+/** Readings as Dashboard-style telemetry lines. On the practice target's test, judged lines turn green or red. */
+function renderTelemetry() {
+  const key = state.plant;
+  const p = PLANTS[key];
+  const m = state.metrics;
+  const scKey = state.scenario[key];
+  const sc = p.scenarios[scKey];
+  const c = p.challenge;
+  const judged = scKey === c.scenario;
+  const goalText = v => (p.kind === 'velocity' ? `${p.display(v).toFixed(0)} ${p.unit}` : `${+p.display(v).toFixed(2)}${p.unit}`);
+  const lines = [];
+  const add = (label, value, goal, pass) => {
+    if (judged && goal) lines.push(`${label}: <span class="${pass ? 'pass' : 'fail'}">${value}</span> <span class="dim">${goal}</span>`);
+    else lines.push(`${label}: ${value}`);
+  };
+  if (sc.type === 'step') {
+    add('riseTime', m.rise == null ? 'never' : `${m.rise.toFixed(2)} s`);
+    add('overshoot', `${(m.overshoot * 100).toFixed(1)}%`, c.overshoot != null ? `< ${Math.round(c.overshoot * 100)}%` : null, m.overshoot <= c.overshoot);
+    add('settlingTime', m.settle == null ? 'never' : `${m.settle.toFixed(2)} s`, c.settle != null ? `< ${c.settle} s` : null, m.settle != null && m.settle <= c.settle);
+  } else {
+    add(sc.type === 'shots' ? 'worstDip' : sc.type === 'load' ? 'worstSag' : 'worstError', fmtValue(m.worst));
+    add('recovery', m.recover == null ? 'never' : `${m.recover.toFixed(2)} s`, c.recover != null ? `< ${c.recover} s` : null, m.recover != null && m.recover <= c.recover);
+  }
+  add('finalError', fmtValue(m.sse), c.sse != null ? `< ${goalText(c.sse)}` : null, m.sse <= c.sse);
+  add('powerMaxedOut', `${(m.saturated * 100).toFixed(0)}%`);
+  $('telemetry').innerHTML = lines.join('<br>');
+
+  // Practice target summary in the Op Mode view
+  const status = $('status');
+  status.className = 'status-line';
+  if (!judged) {
+    status.innerHTML = `<button class="link" type="button" id="goTarget">Go to the practice target</button>`;
+    $('goTarget').addEventListener('click', () => { state.scenario[key] = c.scenario; $('scenario').value = c.scenario; rerun(); });
+    return;
+  }
+  const checks = checkChallenge(key, m);
+  const passed = checks.filter(x => x.pass).length;
+  status.classList.add(passed === checks.length ? 'pass' : 'fail');
+  status.textContent = passed === checks.length
+    ? 'Target met'
+    : `Target: ${passed} of ${checks.length}`;
+}
+
+// ---- Graph ----
+const chart = $('chart');
+let chartBase = null, chartBox = null;
+
+function sizeCanvas(c) {
+  const dpr = window.devicePixelRatio || 1;
+  const w = c.clientWidth, h = c.clientHeight;
+  c.width = Math.max(1, Math.round(w * dpr));
+  c.height = Math.max(1, Math.round(h * dpr));
+  const ctx = c.getContext('2d');
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  return { ctx, w, h };
+}
+
+function niceStep(range, target) {
+  const raw = range / target;
+  const mag = Math.pow(10, Math.floor(Math.log10(raw)));
+  const n = raw / mag;
+  return (n < 1.5 ? 1 : n < 3 ? 2 : n < 7 ? 5 : 10) * mag;
+}
+
+/** Where the step-response features are, for drawing on the graph. */
+function features() {
+  const p = PLANTS[state.plant];
+  const sc = p.scenarios[state.scenario[state.plant]];
+  const run = state.run, m = state.metrics;
+  const f = {};
+  if (sc.type === 'step') {
+    const step = sc.target - sc.start, dir = Math.sign(step);
+    const after = run.filter(s => s.t >= sc.at);
+    f.t10 = after.find(s => (s.meas - sc.start) * dir >= 0.1 * Math.abs(step));
+    f.t90 = after.find(s => (s.meas - sc.start) * dir >= 0.9 * Math.abs(step));
+    if (m.overshoot > 0.005) f.peak = after.reduce((a, s) => ((s.meas - a.meas) * dir > 0 ? s : a));
+    f.settle = m.settle == null ? null : sc.at + m.settle;
+  } else {
+    const start = sc.type === 'shots' ? sc.shots[0] : sc.at;
+    f.worst = run.filter(s => s.t >= start).reduce((a, s) => (Math.abs(s.sp - s.meas) > Math.abs(a.sp - a.meas) ? s : a));
+    const from = sc.type === 'shots' ? sc.shots[sc.shots.length - 1] : sc.type === 'track' ? sc.until : sc.at;
+    f.settle = m.recover == null ? null : from + m.recover;
+  }
+  return f;
+}
+
+function drawChartBase() {
+  const { ctx, w, h } = sizeCanvas(chart);
+  if (w < 50 || h < 50) return;
+  const p = PLANTS[state.plant];
+  const run = state.run;
+  const dur = run[run.length - 1].t;
+  const text = css('--text'), dim = css('--dim'), line = css('--line'), target = css('--target');
+  const trace = css('--trace'), power = css('--power'), band = css('--band');
+  const font = css('--font');
+
+  const left = 46, right = 8, top = 22, gap = 38, bottom = 24;
+  const mainH = Math.round((h - top - bottom - gap) * 0.74);
+  const powH = h - top - bottom - gap - mainH;
+  const plotW = w - left - right;
+  const mainTop = top, powTop = top + mainH + gap;
+
+  let lo = Infinity, hi = -Infinity;
+  for (const s of run) { lo = Math.min(lo, s.sp, s.meas); hi = Math.max(hi, s.sp, s.meas); }
+  const pad = Math.max((hi - lo) * 0.12, p.band * 3);
+  lo -= pad; hi += pad;
+  const dLo = p.display(lo), dHi = p.display(hi);
+  const x = t => left + (t / dur) * plotW;
+  const y = v => mainTop + mainH - ((p.display(v) - dLo) / (dHi - dLo)) * mainH;
+  const yu = u => powTop + powH / 2 - u * (powH / 2);
+
+  ctx.clearRect(0, 0, w, h);
+  ctx.font = `12px ${font}`;
+  ctx.lineWidth = 1;
+
+  ctx.strokeStyle = line; ctx.fillStyle = dim; ctx.textAlign = 'right'; ctx.textBaseline = 'middle';
+  const vs = niceStep(dHi - dLo, 5);
+  for (let v = Math.ceil(dLo / vs) * vs; v <= dHi; v += vs) {
+    const yy = mainTop + mainH - ((v - dLo) / (dHi - dLo)) * mainH;
+    ctx.beginPath(); ctx.moveTo(left, yy); ctx.lineTo(left + plotW, yy); ctx.stroke();
+    ctx.fillText(`${+v.toFixed(2)}`, left - 8, yy);
+  }
+  for (const u of [-1, 0, 1]) {
+    ctx.beginPath(); ctx.moveTo(left, yu(u)); ctx.lineTo(left + plotW, yu(u)); ctx.stroke();
+    ctx.fillText(u === 0 ? '0' : u > 0 ? '+1' : '−1', left - 8, yu(u));
+  }
+  const ts = niceStep(dur, 8);
+  ctx.textAlign = 'center'; ctx.textBaseline = 'top';
+  for (let t = 0; t <= dur + 1e-9; t += ts) ctx.fillText(`${+t.toFixed(2)} s`, x(t), powTop + powH + 8);
+  ctx.textAlign = 'left'; ctx.textBaseline = 'bottom';
+  ctx.fillText(p.kind === 'velocity' ? 'Speed (ticks/s)' : 'Angle (°)', left, mainTop - 6);
+  ctx.fillText('Motor power', left, powTop - 8);
+
+  ctx.fillStyle = band;
+  ctx.beginPath();
+  run.forEach((s, i) => { const yy = y(s.sp + p.band); i ? ctx.lineTo(x(s.t), yy) : ctx.moveTo(x(s.t), yy); });
+  for (let i = run.length - 1; i >= 0; i--) ctx.lineTo(x(run[i].t), y(run[i].sp - p.band));
+  ctx.closePath(); ctx.fill();
+
+  const umax = run[0].umax;
+  if (umax < 1) {
+    ctx.strokeStyle = power; ctx.globalAlpha = 0.5; ctx.setLineDash([2, 4]);
+    for (const u of [umax, -umax]) { ctx.beginPath(); ctx.moveTo(left, yu(u)); ctx.lineTo(left + plotW, yu(u)); ctx.stroke(); }
+    ctx.setLineDash([]); ctx.globalAlpha = 1;
+  }
+
+  const plot = (color, width, get, dash, yf) => {
+    ctx.strokeStyle = color; ctx.lineWidth = width; ctx.setLineDash(dash || []); ctx.lineJoin = 'round';
+    ctx.beginPath();
+    run.forEach((s, i) => { const yy = yf(get(s)); i ? ctx.lineTo(x(s.t), yy) : ctx.moveTo(x(s.t), yy); });
+    ctx.stroke(); ctx.setLineDash([]);
+  };
+  plot(power, 1.5, s => s.u, null, yu);
+  plot(target, 1.25, s => s.sp, [6, 5], y);
+  plot(trace, 2.25, s => s.meas, null, y);
+
+  // Step-response features, drawn where they happen
+  const f = features();
+  ctx.font = `500 12px ${font}`;
+  const label = (str, lx, ly, align, color) => {
+    ctx.fillStyle = color || text; ctx.textAlign = align || 'left'; ctx.textBaseline = 'middle';
+    ctx.fillText(str, Math.min(Math.max(lx, left + 4), left + plotW - 4), ly);
+  };
+  if (f.t10 && f.t90) {
+    const yy = y((f.t10.meas + f.t90.meas) / 2);
+    ctx.strokeStyle = text; ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.moveTo(x(f.t10.t), yy - 5); ctx.lineTo(x(f.t10.t), yy + 5);
+    ctx.moveTo(x(f.t10.t), yy); ctx.lineTo(x(f.t90.t), yy);
+    ctx.moveTo(x(f.t90.t), yy - 5); ctx.lineTo(x(f.t90.t), yy + 5);
+    ctx.stroke();
+    label(`rise ${(f.t90.t - f.t10.t).toFixed(2)} s`, x(f.t90.t) + 8, yy);
+  }
+  if (f.peak) {
+    ctx.fillStyle = text;
+    ctx.beginPath(); ctx.arc(x(f.peak.t), y(f.peak.meas), 3.5, 0, Math.PI * 2); ctx.fill();
+    const sc = p.scenarios[state.scenario[state.plant]];
+    const up = Math.sign(sc.target - sc.start) >= 0;
+    label(`overshoot ${(state.metrics.overshoot * 100).toFixed(0)}%`, x(f.peak.t), y(f.peak.meas) + (up ? -14 : 14), 'center');
+  }
+  if (f.worst) {
+    ctx.fillStyle = text;
+    ctx.beginPath(); ctx.arc(x(f.worst.t), y(f.worst.meas), 3.5, 0, Math.PI * 2); ctx.fill();
+    const below = f.worst.meas < f.worst.sp;
+    label(`worst ${fmtValue(state.metrics.worst)}`, x(f.worst.t) + 8, y(f.worst.meas) + (below ? 12 : -12));
+  }
+  if (f.settle != null) {
+    ctx.strokeStyle = text; ctx.globalAlpha = 0.5; ctx.setLineDash([3, 4]); ctx.lineWidth = 1;
+    ctx.beginPath(); ctx.moveTo(x(f.settle), mainTop); ctx.lineTo(x(f.settle), mainTop + mainH); ctx.stroke();
+    ctx.setLineDash([]); ctx.globalAlpha = 1;
+    label(`settled ${f.settle.toFixed(2)} s`, x(f.settle) + 6, mainTop + 10);
+  } else {
+    label('never settles', left + plotW - 4, mainTop + 10, 'right', css('--bad'));
+  }
+
+  chartBox = { x, y, yu, left, plotW, mainTop, mainH, powTop, powH, dur };
+  chartBase = ctx.getImageData(0, 0, chart.width, chart.height);
+}
+
+// ---- Replay ----
+const mech = $('mech');
+let playStart = performance.now();
+let pausedAt = null, lastT = 0, spin = 0;
+function setPlayIcon() {
+  const paused = pausedAt != null;
+  $('playIcon').firstElementChild.setAttribute('d', paused ? ICONS.play : ICONS.pause);
+  $('playPause').title = paused ? 'Play' : 'Pause';
+  $('playPause').setAttribute('aria-label', paused ? 'Play' : 'Pause');
+}
+$('playPause').addEventListener('click', () => {
+  if (pausedAt == null) pausedAt = lastT;
+  else { playStart = performance.now() - pausedAt * 1000; pausedAt = null; }
+  setPlayIcon();
+});
+$('replay').addEventListener('click', () => { pausedAt = null; playStart = performance.now(); setPlayIcon(); });
+if (reduceMotion) { $('playPause').hidden = true; $('replay').hidden = true; }
+
+function sampleAt(t) {
+  const run = state.run;
+  return run[Math.min(run.length - 1, Math.max(0, Math.round(t / 0.005)))];
+}
+
+function drawFrame(now) {
+  if (!state.run || !chartBase) return;
+  const dur = chartBox.dur;
+  const t = now === Infinity ? dur : pausedAt != null ? pausedAt : (Math.max(0, now - playStart) / 1000) % (dur + 0.6);
+  lastT = t;
+  const tc = Math.min(t, dur);
+  const s = sampleAt(tc);
+
+  const ctx = chart.getContext('2d');
+  ctx.putImageData(chartBase, 0, 0);
+  const dpr = window.devicePixelRatio || 1;
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  const xx = chartBox.x(tc);
+  ctx.strokeStyle = css('--dim'); ctx.globalAlpha = 0.5; ctx.lineWidth = 1;
+  ctx.beginPath(); ctx.moveTo(xx, chartBox.mainTop); ctx.lineTo(xx, chartBox.powTop + chartBox.powH); ctx.stroke();
+  ctx.globalAlpha = 1;
+  const dot = (yy, color) => { ctx.fillStyle = color; ctx.beginPath(); ctx.arc(xx, yy, 4.5, 0, Math.PI * 2); ctx.fill(); };
+  dot(chartBox.y(s.meas), css('--trace'));
+  dot(chartBox.yu(s.u), css('--power'));
+  $('replayTime').textContent = `t = ${tc.toFixed(2)} s`;
+
+  drawMechanism(s, tc);
+}
+
+function drawMechanism(s, t) {
+  const { ctx, w, h } = mech.__ctx || (mech.__ctx = sizeCanvas(mech));
+  const size = Math.min(w, h), cx = w / 2, cy = h / 2, R = size * 0.4;
+  const text = css('--text'), dim = css('--dim'), outline = css('--outline'), trace = css('--trace'), view = css('--view'), power = css('--power'), target = css('--target');
+  const font = css('--font');
+  ctx.clearRect(0, 0, w, h);
+  ctx.lineCap = 'round';
+
+  if (state.plant === 'turret') {
+    // Top view. 0 = robot front (up), + = counter-clockwise.
+    const b = R * 1.5;
+    ctx.fillStyle = view; ctx.strokeStyle = outline; ctx.lineWidth = 2;
+    ctx.beginPath();
+    if (ctx.roundRect) ctx.roundRect(cx - b / 2, cy - b / 2, b, b, 10); else ctx.rect(cx - b / 2, cy - b / 2, b, b);
+    ctx.fill(); ctx.stroke();
+    ctx.fillStyle = dim; ctx.font = `500 11px ${font}`; ctx.textAlign = 'center'; ctx.textBaseline = 'bottom';
+    ctx.fillText('front', cx, cy - R - 6);
+    const aim = (a, color, width, dash) => {
+      ctx.strokeStyle = color; ctx.lineWidth = width; ctx.setLineDash(dash || []);
+      ctx.beginPath(); ctx.moveTo(cx, cy); ctx.lineTo(cx - Math.sin(a) * R, cy - Math.cos(a) * R); ctx.stroke(); ctx.setLineDash([]);
+    };
+    aim(s.sp, target, 1.5, [5, 5]);
+    ctx.fillStyle = view; ctx.strokeStyle = trace; ctx.lineWidth = 3;
+    ctx.beginPath(); ctx.arc(cx, cy, R * 0.36, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+    aim(s.meas, trace, 7);
+  } else if (state.plant === 'flywheel') {
+    // Speed gauge, 0 to 3000 ticks/s, with a wheel that spins slowed down so you can see it
+    const max = 3000, a0 = Math.PI * 0.75, a1 = Math.PI * 2.25;
+    const ang = v => a0 + (Math.max(0, Math.min(max, v)) / max) * (a1 - a0);
+    ctx.lineWidth = 9; ctx.strokeStyle = css('--line');
+    ctx.beginPath(); ctx.arc(cx, cy, R, a0, a1); ctx.stroke();
+    ctx.strokeStyle = trace;
+    ctx.beginPath(); ctx.arc(cx, cy, R, a0, ang(s.meas)); ctx.stroke();
+    ctx.strokeStyle = target; ctx.lineWidth = 2;
+    const at = ang(s.sp);
+    ctx.beginPath(); ctx.moveTo(cx + Math.cos(at) * (R - 11), cy + Math.sin(at) * (R - 11)); ctx.lineTo(cx + Math.cos(at) * (R + 11), cy + Math.sin(at) * (R + 11)); ctx.stroke();
+    if (!reduceMotion) spin += (s.meas / 2800) * 0.35;
+    ctx.strokeStyle = dim; ctx.lineWidth = 2;
+    ctx.beginPath(); ctx.arc(cx, cy, R * 0.4, 0, Math.PI * 2); ctx.stroke();
+    for (let k = 0; k < 5; k++) {
+      const a = spin + (k * Math.PI * 2) / 5;
+      ctx.beginPath(); ctx.moveTo(cx, cy); ctx.lineTo(cx + Math.cos(a) * R * 0.4, cy + Math.sin(a) * R * 0.4); ctx.stroke();
+    }
+    ctx.fillStyle = text; ctx.textAlign = 'center'; ctx.textBaseline = 'alphabetic'; ctx.font = `500 16px ${font}`;
+    ctx.fillText(`${Math.round(s.meas)}`, cx, cy + R * 0.82);
+    ctx.fillStyle = dim; ctx.font = `11px ${font}`;
+    ctx.fillText('ticks/s', cx, cy + R * 0.82 + 15);
+  } else {
+    // Side view. 0° = level, + = up.
+    const px = cx - R * 0.6, py = cy + R * 0.1, L = R * 1.45;
+    ctx.strokeStyle = outline; ctx.lineWidth = 2;
+    ctx.beginPath(); ctx.moveTo(px - R * 0.4, py + R * 0.9); ctx.lineTo(px + R * 0.4, py + R * 0.9); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(px, py); ctx.lineTo(px, py + R * 0.9); ctx.stroke();
+    const arm = (a, color, width, dash) => {
+      ctx.strokeStyle = color; ctx.lineWidth = width; ctx.setLineDash(dash || []);
+      ctx.beginPath(); ctx.moveTo(px, py); ctx.lineTo(px + Math.cos(a) * L, py - Math.sin(a) * L); ctx.stroke(); ctx.setLineDash([]);
+    };
+    arm(s.sp, target, 1.5, [5, 5]);
+    arm(s.meas, trace, 8);
+    const sc = PLANTS.arm.scenarios[state.scenario.arm];
+    if (sc.type === 'load' && t >= sc.at) {
+      ctx.fillStyle = power;
+      ctx.beginPath(); ctx.arc(px + Math.cos(s.meas) * L, py - Math.sin(s.meas) * L, 9, 0, Math.PI * 2); ctx.fill();
+    }
+    ctx.fillStyle = view; ctx.strokeStyle = text; ctx.lineWidth = 2;
+    ctx.beginPath(); ctx.arc(px, py, 6, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+  }
+}
+
+function loop(now) {
+  drawFrame(now);
+  requestAnimationFrame(loop);
+}
+
+// ---- Auto-tune, reset, copy ----
+$('autotune').addEventListener('click', () => {
+  const key = state.plant;
+  const log = $('log');
+  if (PLANTS[key].kind === 'velocity') {
+    const r = flywheelTune(state.realism, physicsOverride());
+    if (!r.best) { log.innerHTML = 'Auto-tune failed: tune kP by hand.'; return; }
+    log.innerHTML = `topSpeed: ${r.top.toFixed(0)} ticks/s`;
+    setGains({ kF: r.kF, kP: r.best.gains.kP, kI: 0, kD: 0 });
+    return;
+  }
+  const r = relayTune(key, state.gains[key], state.realism, physicsOverride());
+  if (!r) { log.innerHTML = 'Auto-tune failed: turn friction off and retry.'; return; }
+  const deg = PLANTS[key].display;
+  log.innerHTML = `Ku: ${r.ku.toFixed(3)}<br>Tu: ${r.tu.toFixed(3)} s<br><button class="link" type="button" id="useClassic">Use classic Ziegler-Nichols</button>`
+    + (key === 'arm' && !(state.gains.arm.kG > 0) ? '<br>Set kG first.' : '');
+  setGains(r.gentle);
+  $('useClassic').addEventListener('click', () => setGains(r.classic));
+});
+
+function resetGains() {
+  const defs = {};
+  for (const [k, spec] of Object.entries(PLANTS[state.plant].gains)) defs[k] = spec.def;
+  $('log').innerHTML = '';
+  setGains(defs);
+}
+$('reset').addEventListener('click', resetGains);
+$('resetIcon').addEventListener('click', resetGains);
+
+$('copy').addEventListener('click', () => {
+  const text = $('code').textContent;
+  const log = $('log');
+  const done = () => { log.innerHTML = 'Copied'; };
+  const fallback = () => {
+    const r = document.createRange(); r.selectNodeContents($('code'));
+    const sel = getSelection(); sel.removeAllRanges(); sel.addRange(r);
+    log.innerHTML = 'Selected: press Ctrl+C';
+  };
+  if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(text).then(done, fallback);
+  else fallback();
+});
+
+// ---- Real-world effects ----
+function bindRealism() {
+  numberField($('loopMs'), () => String(state.realism.loopMs), v => { state.realism.loopMs = v; rerun(); }, v => v >= 1 && v <= 200);
+  numberField($('voltage'), () => String(state.realism.voltage), v => { state.realism.voltage = v; rerun(); }, v => v >= 8 && v <= 15);
+  $('noise').addEventListener('change', e => { state.realism.noise = e.target.checked; rerun(); });
+  $('friction').addEventListener('change', e => { state.realism.friction = e.target.checked; rerun(); });
+  $('mystery').addEventListener('change', e => {
+    $('mysteryRow').hidden = !e.target.checked;
+    if (e.target.checked) reroll(); else { state.mystery = null; $('mysteryNote').hidden = true; rerun(); }
+  });
+  $('reroll').addEventListener('click', reroll);
+  $('reveal').addEventListener('click', () => {
+    if (!state.mystery) return;
+    const m = state.mystery, pct = v => `${Math.round(v * 100)}%`;
+    $('mysteryNote').textContent = `Inertia ${pct(m.J)}, friction ${pct(m.friction)}, torque ${pct(m.stallTorque)}`;
+    $('mysteryNote').hidden = false;
+  });
+}
+
+// ---- Light / dark, like Dashboard's theme switch ----
+function isDark() {
+  const t = document.documentElement.dataset.theme;
+  return t ? t === 'dark' : window.matchMedia('(prefers-color-scheme: dark)').matches;
+}
+function showThemeIcon() { $('themeIcon').firstElementChild.setAttribute('d', isDark() ? ICONS.light : ICONS.dark); }
+const savedTheme = store.get('theme', null);
+if (savedTheme === 'dark' || savedTheme === 'light') document.documentElement.dataset.theme = savedTheme;
+$('theme').addEventListener('click', () => {
+  const next = isDark() ? 'light' : 'dark';
+  document.documentElement.dataset.theme = next;
+  store.set('theme', next);
+  showThemeIcon();
+  mech.__ctx = null;
+  rerun();
+});
+window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', () => { showThemeIcon(); rerun(); });
+showThemeIcon();
+
+buildMechanisms();
+bindRealism();
+buildAll();
+window.addEventListener('resize', () => { mech.__ctx = null; rerun(); });
+if (document.fonts) document.fonts.ready.then(() => rerun());
+if (!reduceMotion) requestAnimationFrame(loop);
+</script>
+</body>
+</html>
