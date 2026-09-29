@@ -8,11 +8,17 @@ import com.qualcomm.robotcore.hardware.PIDFCoefficients;
 public class RobotConstants {
     /** Red-side poses in Pedro coordinates (inches). Blue is rotated 180° with Alliance.apply; never write blue poses. */
     public static class Field {
-        // Center of each cell's opening, from the red driver station's point of view. From BiobuzzSim: the hive is
-        // 12.75 in from field center toward our wall, and the up cell's opening is centered 15.7 in out from the hive
-        // center (59.6 in above the tiles, leaning back 30°). TODO: check against the real field
-        public static Pose RED_HIVE_LEFT_CELL = new Pose(59.25, 87.7, 0);  // rear cell
-        public static Pose RED_HIVE_RIGHT_CELL = new Pose(59.25, 56.3, 0); // audience cell
+        // Center of each cell's opening, from the red driver station's point of view, with the heading pointing out of
+        // the opening. From BiobuzzSim: the hive is 12.75 in from field center toward our wall, and the up cell's
+        // opening is centered 15.7 in out from the hive center. TODO: check against the real field
+        public static Pose RED_HIVE_LEFT_CELL = new Pose(59.25, 87.7, Math.toRadians(90));   // rear cell
+        public static Pose RED_HIVE_RIGHT_CELL = new Pose(59.25, 56.3, Math.toRadians(-90)); // audience cell
+        // The up cell's opening (Competition Manual 9.6, via BiobuzzSim): 20 in wide, 14 in tall, centered 59.6 in
+        // above the tiles, and leaning back 30° with the arm, so its face points outward and 30° up
+        public static double HIVE_OPENING_CENTER_Z = 59.6;
+        public static double HIVE_OPENING_WIDTH = 20;
+        public static double HIVE_OPENING_HEIGHT = 14;
+        public static double HIVE_OPENING_TILT = Math.toRadians(30);
 
         // Pose resets: robot pushed into the corner, back against the alliance wall.
         // 9 in = half of an 18 in robot. TODO: use the real robot size from CAD
@@ -59,16 +65,10 @@ public class RobotConstants {
 
         // ---- Flywheel ----
         // goBILDA 6000 RPM: 28 ticks/rev, about 2800 ticks/sec flat out. The counter-rollers are geared off this motor.
-        // Speed for a distance to the hive cell: rows of {inches, ticks/sec}, sorted by distance.
-        // Linearly interpolated between rows, and held at the end rows outside them.
-        // TODO: tune (shoot from a few distances and record the speed that scores)
-        public static double[][] VELOCITY_TABLE = {
-                {36, 1800},
-                {120, 2400},
-        };
+        public static double FLYWHEEL_MAX_VELOCITY = 2800; // ticks/sec
         // Fixed speed for spinUp() and the Flywheel Tuner
         public static double TARGET_VELOCITY = 2000;  // ticks/sec. TODO: tune
-        public static double VELOCITY_TOLERANCE = 50; // ticks/sec. TODO: tune
+        public static double VELOCITY_TOLERANCE = 50; // ticks/sec, when not aiming with ShotSolver. TODO: tune
         public static double VELOCITY_NUDGE = 25;     // ticks/sec per operator press. TODO: tune
         // Velocity PIDF on the hub: F ≈ 32767 / 2800 max ticks/sec, P ≈ F / 10
         public static PIDFCoefficients FLYWHEEL_PIDF = new PIDFCoefficients(1.2, 0, 0, 11.7); // TODO: tune
@@ -88,7 +88,7 @@ public class RobotConstants {
         public static double TURRET_KI = 0;           // power per radian-second
         public static double TURRET_KD = 0;           // power per radian/sec of speed error
         public static double TURRET_MAX_POWER = 0.8;
-        public static double TURRET_ANGLE_TOLERANCE = Math.toRadians(1);
+        public static double TURRET_ANGLE_TOLERANCE = Math.toRadians(1); // when not aiming with ShotSolver
         public static double TURRET_NUDGE = Math.toRadians(1); // per operator press
 
         // ---- Tracking ----
@@ -98,18 +98,28 @@ public class RobotConstants {
         // Aim from where the robot will be this far ahead, to make up for loop and localizer lag (seconds). TODO: tune
         public static double AIM_LOOKAHEAD = 0.05;
 
-        // ---- Shooting on the move ----
-        // A ball keeps the robot's velocity when it leaves, so lead the target by velocity × time of flight.
+        // ---- Shot model (ShotSolver) ----
+        // Every shot is simulated (gravity, drag, backspin lift) to find the exit speed and turret angle that put the
+        // ball through the middle of the opening, allowing for the robot's motion.
+        public static double HOOD_ANGLE = Math.toRadians(67.608); // fixed hood, above horizontal
+        public static double EXIT_HEIGHT = 13;  // inches above the tiles where the ball leaves. TODO: set from CAD
+        public static double EXIT_RADIUS = 0;   // inches from the turret axis to where the ball leaves. TODO: set from CAD
+        // Flywheel ticks/sec per inch/sec of ball exit speed. Depends on wheel size and grip, so it has to be measured:
+        // stand still, nudge the flywheel until shots go through the middle of the opening, and read "Calibration" in
+        // the TeleOp details. Average it over a few distances. Starting value ≈ a 72 mm wheel at 80% grip.
+        // TODO: calibrate
+        public static double FLYWHEEL_TICKS_PER_EXIT_SPEED = 8.0;
+        // The ball keeps the robot's velocity when it leaves; false simulates every shot from a standstill
         public static boolean SHOOT_ON_THE_MOVE = true;
-        // Ball time of flight for a distance to the hive cell: rows of {inches, seconds}, sorted by distance and
-        // interpolated like VELOCITY_TABLE. Starting values are distance / horizontal speed of the slowest shot in
-        // BiobuzzSim's docs/launcher-design-numbers.md (55-72° hood).
-        // TODO: measure (film a few shots in slow motion; count frames from the gate to the cell)
-        public static double[][] TIME_OF_FLIGHT_TABLE = {
-                {30, 0.47},
-                {45, 0.50},
-                {60, 0.56},
-                {90, 0.63},
-        };
+        // Pollen, from the AndyMark product page. Nectar is bigger and heavier in proportion, so it flies the same.
+        public static double BALL_DIAMETER = 2.8; // inches
+        public static double BALL_MASS = 0.0249;  // kg
+        // Air: drag 0.4-0.6 for a smooth sphere; lift from the hood's backspin 0-0.45. TODO: fit to real shots
+        public static double DRAG_COEFFICIENT = 0.5;
+        public static double LIFT_COEFFICIENT = 0.3;
+        public static double AIR_DENSITY = 1.2;   // kg/m³
+        public static double SCORING_MARGIN = 0.5; // inches the ball's edge must clear each side of the opening by
+        // Ready to shoot once flywheel and turret errors are within this fraction of what the shot can take
+        public static double READY_WINDOW_FRACTION = 0.5;
     }
 }
