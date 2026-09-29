@@ -8,10 +8,11 @@ import com.qualcomm.robotcore.hardware.PIDFCoefficients;
 public class RobotConstants {
     /** Red-side poses in Pedro coordinates (inches). Blue is rotated 180° with Alliance.apply; never write blue poses. */
     public static class Field {
-        // Center of each cell's opening, from the red driver station's point of view
-        // TODO: estimates from the game manual; check against the field CAD or measure
-        public static Pose RED_HIVE_LEFT_CELL = new Pose(59.25, 89.5, 0);  // rear cell
-        public static Pose RED_HIVE_RIGHT_CELL = new Pose(59.25, 54.5, 0); // audience cell
+        // Center of each cell's opening, from the red driver station's point of view. From BiobuzzSim: the hive is
+        // 12.75 in from field center toward our wall, and the up cell's opening is centered 15.7 in out from the hive
+        // center (59.6 in above the tiles, leaning back 30°). TODO: check against the real field
+        public static Pose RED_HIVE_LEFT_CELL = new Pose(59.25, 87.7, 0);  // rear cell
+        public static Pose RED_HIVE_RIGHT_CELL = new Pose(59.25, 56.3, 0); // audience cell
 
         // Pose resets: robot pushed into the corner, back against the alliance wall.
         // 9 in = half of an 18 in robot. TODO: use the real robot size from CAD
@@ -85,9 +86,30 @@ public class RobotConstants {
         // TODO: tune
         public static double TURRET_KP = 1.0;         // power per radian of error
         public static double TURRET_KI = 0;           // power per radian-second
-        public static double TURRET_KD = 0;           // power per radian/sec of turret speed
+        public static double TURRET_KD = 0;           // power per radian/sec of speed error
         public static double TURRET_MAX_POWER = 0.8;
         public static double TURRET_ANGLE_TOLERANCE = Math.toRadians(1);
         public static double TURRET_NUDGE = Math.toRadians(1); // per operator press
+
+        // ---- Tracking ----
+        // Velocity feedforward, so the turret keeps up while the robot drives and turns instead of lagging behind.
+        // Power per radian/sec of turret speed. 1 / free speed is a good start: 1150 RPM / (100/30) ≈ 36 rad/s. TODO: tune
+        public static double TURRET_KV = 1.0 / 36;
+        // Aim from where the robot will be this far ahead, to make up for loop and localizer lag (seconds). TODO: tune
+        public static double AIM_LOOKAHEAD = 0.05;
+
+        // ---- Shooting on the move ----
+        // A ball keeps the robot's velocity when it leaves, so lead the target by velocity × time of flight.
+        public static boolean SHOOT_ON_THE_MOVE = true;
+        // Ball time of flight for a distance to the hive cell: rows of {inches, seconds}, sorted by distance and
+        // interpolated like VELOCITY_TABLE. Starting values are distance / horizontal speed of the slowest shot in
+        // BiobuzzSim's docs/launcher-design-numbers.md (55-72° hood).
+        // TODO: measure (film a few shots in slow motion; count frames from the gate to the cell)
+        public static double[][] TIME_OF_FLIGHT_TABLE = {
+                {30, 0.47},
+                {45, 0.50},
+                {60, 0.56},
+                {90, 0.63},
+        };
     }
 }
