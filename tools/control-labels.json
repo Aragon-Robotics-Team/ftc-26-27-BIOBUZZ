@@ -1,0 +1,46 @@
+{
+  "_help": "Wording for doc/controls.html. Keys are [init.]gamepad<N>.<control>; see tools/control_layout.py. '*' applies to every OpMode. Rebuild or run: python3 tools/control_layout.py",
+
+  "*": {
+    "init.gamepad1.square": "Blue alliance",
+    "init.gamepad1.circle": "Red alliance"
+  },
+
+  "TeleOp": {
+    "gamepad1": "Driver",
+    "gamepad2": "Operator",
+
+    "gamepad1.left_stick": "Drive (field-centric: forward = away from our driver station)",
+    "gamepad1.right_stick": "Turn",
+    "gamepad1.left_trigger": "Hold: slow mode",
+    "gamepad1.right_trigger": "Hold: open gate and feed the shooter",
+    "gamepad1.right_bumper": "Flywheel on",
+    "gamepad1.left_bumper": "Flywheel off",
+    "gamepad1.triangle": "Toggle intake",
+    "gamepad1.cross": "Toggle outtake",
+
+    "gamepad2.dpad_left": "Nudge turret left",
+    "gamepad2.dpad_right": "Nudge turret right",
+    "gamepad2.dpad_up": "Flywheel speed up",
+    "gamepad2.dpad_down": "Flywheel speed down",
+    "gamepad2.square": "Hive: LEFT cell is up",
+    "gamepad2.circle": "Hive: RIGHT cell is up",
+    "gamepad2.share": "Reset pose: pushed into our LEFT corner, back to alliance wall",
+    "gamepad2.options": "Reset pose: pushed into our RIGHT corner, back to alliance wall"
+  },
+
+  "Auto": {
+    "init.gamepad1.dpad_up": "Previous routine",
+    "init.gamepad1.dpad_down": "Next routine"
+  },
+
+  "Turret Tuner": {
+    "gamepad1.square": "Jump target left by stepDegrees",
+    "gamepad1.cross": "Jump target to center",
+    "gamepad1.circle": "Jump target right by stepDegrees"
+  },
+
+  "Flywheel Tuner": {
+    "gamepad1.cross": "Toggle flywheel on / off"
+  }
+}
