@@ -2,14 +2,12 @@ package org.firstinspires.ftc.teamcode.examples;
 
 import static com.pedropathing.api.Paths.line;
 import static com.pedropathing.ivy.Scheduler.schedule;
-import static com.pedropathing.ivy.commands.Commands.infinite;
-import static com.pedropathing.ivy.commands.Commands.instant;
 import static com.pedropathing.ivy.commands.Commands.waitMs;
-import static com.pedropathing.ivy.commands.Commands.waitUntil;
 import static com.pedropathing.ivy.groups.Groups.deadline;
 import static com.pedropathing.ivy.groups.Groups.parallel;
 import static com.pedropathing.ivy.groups.Groups.sequential;
 import static com.pedropathing.ivy.pedro.PedroCommands.follow;
+import static org.firstinspires.ftc.teamcode.RobotConstants.Field.RED_GOAL_POSE;
 
 import com.pedropathing.api.PoseFactory;
 import com.pedropathing.follower.Follower;
@@ -33,6 +31,7 @@ import org.firstinspires.ftc.teamcode.subsystems.Launcher;
  * Ivy basics:
  * - A Command has start / execute / done / end. Commands.instant runs once, waitMs / waitUntil wait,
  *   PedroCommands.follow drives a path and finishes at the end of it.
+ * - Subsystems hand out their own commands (launcher.spinUp(), intake.intake(), ...).
  * - Groups combine commands: sequential (one after another), parallel (all at once, done when all are done),
  *   deadline (all at once, done when the first one is done).
  * - Scheduler.schedule starts a command; Scheduler.execute must run every loop.
@@ -51,7 +50,6 @@ public class IvyExample extends OpMode {
     private final Pose redLaunchPose = poseFactory.of(24, 0, 0);
     private final Pose redPickupPose = poseFactory.of(24, 24, 90);
     private final Pose redParkPose = poseFactory.of(0, 24, 0);
-    private final Pose redGoalPose = poseFactory.of(72, 72, 0); // what the turret aims at
 
     private Pose startPose;
     private Pose launchPose;
@@ -80,36 +78,27 @@ public class IvyExample extends OpMode {
         Command routine = sequential(
                 // Spin up while driving so the flywheel is ready when we arrive
                 parallel(
-                        instant(launcher::spinUp),
+                        launcher.spinUp(),
                         follow(follower, startToLaunch())
                 ),
-                shoot(),
+                launcher.shoot(),
 
                 // Run the intake on the way to the pickup, stop it on the way back
-                instant(intake::intake),
+                intake.intake(),
                 follow(follower, launchToPickup()),
                 waitMs(300),
-                instant(intake::off),
+                intake.off(),
                 follow(follower, pickupToLaunch()),
-                shoot(),
+                launcher.shoot(),
 
-                instant(launcher::idle),
+                launcher.idle(),
                 follow(follower, park())
         );
 
         // Keep the turret pointed at the goal for as long as the routine runs
         return deadline(
                 routine,
-                infinite(() -> launcher.aimAt(follower.pose(), goalPose))
-        );
-    }
-
-    /** Wait until the launcher is ready (max 1.5 s so a slow flywheel can't stall the auto), then fire. */
-    private Command shoot() {
-        return sequential(
-                waitUntil(launcher::isReady).raceWith(waitMs(1500)),
-                instant(launcher::launch),
-                waitMs(250) // TODO: tune shot delay
+                launcher.aimAt(follower::pose, goalPose)
         );
     }
 
@@ -138,7 +127,7 @@ public class IvyExample extends OpMode {
         launchPose = alliance.apply(redLaunchPose);
         pickupPose = alliance.apply(redPickupPose);
         parkPose = alliance.apply(redParkPose);
-        goalPose = alliance.apply(redGoalPose);
+        goalPose = alliance.apply(RED_GOAL_POSE);
         follower.setPose(startPose);
 
         robot.start();

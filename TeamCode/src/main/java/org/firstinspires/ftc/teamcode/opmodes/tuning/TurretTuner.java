@@ -1,5 +1,8 @@
 package org.firstinspires.ftc.teamcode.opmodes.tuning;
 
+import static com.pedropathing.ivy.Scheduler.schedule;
+
+import com.pedropathing.ivy.Scheduler;
 import com.qualcomm.robotcore.eventloop.opmode.OpMode;
 import com.qualcomm.robotcore.eventloop.opmode.TeleOp;
 
@@ -20,6 +23,8 @@ public class TurretTuner extends OpMode {
 
     @Override
     public void init() {
+        Scheduler.reset();
+
         launcher = new Launcher(hardwareMap);
         menu = new TuningMenu()
                 .add("Step (deg)", 5, () -> stepDegrees, v -> stepDegrees = v)
@@ -39,11 +44,13 @@ public class TurretTuner extends OpMode {
     public void loop() {
         menu.update(gamepad1);
         // Positive angle is counter-clockwise, i.e. to the left
-        if (gamepad1.xWasPressed()) launcher.setTurretAngle(Math.toRadians(stepDegrees));
-        if (gamepad1.aWasPressed()) launcher.setTurretAngle(0);
-        if (gamepad1.bWasPressed()) launcher.setTurretAngle(Math.toRadians(-stepDegrees));
+        if (gamepad1.xWasPressed()) schedule(launcher.turnTurretTo(Math.toRadians(stepDegrees)));
+        if (gamepad1.aWasPressed()) schedule(launcher.turnTurretTo(0));
+        if (gamepad1.bWasPressed()) schedule(launcher.turnTurretTo(Math.toRadians(-stepDegrees)));
 
         launcher.update();
+        Scheduler.execute();
+
         telemetry.addLine("X left, A center, B right");
         telemetry.addData("On target", launcher.isTurretOnTarget());
         launcher.telemetry(telemetry);
@@ -53,6 +60,7 @@ public class TurretTuner extends OpMode {
 
     @Override
     public void stop() {
+        Scheduler.reset();
         launcher.stop();
     }
 }

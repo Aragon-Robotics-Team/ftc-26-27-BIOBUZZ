@@ -1,7 +1,14 @@
 package org.firstinspires.ftc.teamcode.subsystems;
 
+import static com.pedropathing.ivy.commands.Commands.conditional;
+import static com.pedropathing.ivy.commands.Commands.infinite;
+import static com.pedropathing.ivy.commands.Commands.instant;
+import static com.pedropathing.ivy.commands.Commands.waitMs;
+import static com.pedropathing.ivy.commands.Commands.waitUntil;
+import static com.pedropathing.ivy.groups.Groups.sequential;
 import static org.firstinspires.ftc.teamcode.RobotConstants.Launcher.*;
 
+import com.pedropathing.ivy.Command;
 import com.pedropathing.math.Pose;
 import com.pedropathing.utils.Angle;
 import com.qualcomm.robotcore.hardware.DcMotor;
@@ -13,19 +20,18 @@ import com.qualcomm.robotcore.util.Range;
 
 import org.firstinspires.ftc.robotcore.external.Telemetry;
 
-/** Turreted flywheel shooter. The flywheel is velocity-controlled; the turret runs a PID loop on its encoder angle. */
-public class Launcher implements Subsystem {
-    public enum State {
-        IDLE,
-        SPINNING_UP,
-        READY
-    }
+import java.util.function.Supplier;
 
+/**
+ * Turreted flywheel shooter. The flywheel is velocity-controlled; the turret runs a PID loop on its encoder angle.
+ * Flywheel commands require the flywheel motor and turret commands require the turret motor, so aiming and
+ * spinning up can run at the same time.
+ */
+public class Launcher implements Subsystem {
     private final DcMotorEx flywheel;
     private final DcMotorEx turret;
     private final double turretTicksPerRadian = TURRET_MOTOR_TICKS_PER_REV * TURRET_GEAR_RATIO / (2 * Math.PI);
 
-    private State state = State.IDLE;
     private double targetVelocity = 0;
     private double flywheelVelocity = 0;
     private double turretTargetAngle = 0;
@@ -53,55 +59,71 @@ public class Launcher implements Subsystem {
         turret.setMode(DcMotor.RunMode.RUN_WITHOUT_ENCODER);
     }
 
-    // ---- Flywheel ----
+    // ---- Flywheel commands ----
 
-    public void spinUp() {
-        spinUp(TARGET_VELOCITY);
+    /** Spin the flywheel up to TARGET_VELOCITY. Finishes right away; {@link #shoot()} waits for speed. */
+    public Command spinUp() {
+        return instant(() -> targetVelocity = TARGET_VELOCITY).requiring(flywheel);
     }
 
     /** @param velocity ticks/sec */
-    public void spinUp(double velocity) {
+    public Command spinUp(double velocity) {
         // TODO: velocity from distance
-        targetVelocity = velocity;
-        state = State.SPINNING_UP;
+        return instant(() -> targetVelocity = velocity).requiring(flywheel);
     }
 
-    public void idle() {
-        targetVelocity = 0;
-        state = State.IDLE;
+    public Command idle() {
+        return instant(() -> targetVelocity = 0).requiring(flywheel);
     }
 
-    public State getState() {
-        return state;
+    public Command toggleFlywheel() {
+        return conditional(this::isSpinning, idle(), spinUp());
     }
 
-    /** Push new velocity PIDF to the motor controller. Used by the tuning OpMode. */
-    public void setFlywheelPIDF(PIDFCoefficients pidf) {
-        flywheel.setPIDFCoefficients(DcMotor.RunMode.RUN_USING_ENCODER, pidf);
+    // ---- Turret commands ----
+
+    /** Turn to a robot-relative angle (radians, 0 = forward, CCW positive). Finishes once on target. */
+    public Command turnTurretTo(double angle) {
+        return Command.build()
+                .setStart(() -> setTurretTarget(angle))
+                .setDone(this::isTurretOnTarget)
+                .requiring(turret);
     }
 
-    // ---- Turret ----
-
-    /**
-     * Point the turret at a robot-relative angle (radians, 0 = forward, CCW positive).
-     * Clamped to [TURRET_MIN_ANGLE, TURRET_MAX_ANGLE], so targets past the limits need the drivetrain to turn.
-     */
-    public void setTurretAngle(double angle) {
-        turretTargetAngle = Range.clip(Angle.normalizeSigned(angle), TURRET_MIN_ANGLE, TURRET_MAX_ANGLE);
+    /** Keep the turret pointed at a field position. Runs until interrupted. */
+    public Command aimAt(Supplier<Pose> robotPose, Pose target) {
+        return infinite(() -> {
+            // TODO: turret offset from center
+            Pose pose = robotPose.get();
+            double fieldAngle = Math.atan2(target.y() - pose.y(), target.x() - pose.x());
+            setTurretTarget(fieldAngle - pose.heading());
+        }).requiring(turret);
     }
 
-    /** Point the turret at a field position, given where the robot is. */
-    public void aimAt(Pose robotPose, Pose target) {
-        // TODO: turret offset from center
-        double fieldAngle = Math.atan2(target.y() - robotPose.y(), target.x() - robotPose.x());
-        setTurretAngle(fieldAngle - robotPose.heading());
+    // ---- Shooting commands ----
+
+    /** Wait until ready (max 1.5 s so a slow flywheel can't stall), then fire. */
+    public Command shoot() {
+        // TODO: require the feeder once it exists
+        return sequential(
+                waitUntil(this::isReady).raceWith(waitMs(1500)),
+                instant(this::fire),
+                waitMs(250) // TODO: tune shot delay
+        );
     }
 
-    /** Tell the launcher where the turret is right now, e.g. the angle Auto left it at. */
-    public void setCurrentTurretAngle(double angle) {
-        turretAngleOffset = angle - turret.getCurrentPosition() / turretTicksPerRadian;
-        turretAngle = angle;
-        lastTurretAngle = angle;
+    private void fire() {
+        // TODO: fire feeder / gate
+    }
+
+    // ---- State ----
+
+    public boolean isSpinning() {
+        return targetVelocity != 0;
+    }
+
+    public boolean isFlywheelAtSpeed() {
+        return isSpinning() && Math.abs(targetVelocity - flywheelVelocity) <= VELOCITY_TOLERANCE;
     }
 
     /** Robot-relative turret angle in radians, as of the last {@link #update()}. */
@@ -113,16 +135,28 @@ public class Launcher implements Subsystem {
         return Math.abs(turretTargetAngle - getTurretAngle()) <= TURRET_ANGLE_TOLERANCE;
     }
 
-    // ---- Shooting ----
-
     /** Flywheel is at speed and the turret is on target. */
     public boolean isReady() {
-        return state == State.READY && isTurretOnTarget();
+        return isFlywheelAtSpeed() && isTurretOnTarget();
     }
 
-    /** Fire a game piece. Only meaningful once {@link #isReady()}. */
-    public void launch() {
-        // TODO: fire feeder / gate
+    // ---- Setup ----
+
+    /** Push new velocity PIDF to the motor controller. Used by the tuning OpMode. */
+    public void setFlywheelPIDF(PIDFCoefficients pidf) {
+        flywheel.setPIDFCoefficients(DcMotor.RunMode.RUN_USING_ENCODER, pidf);
+    }
+
+    /** Tell the launcher where the turret is right now, e.g. the angle Auto left it at. */
+    public void setCurrentTurretAngle(double angle) {
+        turretAngleOffset = angle - turret.getCurrentPosition() / turretTicksPerRadian;
+        turretAngle = angle;
+        lastTurretAngle = angle;
+    }
+
+    /** Clamped to [TURRET_MIN_ANGLE, TURRET_MAX_ANGLE], so targets past the limits need the drivetrain to turn. */
+    private void setTurretTarget(double angle) {
+        turretTargetAngle = Range.clip(Angle.normalizeSigned(angle), TURRET_MIN_ANGLE, TURRET_MAX_ANGLE);
     }
 
     @Override
@@ -137,13 +171,8 @@ public class Launcher implements Subsystem {
     public void update() {
         flywheelVelocity = flywheel.getVelocity();
         turretAngle = turret.getCurrentPosition() / turretTicksPerRadian + turretAngleOffset;
-        if (state == State.IDLE) {
-            flywheel.setPower(0);
-        } else {
-            flywheel.setVelocity(targetVelocity);
-            // Drops back to SPINNING_UP when a shot pulls the speed down
-            state = Math.abs(targetVelocity - flywheelVelocity) <= VELOCITY_TOLERANCE ? State.READY : State.SPINNING_UP;
-        }
+        if (isSpinning()) flywheel.setVelocity(targetVelocity);
+        else flywheel.setPower(0);
 
         updateTurret();
     }
@@ -168,14 +197,14 @@ public class Launcher implements Subsystem {
 
     @Override
     public void stop() {
-        idle();
+        targetVelocity = 0;
         flywheel.setPower(0);
         turret.setPower(0);
     }
 
     @Override
     public void telemetry(Telemetry telemetry) {
-        telemetry.addData("Launcher", state);
+        telemetry.addData("Launcher ready", isReady());
         telemetry.addData("Flywheel target / actual", "%.0f / %.0f", targetVelocity, flywheelVelocity);
         telemetry.addData("Turret target / actual (deg)", "%.1f / %.1f",
                 Math.toDegrees(turretTargetAngle), Math.toDegrees(getTurretAngle()));

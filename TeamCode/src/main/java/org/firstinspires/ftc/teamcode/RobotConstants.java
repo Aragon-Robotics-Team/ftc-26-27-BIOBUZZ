@@ -1,10 +1,17 @@
 package org.firstinspires.ftc.teamcode;
 
+import com.pedropathing.math.Pose;
 import com.qualcomm.robotcore.hardware.DcMotorSimple;
 import com.qualcomm.robotcore.hardware.PIDFCoefficients;
 
 /** Every robot tunable and hardware name in one place. Drivetrain / localizer config lives in pedro.Constants. */
 public class RobotConstants {
+    public static class Field {
+        // Red side. Blue is mirrored with Alliance.apply
+        // TODO: real goal position
+        public static Pose RED_GOAL_POSE = new Pose(72, 72, 0); // what the turret aims at
+    }
+
     public static class Intake {
         // TODO: match robot config
         public static String MOTOR_NAME = "intake";

@@ -1,7 +1,11 @@
 package org.firstinspires.ftc.teamcode.subsystems;
 
+import static com.pedropathing.ivy.commands.Commands.instant;
+import static org.firstinspires.ftc.teamcode.RobotConstants.Intake.INTAKE_POWER;
 import static org.firstinspires.ftc.teamcode.RobotConstants.Intake.MOTOR_NAME;
+import static org.firstinspires.ftc.teamcode.RobotConstants.Intake.OUTTAKE_POWER;
 
+import com.pedropathing.ivy.Command;
 import com.qualcomm.robotcore.hardware.DcMotorEx;
 import com.qualcomm.robotcore.hardware.HardwareMap;
 
@@ -9,49 +13,38 @@ import org.firstinspires.ftc.robotcore.external.Telemetry;
 
 // TODO: match the real intake
 public class Intake implements Subsystem {
-    public enum State {
-        OFF,
-        INTAKING,
-        OUTTAKING
-    }
-
     private final DcMotorEx motor;
-    private State state = State.OFF;
 
     public Intake(HardwareMap hardwareMap) {
         // TODO: set direction + zero power behavior
         motor = hardwareMap.get(DcMotorEx.class, MOTOR_NAME);
     }
 
-    public void intake() {
-        state = State.INTAKING;
+    // ---- Commands ----
+
+    public Command intake() {
+        return setPower(INTAKE_POWER);
     }
 
-    public void outtake() {
-        state = State.OUTTAKING;
+    public Command outtake() {
+        return setPower(OUTTAKE_POWER);
     }
 
-    public void off() {
-        state = State.OFF;
+    public Command off() {
+        return setPower(0);
     }
 
-    public State getState() {
-        return state;
-    }
-
-    @Override
-    public void update() {
-        // TODO: set power for state
+    private Command setPower(double power) {
+        return instant(() -> motor.setPower(power)).requiring(motor);
     }
 
     @Override
     public void stop() {
-        off();
         motor.setPower(0);
     }
 
     @Override
     public void telemetry(Telemetry telemetry) {
-        telemetry.addData("Intake", state);
+        telemetry.addData("Intake power", "%.2f", motor.getPower());
     }
 }

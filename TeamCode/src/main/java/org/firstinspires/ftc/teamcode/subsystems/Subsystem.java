@@ -2,13 +2,17 @@ package org.firstinspires.ftc.teamcode.subsystems;
 
 import org.firstinspires.ftc.robotcore.external.Telemetry;
 
-/** Common lifecycle every subsystem implements. The OpMode drives these through {@link org.firstinspires.ftc.teamcode.Robot}. */
+/**
+ * Common lifecycle every subsystem implements. The OpMode drives these through {@link org.firstinspires.ftc.teamcode.Robot}.
+ * Actions are exposed as Ivy commands (methods returning {@code Command}) that the OpMode schedules;
+ * update() runs every loop to push whatever those commands set to hardware.
+ */
 public interface Subsystem {
     /** Called once when the match starts, before the first update(). */
     default void start() {}
 
-    /** Push the current target state to hardware. */
-    void update();
+    /** Read sensors, run control loops, and push the current targets to hardware. Called every loop. */
+    default void update() {}
 
     /** Put the subsystem into a safe, powered-down state. */
     void stop();

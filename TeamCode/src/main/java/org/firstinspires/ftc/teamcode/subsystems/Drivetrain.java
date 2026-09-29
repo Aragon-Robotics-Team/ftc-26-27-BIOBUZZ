@@ -1,14 +1,22 @@
 package org.firstinspires.ftc.teamcode.subsystems;
 
+import static com.pedropathing.ivy.commands.Commands.infinite;
+
 import com.pedropathing.follower.Follower;
+import com.pedropathing.ivy.Command;
+import com.pedropathing.ivy.behaviors.InterruptedBehavior;
 import com.pedropathing.math.Pose;
-import com.pedropathing.paths.Path;
 import com.qualcomm.robotcore.hardware.HardwareMap;
 
 import org.firstinspires.ftc.robotcore.external.Telemetry;
 import org.firstinspires.ftc.teamcode.pedro.Constants;
 
-/** Thin wrapper around the Pedro Pathing {@link Follower}, configured in {@link Constants}. */
+import java.util.function.DoubleSupplier;
+
+/**
+ * Thin wrapper around the Pedro Pathing {@link Follower}, configured in {@link Constants}.
+ * Autos drive paths with {@code PedroCommands.follow(follower, path)}.
+ */
 public class Drivetrain implements Subsystem {
     private final Follower follower;
 
@@ -30,26 +38,17 @@ public class Drivetrain implements Subsystem {
         follower.setPose(pose);
     }
 
-    // ---- TeleOp ----
+    // ---- Commands ----
 
-    /** Robot-centric drive. Inputs are in [-1, 1]. */
-    public void drive(double forward, double strafe, double turn) {
+    /**
+     * Robot-centric drive from the sticks (inputs in [-1, 1]). Runs until interrupted.
+     * A later command that requires the drivetrain (e.g. an auto-align path) suspends this, and it resumes after.
+     */
+    public Command drive(DoubleSupplier forward, DoubleSupplier strafe, DoubleSupplier turn) {
         // TODO: field-centric option
-        follower.manual(forward, strafe, turn);
-    }
-
-    // ---- Autonomous ----
-
-    public void follow(Path path) {
-        follower.follow(path);
-    }
-
-    public void hold(Pose pose) {
-        follower.hold(pose);
-    }
-
-    public boolean isBusy() {
-        return follower.isBusy();
+        return infinite(() -> follower.manual(forward.getAsDouble(), strafe.getAsDouble(), turn.getAsDouble()))
+                .requiring(this)
+                .setInterruptedBehavior(InterruptedBehavior.SUSPEND);
     }
 
     @Override

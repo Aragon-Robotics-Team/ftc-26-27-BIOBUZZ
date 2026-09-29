@@ -1,7 +1,9 @@
 package org.firstinspires.ftc.teamcode.opmodes.tuning;
 
+import static com.pedropathing.ivy.Scheduler.schedule;
 import static org.firstinspires.ftc.teamcode.RobotConstants.Launcher.FLYWHEEL_PIDF;
 
+import com.pedropathing.ivy.Scheduler;
 import com.qualcomm.robotcore.eventloop.opmode.OpMode;
 import com.qualcomm.robotcore.eventloop.opmode.TeleOp;
 
@@ -18,10 +20,11 @@ import org.firstinspires.ftc.teamcode.subsystems.Launcher;
 public class FlywheelTuner extends OpMode {
     private Launcher launcher;
     private TuningMenu menu;
-    private boolean spinning = false;
 
     @Override
     public void init() {
+        Scheduler.reset();
+
         launcher = new Launcher(hardwareMap);
         menu = new TuningMenu()
                 .add("Target (ticks/s)", 100,
@@ -41,16 +44,14 @@ public class FlywheelTuner extends OpMode {
     public void loop() {
         if (menu.update(gamepad1)) {
             launcher.setFlywheelPIDF(FLYWHEEL_PIDF);
-            if (spinning) launcher.spinUp(); // pick up a new target
+            if (launcher.isSpinning()) schedule(launcher.spinUp()); // pick up a new target
         }
-        if (gamepad1.aWasPressed()) {
-            spinning = !spinning;
-            if (spinning) launcher.spinUp();
-            else launcher.idle();
-        }
+        if (gamepad1.aWasPressed()) schedule(launcher.toggleFlywheel());
 
         launcher.update();
-        telemetry.addData("Flywheel", spinning ? "ON (A to stop)" : "OFF (A to start)");
+        Scheduler.execute();
+
+        telemetry.addData("Flywheel", launcher.isSpinning() ? "ON (A to stop)" : "OFF (A to start)");
         launcher.telemetry(telemetry);
         menu.telemetry(telemetry);
         telemetry.update();
@@ -58,6 +59,7 @@ public class FlywheelTuner extends OpMode {
 
     @Override
     public void stop() {
+        Scheduler.reset();
         launcher.stop();
     }
 }
