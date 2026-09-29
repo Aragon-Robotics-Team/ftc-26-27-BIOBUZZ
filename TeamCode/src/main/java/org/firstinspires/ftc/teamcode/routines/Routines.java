@@ -13,6 +13,7 @@ import java.util.List;
  * Every auto the drivers can pick from, in menu order. Register new routines here.
  * Put {@code @Disabled} on a routine class to hide it from the menu, same as for an OpMode.
  */
+//super advanced reflection stuff wow!
 public enum Routines {
     CYCLE_GARDEN_PARK(CycleGardenPark.class),
     EXAMPLE(ExampleRoutine.class);
