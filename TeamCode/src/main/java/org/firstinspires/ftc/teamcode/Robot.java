@@ -68,7 +68,7 @@ public class Robot {
         return launcher.aimAt(drivebase::getPose, drivebase::getVelocity, this::hiveTarget);
     }
 
-    /** Flywheel speed follows the distance to the hive's up cell (led while moving). Runs until launcher.idle(). */
+    /** Flywheel speed follows the simulated shot into the hive's up cell. Runs until launcher.idle(). */
     public Command enableFlywheel() {
         return launcher.enableFlywheel(drivebase::getPose, drivebase::getVelocity, this::hiveTarget);
     }

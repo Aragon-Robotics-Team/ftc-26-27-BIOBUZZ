@@ -132,7 +132,7 @@ public class TeleOp extends OpMode {
                 flywheelStatus(launcher), launcher.getFlywheelVelocity(), launcher.getTargetVelocity(),
                 launcher.getVelocityNudge()));
         telemetry.addLine(String.format("Turret %s  %.1f° / %.1f°  (%+.0f°)",
-                launcher.isTurretOnTarget() ? color("ON TARGET", Html.GREEN) : color("AIMING", Html.YELLOW),
+                turretStatus(launcher),
                 Math.toDegrees(launcher.getTurretTargetAngle()), Math.toDegrees(launcher.getTurretAngle()),
                 Math.toDegrees(launcher.getTurretNudge())));
         telemetry.addLine(String.format("Distance to hive  %.1f in", robot.distanceToHive()));
@@ -148,7 +148,12 @@ public class TeleOp extends OpMode {
         telemetry.update();
     }
 
-    private static String flywheelStatus(Launcher launcher) {
+    private static String turretStatus(Launcher launcher) {
+        if (!launcher.hasShot()) return color("NO SHOT", Html.RED);
+        return launcher.isTurretOnTarget() ? color("ON TARGET", Html.GREEN) : color("AIMING", Html.YELLOW);
+    }
+
+        private static String flywheelStatus(Launcher launcher) {
         if (!launcher.isSpinning()) return bold("OFF");
         if (launcher.isFlywheelAtSpeed()) return bold(color("READY", Html.GREEN));
         return launcher.getFlywheelVelocity() < launcher.getTargetVelocity()
