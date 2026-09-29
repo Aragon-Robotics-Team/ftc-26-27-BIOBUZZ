@@ -213,7 +213,6 @@ pre.code { margin: 0; font: 0.8rem/1.5 var(--mono); white-space: pre; overflow-x
         <div class="guide">
           <h3 id="guideTitle"></h3>
           <ol id="guideSteps"></ol>
-          <div id="guideNotes"></div>
         </div>
       </div>
     </section>
@@ -263,17 +262,17 @@ pre.code { margin: 0; font: 0.8rem/1.5 var(--mono); white-space: pre; overflow-x
       </div>
       <div class="view-body">
         <details class="group" open>
-          <summary><svg viewBox="0 0 24 24"><path d="M16.59 8.59L12 13.17 7.41 8.59 6 10l6 6 6-6z"/></svg><span id="gainsTitle">Gains</span></summary>
+          <summary><svg viewBox="0 0 24 24"><path d="M16.59 8.59L12 13.17 7.41 8.59 6 10l6 6 6-6z"/></svg><span id="gainsTitle">Turret</span></summary>
           <table class="config"><tbody id="gains"></tbody></table>
         </details>
         <details class="group" open>
-          <summary><svg viewBox="0 0 24 24"><path d="M16.59 8.59L12 13.17 7.41 8.59 6 10l6 6 6-6z"/></svg>Real-world effects</summary>
+          <summary><svg viewBox="0 0 24 24"><path d="M16.59 8.59L12 13.17 7.41 8.59 6 10l6 6 6-6z"/></svg>Robot</summary>
           <table class="config"><tbody>
-            <tr><td><label for="loopMs">loopMs</label><small>ms per OpMode loop</small></td><td><input type="text" id="loopMs" size="15"></td></tr>
-            <tr><td><label for="voltage">battery</label><small>volts</small></td><td><input type="text" id="voltage" size="15"></td></tr>
+            <tr><td><label for="loopMs">loopMs</label></td><td><input type="text" id="loopMs" size="15"></td></tr>
+            <tr><td><label for="voltage">batteryVolts</label></td><td><input type="text" id="voltage" size="15"></td></tr>
             <tr><td><label for="noise">sensorNoise</label></td><td><input type="checkbox" id="noise" checked></td></tr>
             <tr><td><label for="friction">friction</label></td><td><input type="checkbox" id="friction" checked></td></tr>
-            <tr><td><label for="mystery">mysteryRobot</label><small>hidden physics</small></td><td><input type="checkbox" id="mystery"></td></tr>
+            <tr><td><label for="mystery">mysteryRobot</label></td><td><input type="checkbox" id="mystery"></td></tr>
           </tbody></table>
           <div class="config-actions" id="mysteryRow" hidden>
             <button class="small-btn" id="reroll" type="button">New robot</button>
@@ -619,42 +618,30 @@ function flywheelTune(realism, physicsOverride) {
 
 const GUIDES = {
   turret: {
-    title: 'How to tune the turret',
+    title: 'How to tune',
     steps: [
-      'Set kI and kD to 0. Raise kP until the turret reaches 45° quickly and overshoots a little.',
-      'Raise kD until the overshoot is gone. Too much kD makes it slow, and jittery with sensor noise on.',
-      'If it stops just short of 45° because of friction, add a little kI.',
-      'Pick "Track while the robot turns". A good turret stays close to the target the whole time.',
-      'Press Auto-tune. It runs the same relay test as the robot\'s Turret Auto Tuner, so you can compare its gains with yours.',
-    ],
-    notes: [
-      'On the robot: run Turret Auto Tuner, fine-tune in Turret Tuner with Panels, then paste the result into RobotConstants.Launcher.',
+      'kI, kD = 0. Raise kP until it overshoots a little.',
+      'Raise kD until the overshoot is gone.',
+      'Add a little kI if it stops short.',
+      'Check "Track while the robot turns".',
     ],
   },
   flywheel: {
-    title: 'How to tune the flywheel',
+    title: 'How to tune',
     steps: [
-      'Set kP to 0. Raise kF until the speed levels off just under 2000. A good kF is about 1 ÷ top speed.',
-      'Raise kP until it reaches 2000 without overshooting.',
-      'Pick "Recover from 3 shots". Raise kP until each dip recovers quickly.',
-      'If it settles a little under 2000, add a small kI. kD rarely helps a flywheel.',
-      'Press Auto-tune. It runs the same steps as the robot\'s Flywheel Auto Tuner.',
-    ],
-    notes: [
-      'On the robot: run Flywheel Auto Tuner, then fine-tune in Flywheel Tuner. The Control Hub\'s velocity PIDF uses its own scale: its F is 32767 × kF, but its P isn\'t directly comparable.',
+      'kP = 0. Raise kF until it levels off just under 2000.',
+      'Raise kP until it reaches 2000 without overshoot.',
+      'Check "Recover from 3 shots".',
+      'Add a small kI if it settles low.',
     ],
   },
   arm: {
-    title: 'How to tune an arm with gravity',
+    title: 'How to tune',
     steps: [
-      'Set kP, kI and kD to 0. Raise kG until the arm stays where it starts instead of falling or rising.',
+      'kP, kI, kD = 0. Raise kG until the arm holds still.',
       'Raise kP until it reaches 45° quickly.',
-      'Add kD to remove overshoot. Add kI only if it stops short.',
-      'Pick "Pick up a 0.6 kg game piece". The extra weight makes it sag; watch kP and kI pull it back.',
-      'Press Auto-tune with kG set. It uses the relay test on top of kG.',
-    ],
-    notes: [
-      'kG × cos(angle) is the power that holds the arm still: most when level, none when straight up. This arm isn\'t on the BIOBUZZ robot; it\'s here because arms and lifts are the most common PID in FTC.',
+      'Add kD to remove overshoot.',
+      'Check "Pick up a 0.6 kg game piece".',
     ],
   },
 };
@@ -733,13 +720,13 @@ $('scenario').addEventListener('change', e => { state.scenario[state.plant] = e.
 
 function buildGains() {
   const p = PLANTS[state.plant];
-  $('gainsTitle').textContent = `${p.name} gains`;
+  $('gainsTitle').textContent = p.name;
   const body = $('gains');
   body.innerHTML = '';
   for (const [key, spec] of Object.entries(p.gains)) {
     const id = `g-${state.plant}-${key}`;
     const row = document.createElement('tr');
-    row.innerHTML = `<td><label for="${id}">${spec.label}</label>${spec.unit ? `<small>${spec.unit}</small>` : ''}</td>
+    row.innerHTML = `<td><label for="${id}">${spec.label}</label></td>
       <td><input type="text" id="${id}" size="15" spellcheck="false" autocomplete="off"></td>`;
     body.appendChild(row);
     const plant = state.plant;
@@ -767,7 +754,6 @@ function buildGuide() {
   const g = GUIDES[state.plant];
   $('guideTitle').textContent = g.title;
   $('guideSteps').innerHTML = g.steps.map(s => `<li>${s}</li>`).join('');
-  $('guideNotes').innerHTML = g.notes.map(s => `<p>${s}</p>`).join('');
   $('log').innerHTML = '';
 }
 
@@ -832,26 +818,26 @@ function renderTelemetry() {
   const goalText = v => (p.kind === 'velocity' ? `${p.display(v).toFixed(0)} ${p.unit}` : `${+p.display(v).toFixed(2)}${p.unit}`);
   const lines = [];
   const add = (label, value, goal, pass) => {
-    if (judged && goal) lines.push(`${label}: <span class="${pass ? 'pass' : 'fail'}">${value}</span> <span class="dim">(${goal})</span>`);
+    if (judged && goal) lines.push(`${label}: <span class="${pass ? 'pass' : 'fail'}">${value}</span> <span class="dim">${goal}</span>`);
     else lines.push(`${label}: ${value}`);
   };
   if (sc.type === 'step') {
     add('riseTime', m.rise == null ? 'never' : `${m.rise.toFixed(2)} s`);
-    add('overshoot', `${(m.overshoot * 100).toFixed(1)}%`, c.overshoot != null ? `target under ${Math.round(c.overshoot * 100)}%` : null, m.overshoot <= c.overshoot);
-    add('settlingTime', m.settle == null ? 'never' : `${m.settle.toFixed(2)} s`, c.settle != null ? `target within ${c.settle} s` : null, m.settle != null && m.settle <= c.settle);
+    add('overshoot', `${(m.overshoot * 100).toFixed(1)}%`, c.overshoot != null ? `< ${Math.round(c.overshoot * 100)}%` : null, m.overshoot <= c.overshoot);
+    add('settlingTime', m.settle == null ? 'never' : `${m.settle.toFixed(2)} s`, c.settle != null ? `< ${c.settle} s` : null, m.settle != null && m.settle <= c.settle);
   } else {
     add(sc.type === 'shots' ? 'worstDip' : sc.type === 'load' ? 'worstSag' : 'worstError', fmtValue(m.worst));
-    add('recovery', m.recover == null ? 'never' : `${m.recover.toFixed(2)} s`, c.recover != null ? `target within ${c.recover} s` : null, m.recover != null && m.recover <= c.recover);
+    add('recovery', m.recover == null ? 'never' : `${m.recover.toFixed(2)} s`, c.recover != null ? `< ${c.recover} s` : null, m.recover != null && m.recover <= c.recover);
   }
-  add('finalError', fmtValue(m.sse), c.sse != null ? `target within ${goalText(c.sse)}` : null, m.sse <= c.sse);
-  add('powerMaxedOut', `${(m.saturated * 100).toFixed(0)}% of the time`);
+  add('finalError', fmtValue(m.sse), c.sse != null ? `< ${goalText(c.sse)}` : null, m.sse <= c.sse);
+  add('powerMaxedOut', `${(m.saturated * 100).toFixed(0)}%`);
   $('telemetry').innerHTML = lines.join('<br>');
 
   // Practice target summary in the Op Mode view
   const status = $('status');
   status.className = 'status-line';
   if (!judged) {
-    status.innerHTML = `Practice target is on "${p.scenarios[c.scenario].label}". <button class="link" type="button" id="goTarget">Switch to it</button>`;
+    status.innerHTML = `<button class="link" type="button" id="goTarget">Go to the practice target</button>`;
     $('goTarget').addEventListener('click', () => { state.scenario[key] = c.scenario; $('scenario').value = c.scenario; rerun(); });
     return;
   }
@@ -859,8 +845,8 @@ function renderTelemetry() {
   const passed = checks.filter(x => x.pass).length;
   status.classList.add(passed === checks.length ? 'pass' : 'fail');
   status.textContent = passed === checks.length
-    ? 'Practice target met. Try it on the mystery robot.'
-    : `Practice target: ${passed} of ${checks.length} met`;
+    ? 'Target met'
+    : `Target: ${passed} of ${checks.length}`;
 }
 
 // ---- Graph ----
@@ -1146,18 +1132,16 @@ $('autotune').addEventListener('click', () => {
   const log = $('log');
   if (PLANTS[key].kind === 'velocity') {
     const r = flywheelTune(state.realism, physicsOverride());
-    if (!r.best) { log.innerHTML = 'Auto-tune: no kP settled without overshooting. Tune kP by hand.'; return; }
-    log.innerHTML = `Auto-tune: top speed ${r.top.toFixed(0)} ticks/s, so kF = 1 ÷ ${r.top.toFixed(0)} = ${fmtGain(r.kF)}<br>`
-      + `Auto-tune: out of ${r.tried.length} kP values, ${fmtGain(r.best.gains.kP)} settled fastest (${r.best.m.settle.toFixed(2)} s) without overshooting`;
+    if (!r.best) { log.innerHTML = 'Auto-tune failed: tune kP by hand.'; return; }
+    log.innerHTML = `topSpeed: ${r.top.toFixed(0)} ticks/s`;
     setGains({ kF: r.kF, kP: r.best.gains.kP, kI: 0, kD: 0 });
     return;
   }
   const r = relayTune(key, state.gains[key], state.realism, physicsOverride());
-  if (!r) { log.innerHTML = 'Auto-tune: the relay test never oscillated. Set friction to false or lower loopMs, then run it again.'; return; }
+  if (!r) { log.innerHTML = 'Auto-tune failed: turn friction off and retry.'; return; }
   const deg = PLANTS[key].display;
-  log.innerHTML = `Auto-tune: swung ±${deg(r.amplitude).toFixed(2)}° every ${r.tu.toFixed(3)} s, so Ku = ${r.ku.toFixed(3)}, Tu = ${r.tu.toFixed(3)} s<br>`
-    + `Auto-tune: applied the no-overshoot gains. <button class="link" type="button" id="useClassic">Use classic Ziegler-Nichols instead</button> (faster, about 25% overshoot)`
-    + (key === 'arm' && !(state.gains.arm.kG > 0) ? '<br>Auto-tune: kG is 0, so gravity skews the test. Set kG first for better gains.' : '');
+  log.innerHTML = `Ku: ${r.ku.toFixed(3)}<br>Tu: ${r.tu.toFixed(3)} s<br><button class="link" type="button" id="useClassic">Use classic Ziegler-Nichols</button>`
+    + (key === 'arm' && !(state.gains.arm.kG > 0) ? '<br>Set kG first.' : '');
   setGains(r.gentle);
   $('useClassic').addEventListener('click', () => setGains(r.classic));
 });
@@ -1174,11 +1158,11 @@ $('resetIcon').addEventListener('click', resetGains);
 $('copy').addEventListener('click', () => {
   const text = $('code').textContent;
   const log = $('log');
-  const done = () => { log.innerHTML = 'Copied the gains as code.'; };
+  const done = () => { log.innerHTML = 'Copied'; };
   const fallback = () => {
     const r = document.createRange(); r.selectNodeContents($('code'));
     const sel = getSelection(); sel.removeAllRanges(); sel.addRange(r);
-    log.innerHTML = 'Selected the gains as code below. Press Ctrl+C (Cmd+C on a Mac) to copy.';
+    log.innerHTML = 'Selected: press Ctrl+C';
   };
   if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(text).then(done, fallback);
   else fallback();
@@ -1198,7 +1182,7 @@ function bindRealism() {
   $('reveal').addEventListener('click', () => {
     if (!state.mystery) return;
     const m = state.mystery, pct = v => `${Math.round(v * 100)}%`;
-    $('mysteryNote').textContent = `This robot has ${pct(m.J)} of the normal inertia, ${pct(m.friction)} of the friction and ${pct(m.stallTorque)} of the motor torque.`;
+    $('mysteryNote').textContent = `Inertia ${pct(m.J)}, friction ${pct(m.friction)}, torque ${pct(m.stallTorque)}`;
     $('mysteryNote').hidden = false;
   });
 }
