@@ -3,9 +3,6 @@ package org.firstinspires.ftc.teamcode.subsystems;
 import static com.pedropathing.ivy.commands.Commands.conditional;
 import static com.pedropathing.ivy.commands.Commands.infinite;
 import static com.pedropathing.ivy.commands.Commands.instant;
-import static com.pedropathing.ivy.commands.Commands.waitMs;
-import static com.pedropathing.ivy.commands.Commands.waitUntil;
-import static com.pedropathing.ivy.groups.Groups.sequential;
 import static org.firstinspires.ftc.teamcode.RobotConstants.Launcher.*;
 
 import com.pedropathing.ivy.Command;
@@ -25,7 +22,7 @@ import java.util.function.Supplier;
 /**
  * Turreted flywheel shooter. The flywheel is velocity-controlled; the turret runs a PID loop on its encoder angle.
  * Flywheel commands require the flywheel motor and turret commands require the turret motor, so aiming and
- * spinning up can run at the same time.
+ * spinning up can run at the same time. The gate and intake do the actual feeding (see Robot).
  */
 public class Launcher implements Subsystem {
     private final DcMotorEx flywheel;
@@ -37,6 +34,10 @@ public class Launcher implements Subsystem {
     private double turretTargetAngle = 0;
     private double turretAngle = 0;
     private double turretAngleOffset = 0;
+
+    // Operator corrections for drift in the velocity table or localization. New every OpMode, so they reset each match.
+    private double velocityNudge = 0;
+    private double turretNudge = 0;
 
     private final ElapsedTime turretTimer = new ElapsedTime();
     private double turretIntegral = 0;
@@ -61,15 +62,18 @@ public class Launcher implements Subsystem {
 
     // ---- Flywheel commands ----
 
-    /** Spin the flywheel up to TARGET_VELOCITY. Finishes right away; {@link #shoot()} waits for speed. */
-    public Command spinUp() {
-        return instant(() -> targetVelocity = TARGET_VELOCITY).requiring(flywheel);
+    /**
+     * Keep the flywheel at the speed the velocity table gives for the current distance to the target, plus the
+     * operator's nudge. Runs until {@link #idle()}.
+     */
+    public Command enableFlywheel(Supplier<Pose> robotPose, Supplier<Pose> target) {
+        return infinite(() -> targetVelocity = velocityFor(distanceTo(robotPose.get(), target.get())) + velocityNudge)
+                .requiring(flywheel);
     }
 
-    /** @param velocity ticks/sec */
-    public Command spinUp(double velocity) {
-        // TODO: velocity from distance
-        return instant(() -> targetVelocity = velocity).requiring(flywheel);
+    /** Spin the flywheel at the fixed TARGET_VELOCITY. Used by the Flywheel Tuner. */
+    public Command spinUp() {
+        return instant(() -> targetVelocity = TARGET_VELOCITY).requiring(flywheel);
     }
 
     public Command idle() {
@@ -78,6 +82,11 @@ public class Launcher implements Subsystem {
 
     public Command toggleFlywheel() {
         return conditional(this::isSpinning, idle(), spinUp());
+    }
+
+    /** @param direction +1 faster, -1 slower */
+    public Command nudgeVelocity(int direction) {
+        return instant(() -> velocityNudge += direction * VELOCITY_NUDGE);
     }
 
     // ---- Turret commands ----
@@ -90,30 +99,50 @@ public class Launcher implements Subsystem {
                 .requiring(turret);
     }
 
-    /** Keep the turret pointed at a field position. Runs until interrupted. */
-    public Command aimAt(Supplier<Pose> robotPose, Pose target) {
+    /** Keep the turret pointed at a field position (which may move), plus the operator's nudge. Runs until interrupted. */
+    public Command aimAt(Supplier<Pose> robotPose, Supplier<Pose> target) {
         return infinite(() -> {
-            // TODO: turret offset from center
             Pose pose = robotPose.get();
-            double fieldAngle = Math.atan2(target.y() - pose.y(), target.x() - pose.x());
-            setTurretTarget(fieldAngle - pose.heading());
+            Pose pivot = turretPivot(pose);
+            Pose goal = target.get();
+            double fieldAngle = Math.atan2(goal.y() - pivot.y(), goal.x() - pivot.x());
+            setTurretTarget(fieldAngle - pose.heading() + turretNudge);
         }).requiring(turret);
     }
 
-    // ---- Shooting commands ----
-
-    /** Wait until ready (max 1.5 s so a slow flywheel can't stall), then fire. */
-    public Command shoot() {
-        // TODO: require the feeder once it exists
-        return sequential(
-                waitUntil(this::isReady).raceWith(waitMs(1500)),
-                instant(this::fire),
-                waitMs(250) // TODO: tune shot delay
-        );
+    /** @param direction +1 left (CCW), -1 right */
+    public Command nudgeTurret(int direction) {
+        return instant(() -> turretNudge += direction * TURRET_NUDGE);
     }
 
-    private void fire() {
-        // TODO: fire feeder / gate
+    // ---- Aiming math ----
+
+    /** Inches from the turret pivot to a field position. */
+    public double distanceTo(Pose robotPose, Pose target) {
+        Pose pivot = turretPivot(robotPose);
+        return Math.hypot(target.x() - pivot.x(), target.y() - pivot.y());
+    }
+
+    private Pose turretPivot(Pose robotPose) {
+        double cos = Math.cos(robotPose.heading());
+        double sin = Math.sin(robotPose.heading());
+        return new Pose(
+                robotPose.x() + TURRET_OFFSET_X * cos - TURRET_OFFSET_Y * sin,
+                robotPose.y() + TURRET_OFFSET_X * sin + TURRET_OFFSET_Y * cos,
+                robotPose.heading());
+    }
+
+    /** Linear interpolation over VELOCITY_TABLE, held at the end rows. */
+    static double velocityFor(double distance) {
+        double[][] table = VELOCITY_TABLE;
+        if (distance <= table[0][0]) return table[0][1];
+        for (int i = 1; i < table.length; i++) {
+            if (distance <= table[i][0]) {
+                double t = (distance - table[i - 1][0]) / (table[i][0] - table[i - 1][0]);
+                return table[i - 1][1] + t * (table[i][1] - table[i - 1][1]);
+            }
+        }
+        return table[table.length - 1][1];
     }
 
     // ---- State ----
@@ -126,9 +155,29 @@ public class Launcher implements Subsystem {
         return isSpinning() && Math.abs(targetVelocity - flywheelVelocity) <= VELOCITY_TOLERANCE;
     }
 
+    public double getFlywheelVelocity() {
+        return flywheelVelocity;
+    }
+
+    public double getTargetVelocity() {
+        return targetVelocity;
+    }
+
+    public double getVelocityNudge() {
+        return velocityNudge;
+    }
+
     /** Robot-relative turret angle in radians, as of the last {@link #update()}. */
     public double getTurretAngle() {
         return turretAngle;
+    }
+
+    public double getTurretTargetAngle() {
+        return turretTargetAngle;
+    }
+
+    public double getTurretNudge() {
+        return turretNudge;
     }
 
     public boolean isTurretOnTarget() {
@@ -208,5 +257,6 @@ public class Launcher implements Subsystem {
         telemetry.addData("Flywheel target / actual", "%.0f / %.0f", targetVelocity, flywheelVelocity);
         telemetry.addData("Turret target / actual (deg)", "%.1f / %.1f",
                 Math.toDegrees(turretTargetAngle), Math.toDegrees(getTurretAngle()));
+        telemetry.addData("Turret power", "%.2f", turret.getPower());
     }
 }

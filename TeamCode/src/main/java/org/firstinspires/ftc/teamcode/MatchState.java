@@ -8,6 +8,8 @@ import org.firstinspires.ftc.robotcore.external.Telemetry;
 /** Carries state from Auto into TeleOp. Static fields survive between OpModes until the robot app restarts. */
 public class MatchState {
     public static Alliance alliance = Alliance.RED;
+    /** Which of our hive's cells is up. Auto resets it to RIGHT at the start of a match. */
+    public static Hive hive = Hive.RIGHT;
 
     /** Where Auto left the robot, or null if Auto hasn't run. */
     public static Pose pose = null;
