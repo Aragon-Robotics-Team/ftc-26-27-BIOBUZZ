@@ -43,4 +43,6 @@ dependencies {
 
     // Sloth hot-reload runtime (Dairy Foundation). Deploy with the deploySloth gradle task.
     implementation("dev.frozenmilk.sinister:Sloth:0.3.2")
+    // Panels dashboard (Lazar), built for Sloth: <sloth version>+<panels version>
+    implementation("com.bylazar.sloth:fullpanels:0.3.2+1.0.13")
 }
