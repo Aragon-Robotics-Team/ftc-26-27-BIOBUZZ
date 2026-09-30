@@ -23,8 +23,8 @@
     "gamepad2.dpad_right": "Nudge turret right",
     "gamepad2.dpad_up": "Flywheel speed up",
     "gamepad2.dpad_down": "Flywheel speed down",
-    "gamepad2.square": "Hive: LEFT cell is up",
-    "gamepad2.circle": "Hive: RIGHT cell is up",
+    "gamepad2.square": "Tap: hive LEFT cell is up. Hold 1 s: also lock / unlock auto hive",
+    "gamepad2.circle": "Tap: hive RIGHT cell is up. Hold 1 s: also lock / unlock auto hive",
     "gamepad2.share": "Reset pose: pushed into our LEFT corner, back to alliance wall",
     "gamepad2.options": "Reset pose: pushed into our RIGHT corner, back to alliance wall"
   },
