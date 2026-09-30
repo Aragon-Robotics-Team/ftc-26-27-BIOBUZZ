@@ -1,0 +1,343 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Camera Coverage 3D</title>
+<style>
+  :root { --bg: #14161a; --panel: #1d2026; --line: #2c3038; --text: #e6e8eb; --muted: #9aa1ab; --ok: #30a46c; --warn: #d6a21e; --bad: #e5484d; --accent: #3e8ee8; }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; height: 100%; background: var(--bg); color: var(--text); font: 13px/1.45 system-ui, -apple-system, Segoe UI, Roboto, sans-serif; }
+  body { display: grid; grid-template-columns: 330px minmax(0, 1fr); }
+  @media (max-width: 800px) { body { grid-template-columns: 1fr; grid-template-rows: auto 70vh; } }
+  aside { background: var(--panel); border-right: 1px solid var(--line); overflow-y: auto; padding: 14px 16px 20px; max-height: 100vh; }
+  h1 { font-size: 17px; margin: 0 0 4px; }
+  h2 { font-size: 12px; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); margin: 18px 0 8px; }
+  p.hint { color: var(--muted); margin: 0 0 6px; }
+  label { display: block; margin: 0 0 9px; }
+  .row { display: flex; justify-content: space-between; color: var(--muted); }
+  .row b { color: var(--text); font-weight: 600; font-variant-numeric: tabular-nums; }
+  input[type=range] { width: 100%; margin: 2px 0 0; }
+  .seg { display: flex; gap: 5px; margin-top: 3px; }
+  .seg button, .btn { flex: 1; background: var(--bg); color: var(--muted); border: 1px solid var(--line); border-radius: 6px; padding: 5px 4px; cursor: pointer; font: inherit; }
+  .seg button.on { color: var(--text); border-color: var(--accent); background: #22324a; }
+  .btn:hover { color: var(--text); }
+  .check { display: flex; gap: 8px; align-items: center; color: var(--muted); margin-bottom: 6px; }
+  table { border-collapse: collapse; width: 100%; font-variant-numeric: tabular-nums; }
+  td { padding: 3px 0; border-bottom: 1px solid var(--line); vertical-align: top; }
+  td:last-child { text-align: right; }
+  .ok { color: var(--ok); } .warn { color: var(--warn); } .bad { color: var(--bad); }
+  main { position: relative; min-height: 0; }
+  canvas { display: block; width: 100%; height: 100%; }
+  .legend { position: absolute; left: 12px; bottom: 12px; background: rgba(20,22,26,.85); border: 1px solid var(--line); border-radius: 8px; padding: 8px 10px; color: var(--muted); display: grid; gap: 3px; }
+  .legend span::before { content: ""; display: inline-block; width: 11px; height: 11px; border-radius: 2px; margin-right: 6px; vertical-align: -1px; background: var(--c); }
+  .tip { position: absolute; right: 12px; top: 12px; color: var(--muted); background: rgba(20,22,26,.85); border: 1px solid var(--line); border-radius: 8px; padding: 6px 10px; }
+</style>
+</head>
+<body>
+<aside>
+  <h1>Camera coverage</h1>
+  <p class="hint">Limelight 3A on the turret reading hive tags, C270 webcam on an intake side plate looking for balls. Tags are opaque stickers: they only read from the face side.</p>
+
+  <h2>Hive</h2>
+  <label>Our alliance<div class="seg" data-key="alliance"><button data-v="Red" class="on">Red</button><button data-v="Blue">Blue</button></div></label>
+  <label>Our up cell<div class="seg" data-key="up"><button data-v="South" class="on">Audience side</button><button data-v="North">Scoring side</button></div></label>
+
+  <h2>Robot</h2>
+  <p class="hint">Click the floor to move the robot. Drag to orbit, right-drag to pan, wheel to zoom.</p>
+  <label><div class="row">Chassis heading <b id="headingV"></b></div><input id="heading" type="range" min="-180" max="180" step="1" value="-90"></label>
+  <div class="seg" style="margin-bottom:9px"><button class="btn" id="faceHive">Face the hive</button><button class="btn" id="faceAway">Face away</button></div>
+
+  <h2>Limelight 3A (turret)</h2>
+  <label>Orientation<div class="seg" data-key="llOrient"><button data-v="landscape" class="on">Landscape</button><button data-v="portrait">Portrait</button></div></label>
+  <label><div class="row">Lens height <b id="llHV"></b></div><input id="llH" type="range" min="6" max="20" step="0.5" value="11"></label>
+  <label><div class="row">Tilt up <b id="llTiltV"></b></div><input id="llTilt" type="range" min="0" max="50" step="1" value="30"></label>
+  <label><div class="row">Max range, face on <b id="llRangeV"></b></div><input id="llRange" type="range" min="50" max="200" step="5" value="110"></label>
+  <label><div class="row">Max angle off the tag's face <b id="llOffV"></b></div><input id="llOff" type="range" min="30" max="80" step="1" value="60"></label>
+
+  <h2>C270 webcam (chassis)</h2>
+  <label>Side plate<div class="seg" data-key="wSide"><button data-v="left" class="on">Left</button><button data-v="right">Right</button></div></label>
+  <label><div class="row">Lens height <b id="wHV"></b></div><input id="wH" type="range" min="4" max="10" step="0.5" value="5"></label>
+  <label><div class="row">Tilt down <b id="wTiltV"></b></div><input id="wTilt" type="range" min="0" max="45" step="1" value="17"></label>
+  <label><div class="row">Toe-in toward the centre <b id="wToeV"></b></div><input id="wToe" type="range" min="0" max="40" step="1" value="22"></label>
+  <label><div class="row">Lens ahead of robot centre <b id="wFwdV"></b></div><input id="wFwd" type="range" min="4" max="14" step="0.5" value="11"></label>
+  <label><div class="row">Lens off the centre line <b id="wLatV"></b></div><input id="wLat" type="range" min="0" max="10" step="0.5" value="9"></label>
+
+  <h2>Show</h2>
+  <label class="check"><input type="checkbox" id="showHeat" checked> Where the Limelight can read the hive state</label>
+  <label class="check"><input type="checkbox" id="showLL" checked> Limelight view</label>
+  <label class="check"><input type="checkbox" id="showW" checked> Webcam view and floor footprint</label>
+
+  <h2>Limelight readout</h2>
+  <table id="llStats"></table>
+  <h2>Webcam readout</h2>
+  <table id="wStats"></table>
+  <p class="hint" style="margin-top:10px">Range and angle limits are estimates; measure them on the practice hive. C270 view (45° × 34° at 640 × 480) is estimated from Logitech's 55° diagonal.</p>
+</aside>
+<main>
+  <canvas id="view"></canvas>
+  <div class="legend">
+    <span style="--c:#30a46c">Floor: hive state readable, up cell's tags</span>
+    <span style="--c:#d6a21e">Floor: only the down cell's tags</span>
+    <span style="--c:#3e8ee8">Limelight view</span>
+    <span style="--c:#ffd60a">Webcam view and floor it sees</span>
+    <span style="--c:#30a46c">Tag read now</span>
+    <span style="--c:#f5f5f5">Tag not read</span>
+  </div>
+  <div class="tip"><span id="tip"></span><div class="seg" id="views" style="margin-top:6px"><button class="btn" data-v="3d">3D</button><button class="btn" data-v="top">Top</button><button class="btn" data-v="side">Side</button></div></div>
+</main>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+<script src="camera-model.js"></script>
+<script>
+const M = window.CameraModel;
+const S = {
+  alliance: 'Red', up: 'South', heading: -90, robot: { x: -12.75, y: 62 },
+  llOrient: 'landscape', llH: 11, llTilt: 30, llRange: 110, llOff: 60,
+  wSide: 'left', wH: 5, wTilt: 17, wToe: 22, wFwd: 11, wLat: 9,
+  showHeat: true, showLL: true, showW: true,
+};
+const LIP = 11; // intake lip, inches ahead of robot centre
+const cfg = () => ({
+  alliance: S.alliance, up: S.up,
+  limelight: { h: S.llH, tilt: S.llTilt, orient: S.llOrient, range: S.llRange, off: S.llOff },
+  webcam: { h: S.wH, tilt: S.wTilt, toe: S.wToe, side: S.wSide, fwd: S.wFwd, lat: S.wLat },
+});
+const V = (p) => new THREE.Vector3(p.x, p.h, p.y); // model (x, y, h) -> three (x, up, z)
+
+// ---- scene
+const canvas = document.getElementById('view');
+const renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
+renderer.setPixelRatio(Math.min(2, window.devicePixelRatio));
+const scene = new THREE.Scene();
+scene.background = new THREE.Color(0x14161a);
+const cam3 = new THREE.PerspectiveCamera(45, 1, 1, 3000);
+cam3.position.set(-150, 170, 190);
+const controls = new THREE.OrbitControls(cam3, canvas);
+controls.target.set(0, 15, 10);
+controls.maxPolarAngle = Math.PI * 0.49;
+scene.add(new THREE.HemisphereLight(0xffffff, 0x303038, 0.9));
+const sun = new THREE.DirectionalLight(0xffffff, 0.6); sun.position.set(-80, 200, 120); scene.add(sun);
+
+// floor, tiles, walls
+const floor = new THREE.Mesh(new THREE.PlaneGeometry(144, 144), new THREE.MeshLambertMaterial({ color: 0x2a2d33 }));
+floor.rotation.x = -Math.PI / 2; scene.add(floor);
+const grid = new THREE.GridHelper(144, 6, 0x4a4f58, 0x4a4f58); grid.position.y = 0.05; scene.add(grid);
+const wallMat = new THREE.MeshLambertMaterial({ color: 0x5a606a, transparent: true, opacity: 0.55 });
+for (const [x, z, w, d] of [[0, -72.5, 146, 1], [0, 72.5, 146, 1], [-72.5, 0, 1, 146], [72.5, 0, 1, 146]]) {
+  const wall = new THREE.Mesh(new THREE.BoxGeometry(w, 12, d), wallMat); wall.position.set(x, 6, z); scene.add(wall);
+}
+function label(text, x, z) {
+  const c = document.createElement('canvas'); c.width = 256; c.height = 48;
+  const g = c.getContext('2d'); g.fillStyle = '#9aa1ab'; g.font = '28px system-ui'; g.textAlign = 'center'; g.fillText(text, 128, 34);
+  const s = new THREE.Sprite(new THREE.SpriteMaterial({ map: new THREE.CanvasTexture(c), depthTest: false }));
+  s.scale.set(40, 7.5, 1); s.position.set(x, 16, z); scene.add(s);
+}
+label('audience side', 0, 80); label('scoring side', 0, -80); label('red', -84, 0); label('blue', 84, 0);
+
+// hive frame (static)
+const metal = new THREE.MeshLambertMaterial({ color: 0x9aa0a8 });
+function bar(a, b, t) {
+  const va = V(a), vb = V(b), mid = va.clone().add(vb).multiplyScalar(0.5);
+  const m = new THREE.Mesh(new THREE.CylinderGeometry(t, t, va.distanceTo(vb), 8), metal);
+  m.position.copy(mid); m.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), vb.clone().sub(va).normalize()); scene.add(m);
+}
+const FX = M.HIVE.frameW / 2, FY = M.HIVE.frameD / 2;
+for (const sx of [-1, 1]) {
+  bar({ x: sx * FX, y: -FY, h: 0.75 }, { x: sx * FX, y: FY, h: 0.75 }, 0.9);
+  bar({ x: sx * FX, y: -FY, h: 0 }, { x: sx * FX, y: 0, h: M.HIVE.pivot }, 0.7);
+  bar({ x: sx * FX, y: FY, h: 0 }, { x: sx * FX, y: 0, h: M.HIVE.pivot }, 0.7);
+}
+bar({ x: -FX, y: 0, h: M.HIVE.pivot }, { x: FX, y: 0, h: M.HIVE.pivot }, 0.9);
+
+// ---- dynamic groups
+const hiveGroup = new THREE.Group(), robotGroup = new THREE.Group(), viewGroup = new THREE.Group();
+scene.add(hiveGroup, robotGroup, viewGroup);
+function clear(g) { while (g.children.length) { const c = g.children.pop(); c.traverse?.((o) => { o.geometry?.dispose(); o.material?.map?.dispose(); o.material?.dispose?.(); }); } }
+
+// heatmap texture on the floor
+const heatCanvas = document.createElement('canvas'); heatCanvas.width = 72; heatCanvas.height = 72;
+const heatTex = new THREE.CanvasTexture(heatCanvas); heatTex.magFilter = THREE.NearestFilter; heatTex.minFilter = THREE.NearestFilter;
+const heat = new THREE.Mesh(new THREE.PlaneGeometry(144, 144), new THREE.MeshBasicMaterial({ map: heatTex, transparent: true, depthWrite: false }));
+heat.rotation.x = -Math.PI / 2; heat.position.y = 0.1; scene.add(heat);
+let heatKey = '';
+function drawHeat() {
+  const c = cfg(), key = JSON.stringify([c.alliance, c.up, c.limelight]);
+  if (key === heatKey) return; heatKey = key;
+  const g = heatCanvas.getContext('2d'); g.clearRect(0, 0, 72, 72);
+  for (let i = 0; i < 72; i++) for (let j = 0; j < 72; j++) {
+    const x = -71 + 2 * i, y = -71 + 2 * j, e = M.limelight(c, x, y, 0, false);
+    if (!e.upSeen && !e.dnSeen) continue;
+    g.fillStyle = e.upSeen ? 'rgba(48,164,108,0.55)' : 'rgba(214,162,30,0.55)';
+    g.fillRect(i, j, 1, 1); // canvas row 0 lands on the scoring side (-z) once the plane lies flat
+  }
+  heatTex.needsUpdate = true;
+}
+
+function buildHive(reads) {
+  clear(hiveGroup);
+  for (const al of ['Red', 'Blue']) {
+    const up = al === S.alliance ? S.up : (S.alliance === 'Red' ? 'North' : 'South'); // opponent shown in the other state
+    const color = al === 'Red' ? 0xe5484d : 0x3e8ee8, ours = al === S.alliance;
+    for (const cell of ['North', 'South']) {
+      const { inner, outer } = M.cellOutline(al, up, cell);
+      const pos = [];
+      const tri = (a, b, c) => pos.push(...[a, b, c].flatMap((p) => [p.x, p.h, p.y]));
+      for (let i = 0; i < 5; i++) { const j = (i + 1) % 5; tri(inner[i], inner[j], outer[j]); tri(inner[i], outer[j], outer[i]); }
+      for (let i = 1; i < 4; i++) tri(inner[0], inner[i], inner[i + 1]); // closed inner end; the outer end is the opening
+      const geo = new THREE.BufferGeometry(); geo.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3)); geo.computeVertexNormals();
+      hiveGroup.add(new THREE.Mesh(geo, new THREE.MeshLambertMaterial({ color, transparent: true, opacity: ours ? 0.22 : 0.12, side: THREE.DoubleSide, depthWrite: false })));
+      const edge = [];
+      for (let i = 0; i < 5; i++) { const j = (i + 1) % 5; edge.push(inner[i], inner[j], outer[i], outer[j], inner[i], outer[i]); }
+      const eg = new THREE.BufferGeometry().setFromPoints(edge.map(V));
+      hiveGroup.add(new THREE.LineSegments(eg, new THREE.LineBasicMaterial({ color, transparent: true, opacity: ours ? 0.95 : 0.4 })));
+      for (const t of M.tags(al, up, cell)) {
+        const read = ours && reads.get(t.id);
+        const tag = new THREE.Mesh(new THREE.PlaneGeometry(M.HIVE.tagSize, M.HIVE.tagSize), new THREE.MeshBasicMaterial({ color: read ? 0x30a46c : ours ? 0xf5f5f5 : 0x6b7079, side: THREE.FrontSide }));
+        const back = new THREE.Mesh(new THREE.PlaneGeometry(M.HIVE.tagSize, M.HIVE.tagSize), new THREE.MeshBasicMaterial({ color: 0x3a3d44, side: THREE.BackSide }));
+        const p = V(t.p).add(V(t.n).multiplyScalar(0.15));
+        for (const m of [tag, back]) { m.position.copy(p); m.lookAt(p.clone().add(V(t.n))); hiveGroup.add(m); }
+      }
+    }
+    // arm
+    const a = M.hubToWorld({ x: 0, up: 0, along: -(M.HIVE.gap / 2 + M.HIVE.cellD) }, al, up), b = M.hubToWorld({ x: 0, up: 0, along: M.HIVE.gap / 2 + M.HIVE.cellD }, al, up);
+    hiveGroup.add(new THREE.Line(new THREE.BufferGeometry().setFromPoints([V(a), V(b)]), new THREE.LineBasicMaterial({ color })));
+  }
+}
+
+function frustum(cam, length, color, opacity, stopAtFloor) {
+  const g = new THREE.Group(), C = V(cam.C), ends = [];
+  for (const [a, b] of [[-1, -1], [1, -1], [1, 1], [-1, 1]]) {
+    const d = M.ray(cam, a, b), n = Math.hypot(d.x, d.y, d.h);
+    let t = length / n;
+    if (stopAtFloor && d.h < 0) t = Math.min(t, -cam.C.h / d.h);
+    ends.push(new THREE.Vector3(cam.C.x + d.x * t, cam.C.h + d.h * t, cam.C.y + d.y * t));
+  }
+  const pos = [];
+  for (let i = 0; i < 4; i++) { const j = (i + 1) % 4; pos.push(C.x, C.y, C.z, ends[i].x, ends[i].y, ends[i].z, ends[j].x, ends[j].y, ends[j].z); }
+  const geo = new THREE.BufferGeometry(); geo.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+  g.add(new THREE.Mesh(geo, new THREE.MeshBasicMaterial({ color, transparent: true, opacity, side: THREE.DoubleSide, depthWrite: false })));
+  const lines = [];
+  for (let i = 0; i < 4; i++) lines.push(C, ends[i], ends[i], ends[(i + 1) % 4]);
+  g.add(new THREE.LineSegments(new THREE.BufferGeometry().setFromPoints(lines), new THREE.LineBasicMaterial({ color })));
+  return g;
+}
+
+function buildRobot(ll, wcam) {
+  clear(robotGroup);
+  const h = THREE.MathUtils.degToRad(S.heading), R = S.robot;
+  const chassis = new THREE.Group(); chassis.position.set(R.x, 0, R.y); chassis.rotation.y = -h; robotGroup.add(chassis);
+  const body = new THREE.Mesh(new THREE.BoxGeometry(18, 9, 18), new THREE.MeshLambertMaterial({ color: 0x8a7a5c })); body.position.y = 4.5; chassis.add(body);
+  const intake = new THREE.Mesh(new THREE.BoxGeometry(2, 5, 14), new THREE.MeshLambertMaterial({ color: 0xd9b88a })); intake.position.set(10, 3.5, 0); chassis.add(intake);
+  const turret = new THREE.Group(); turret.position.y = 9; turret.rotation.y = -ll.turretRel; chassis.add(turret);
+  const disc = new THREE.Mesh(new THREE.CylinderGeometry(5, 5, 1.5, 24), new THREE.MeshLambertMaterial({ color: 0xa0522d })); disc.position.y = 0.75; turret.add(disc);
+  const launcher = new THREE.Mesh(new THREE.BoxGeometry(10, 7, 7), new THREE.MeshLambertMaterial({ color: 0xc8b48c, transparent: true, opacity: 0.8 })); launcher.position.set(0, 5, 0); turret.add(launcher);
+  const llBox = new THREE.Mesh(new THREE.BoxGeometry(1.5, 2.2, 3), new THREE.MeshLambertMaterial({ color: 0x111111 }));
+  llBox.position.copy(V(ll.cam.C)); robotGroup.add(llBox);
+  const wBox = new THREE.Mesh(new THREE.BoxGeometry(1.2, 1.2, 2.8), new THREE.MeshLambertMaterial({ color: 0x222222 }));
+  wBox.position.copy(V(wcam.C)); robotGroup.add(wBox);
+}
+
+function buildViews(ll, wcam) {
+  clear(viewGroup);
+  if (S.showLL) {
+    viewGroup.add(frustum(ll.cam, S.llRange, 0x3e8ee8, 0.07, false));
+    const seen = [...ll.up.map((t, i) => [t, ll.ru[i]]), ...ll.dn.map((t, i) => [t, ll.rd[i]])].filter(([, r]) => r.ok);
+    if (seen.length) viewGroup.add(new THREE.LineSegments(new THREE.BufferGeometry().setFromPoints(seen.flatMap(([t]) => [V(ll.cam.C), V(t.p)])), new THREE.LineBasicMaterial({ color: 0x30a46c })));
+  }
+  if (S.showW) {
+    viewGroup.add(frustum(wcam, 160, 0xffd60a, 0.06, true));
+    const poly = M.floorPolygon(wcam, 300);
+    if (poly.length > 2) {
+      const shape = new THREE.Shape(poly.map((p) => new THREE.Vector2(p.x, -p.y)));
+      const m = new THREE.Mesh(new THREE.ShapeGeometry(shape), new THREE.MeshBasicMaterial({ color: 0xffd60a, transparent: true, opacity: 0.22, depthWrite: false, side: THREE.DoubleSide }));
+      m.rotation.x = -Math.PI / 2; m.position.y = 0.2; viewGroup.add(m);
+    }
+  }
+}
+
+function readouts(ll) {
+  const c = cfg(), op = M.opening(c.alliance, c.up, c.up);
+  const dOpen = Math.hypot(S.robot.x - op.x, S.robot.y - op.y);
+  const all = [...ll.up.map((t, i) => [t, ll.ru[i]]), ...ll.dn.map((t, i) => [t, ll.rd[i]])];
+  const seen = all.filter(([, r]) => r.ok);
+  const best = all.reduce((a, b) => (a[1].off < b[1].off ? a : b));
+  const state = ll.upSeen ? '<span class="ok">yes, up cell\'s tags</span>' : ll.dnSeen ? '<span class="warn">yes, down cell\'s tags only</span>' : '<span class="bad">no</span>';
+  const rows = [
+    ['Hive state readable here', state],
+    ['Tags read', seen.length ? seen.map(([t]) => t.id).join(', ') : 'none'],
+    ['Tag heights', seen.length ? [...new Set(seen.map(([t]) => t.p.h.toFixed(1)))].join(' / ') + ' in' : '–'],
+    ['Closest angle off a tag face', best[1].off.toFixed(0) + '°' + (best[1].off > 90 ? ' (facing away)' : '')],
+    ['Robot to up cell opening', dOpen.toFixed(0) + ' in'],
+    ['Turret angle from chassis', (ll.turretRel * 180 / Math.PI).toFixed(0) + '°' + (ll.clamped ? ' <span class="bad">at its limit</span>' : '')],
+  ];
+  document.getElementById('llStats').innerHTML = rows.map((r) => `<tr><td>${r[0]}</td><td>${r[1]}</td></tr>`).join('');
+  const w = M.webcamMouth(c, LIP), pc = (v) => Math.round(v * 100) + '%';
+  const wrows = [
+    ['Centre line visible from', w.near === null ? '<span class="bad">never</span>' : `${w.near} in ahead of the intake`],
+    ['Intake mouth seen, 0–12 in ahead', pc(w.share[0])],
+    ['12–24 in ahead', pc(w.share[1])],
+    ['24–48 in ahead', pc(w.share[2])],
+  ];
+  document.getElementById('wStats').innerHTML = wrows.map((r) => `<tr><td>${r[0]}</td><td>${r[1]}</td></tr>`).join('');
+  document.getElementById('tip').textContent = `robot at (${S.robot.x.toFixed(0)}, ${S.robot.y.toFixed(0)}) in, heading ${S.heading}°`;
+}
+
+function update() {
+  for (const [id, unit] of [['heading', '°'], ['llH', ' in'], ['llTilt', '°'], ['llRange', ' in'], ['llOff', '°'], ['wH', ' in'], ['wTilt', '°'], ['wToe', '°'], ['wFwd', ' in'], ['wLat', ' in']])
+    document.getElementById(id + 'V').textContent = S[id] + unit;
+  const c = cfg(), h = THREE.MathUtils.degToRad(S.heading);
+  const ll = M.limelight(c, S.robot.x, S.robot.y, h, true);
+  const wcam = M.webcam(c, S.robot.x, S.robot.y, h);
+  const reads = new Map();
+  ll.up.forEach((t, i) => reads.set(t.id, ll.ru[i].ok)); ll.dn.forEach((t, i) => reads.set(t.id, ll.rd[i].ok));
+  heat.visible = S.showHeat; if (S.showHeat) drawHeat();
+  buildHive(reads); buildRobot(ll, wcam); buildViews(ll, wcam); readouts(ll);
+}
+
+// ---- controls
+document.querySelectorAll('.seg[data-key]').forEach((seg) => seg.addEventListener('click', (ev) => {
+  const b = ev.target.closest('button'); if (!b) return;
+  seg.querySelectorAll('button').forEach((x) => x.classList.toggle('on', x === b));
+  S[seg.dataset.key] = b.dataset.v; update();
+}));
+for (const id of ['heading', 'llH', 'llTilt', 'llRange', 'llOff', 'wH', 'wTilt', 'wToe', 'wFwd', 'wLat'])
+  document.getElementById(id).addEventListener('input', (ev) => { S[id] = +ev.target.value; update(); });
+for (const id of ['showHeat', 'showLL', 'showW'])
+  document.getElementById(id).addEventListener('change', (ev) => { S[id] = ev.target.checked; update(); });
+function setHeading(deg) { S.heading = Math.round(((deg + 540) % 360) - 180); document.getElementById('heading').value = S.heading; update(); }
+function hiveBearing() { const c = cfg(), a = M.clusterCenter(M.tags(c.alliance, c.up, c.up)); return Math.atan2(a.y - S.robot.y, a.x - S.robot.x) * 180 / Math.PI; }
+document.getElementById('faceHive').onclick = () => setHeading(hiveBearing());
+document.getElementById('faceAway').onclick = () => setHeading(hiveBearing() + 180);
+
+const ray = new THREE.Raycaster(), ndc = new THREE.Vector2();
+let down = null;
+canvas.addEventListener('pointerdown', (e) => { down = [e.clientX, e.clientY]; });
+canvas.addEventListener('pointerup', (e) => {
+  if (!down || e.button !== 0 || Math.hypot(e.clientX - down[0], e.clientY - down[1]) > 5) return;
+  const r = canvas.getBoundingClientRect();
+  ndc.set(((e.clientX - r.left) / r.width) * 2 - 1, -((e.clientY - r.top) / r.height) * 2 + 1);
+  ray.setFromCamera(ndc, cam3);
+  const hit = new THREE.Vector3();
+  if (ray.ray.intersectPlane(new THREE.Plane(new THREE.Vector3(0, 1, 0), 0), hit)) {
+    S.robot = { x: Math.max(-63, Math.min(63, hit.x)), y: Math.max(-63, Math.min(63, hit.z)) }; update();
+  }
+});
+
+function resize() {
+  const r = canvas.parentElement.getBoundingClientRect();
+  renderer.setSize(r.width, r.height, false); cam3.aspect = r.width / r.height; cam3.updateProjectionMatrix();
+}
+document.getElementById('views').addEventListener('click', (ev) => {
+  const b = ev.target.closest('button'); if (!b) return;
+  const v = { '3d': [[-150, 170, 190], [0, 15, 10]], top: [[0, 260, 0.1], [0, 0, 0]], side: [[-230, 30, 0], [0, 30, 0]] }[b.dataset.v];
+  cam3.position.set(...v[0]); controls.target.set(...v[1]); controls.update();
+});
+const view0 = new URLSearchParams(location.search).get('view');
+if (view0) document.querySelector(`#views [data-v="${view0}"]`)?.click();
+window.addEventListener('resize', resize);
+resize(); update();
+(function loop() { controls.update(); renderer.render(scene, cam3); requestAnimationFrame(loop); })();
+</script>
+</body>
+</html>
