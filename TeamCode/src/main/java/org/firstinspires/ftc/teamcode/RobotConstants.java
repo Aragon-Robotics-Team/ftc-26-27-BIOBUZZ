@@ -65,6 +65,27 @@ public class RobotConstants {
         public static double FLASH_MS = 300;
     }
 
+    /** Hive state from the Limelight 3A on the turret (HiveVision). */
+    public static class Vision {
+        public static String LIMELIGHT_NAME = "limelight";
+        // AprilTag pipeline on the Limelight: family 36h11, tag size 82.55 mm, Full 3D on, LEDs off.
+        public static int PIPELINE = 0;
+        public static int POLL_RATE_HZ = 100;
+        // Mount, landscape on the turret. TODO: measure; calibrate the tilt with the Hive Vision Test OpMode
+        public static double LENS_HEIGHT = 11;             // inches from the tiles to the lens
+        public static double TILT = Math.toRadians(30);    // above horizontal
+        // Up-cell tags sit about 49.7 in above the tiles, down-cell tags about 35.5 in. TODO: measure on the practice hive
+        public static double HEIGHT_THRESHOLD = 42;        // inches
+        public static int FRAMES_TO_SWITCH = 3;            // new frames in a row showing the other state
+        public static long MAX_STALENESS_MS = 100;         // ignore results older than this
+        // After the operator sets the hive by hand, the camera needs this long of steady disagreement to overrule it
+        public static double MANUAL_HOLDOFF_S = 2;
+        public static double MANUAL_DISAGREE_S = 1;
+        // Operator: hold square / circle this long to set that cell and lock (or unlock) automatic hive detection
+        public static double HOLD_TO_LOCK_S = 1;
+        public static int LOCK_RUMBLE_MS = 250;
+    }
+
     public static class Launcher {
         public static String FLYWHEEL_MOTOR_NAME = "flywheel";
         public static String TURRET_MOTOR_NAME = "turret";

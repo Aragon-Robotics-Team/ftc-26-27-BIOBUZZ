@@ -5,6 +5,8 @@ import static org.firstinspires.ftc.teamcode.RobotConstants.Drive.SLOW_MODE_SCAL
 import static org.firstinspires.ftc.teamcode.RobotConstants.Field.RED_LEFT_CORNER;
 import static org.firstinspires.ftc.teamcode.RobotConstants.Field.RED_RIGHT_CORNER;
 import static org.firstinspires.ftc.teamcode.RobotConstants.Launcher.SHOOT_ON_THE_MOVE;
+import static org.firstinspires.ftc.teamcode.RobotConstants.Vision.HOLD_TO_LOCK_S;
+import static org.firstinspires.ftc.teamcode.RobotConstants.Vision.LOCK_RUMBLE_MS;
 import static org.firstinspires.ftc.teamcode.util.Html.*;
 
 import com.pedropathing.ivy.Scheduler;
@@ -21,6 +23,7 @@ import org.firstinspires.ftc.teamcode.ShotSolver.Shot;
 import org.firstinspires.ftc.teamcode.subsystems.Intake;
 import org.firstinspires.ftc.teamcode.subsystems.Launcher;
 import org.firstinspires.ftc.teamcode.util.FieldDiagram;
+import org.firstinspires.ftc.teamcode.util.HoldButton;
 import org.firstinspires.ftc.teamcode.util.Html;
 
 /**
@@ -32,7 +35,8 @@ import org.firstinspires.ftc.teamcode.util.Html;
  *   hold RT         open the gate and feed the shooter
  * Gamepad 2 (operator):
  *   dpad left/right nudge turret         dpad up/down  nudge flywheel speed
- *   square / circle hive LEFT / RIGHT cell is up
+ *   square / circle tap: hive LEFT / RIGHT cell is up (the Limelight keeps checking it)
+ *                   hold 1 s: set that cell and lock / unlock automatic hive detection (short rumble)
  *   share / options reset pose: robot pushed into our LEFT / RIGHT corner, back to the alliance wall
  */
 @com.qualcomm.robotcore.eventloop.opmode.TeleOp(name = "TeleOp", group = "Competition")
@@ -41,6 +45,9 @@ public class TeleOp extends OpMode {
 
     private Robot robot;
     private final ElapsedTime loopTimer = new ElapsedTime();
+    private final ElapsedTime clock = new ElapsedTime();
+    private final HoldButton leftCellButton = new HoldButton(HOLD_TO_LOCK_S);
+    private final HoldButton rightCellButton = new HoldButton(HOLD_TO_LOCK_S);
 
     @Override
     public void init() {
@@ -48,6 +55,7 @@ public class TeleOp extends OpMode {
         Scheduler.reset();
 
         robot = new Robot(hardwareMap);
+        robot.hiveVision.setEnabled(true);
         // Pick up where Auto left off. Without an Auto run the robot starts at the origin with the turret
         // forward; push it into a corner and use share / options to localize.
         if (MatchState.pose != null) {
@@ -120,11 +128,21 @@ public class TeleOp extends OpMode {
         if (gamepad2.dpadUpWasPressed()) schedule(robot.launcher.nudgeVelocity(+1));
         if (gamepad2.dpadDownWasPressed()) schedule(robot.launcher.nudgeVelocity(-1));
 
-        if (gamepad2.squareWasPressed()) schedule(robot.setHive(Hive.LEFT));
-        if (gamepad2.circleWasPressed()) schedule(robot.setHive(Hive.RIGHT));
+        hiveButton(leftCellButton.update(gamepad2.square, clock.seconds()), Hive.LEFT);
+        hiveButton(rightCellButton.update(gamepad2.circle, clock.seconds()), Hive.RIGHT);
 
         if (gamepad2.shareWasPressed()) schedule(robot.resetPose(RED_LEFT_CORNER));
         if (gamepad2.optionsWasPressed()) schedule(robot.resetPose(RED_RIGHT_CORNER));
+    }
+
+    /** Tap: that cell is up. Hold: that cell is up, and lock or unlock automatic hive detection. */
+    private void hiveButton(HoldButton.Event event, Hive side) {
+        if (event == HoldButton.Event.NONE) return;
+        schedule(robot.setHive(side));
+        if (event == HoldButton.Event.HOLD) {
+            schedule(robot.hiveVision.toggleLock());
+            gamepad2.rumble(LOCK_RUMBLE_MS);
+        }
     }
 
     /**
@@ -149,7 +167,7 @@ public class TeleOp extends OpMode {
                 turretLine(launcher),
                 "",
                 "Alliance " + Html.alliance(MatchState.alliance),
-                "Hive " + bold(color(MatchState.hive.toString(), MatchState.hive == Hive.LEFT ? PINK : CYAN)),
+                "Hive " + bold(color(MatchState.hive.toString(), MatchState.hive == Hive.LEFT ? PINK : CYAN)) + " " + hiveVisionWord(),
                 "Intake " + intakeWord(robot.intake.getMode()) + (robot.intake.isFeeding() ? " (feeding)" : ""),
                 "Gate " + (robot.gate.isOpen() ? bold(color("open", GREEN)) : bold(color("closed", GRAY))),
         };
@@ -195,6 +213,15 @@ public class TeleOp extends OpMode {
         if (shot == null) return label + color("not aiming", GRAY);
         String verdict = shot.feasible ? bold(color("can reach", GREEN)) : bold(color("can't reach", RED));
         return label + verdict + String.format(" %.0f in", shot.distance);
+    }
+
+    private String hiveVisionWord() {
+        String status = robot.hiveVision.status();
+        switch (status) {
+            case "auto": return color("auto", GREEN);
+            case "AUTO HIVE OFF": return bold(color(status, YELLOW));
+            default: return color(status, GRAY);
+        }
     }
 
     private static String intakeWord(Intake.Mode mode) {

@@ -15,6 +15,7 @@ import com.qualcomm.robotcore.hardware.HardwareMap;
 import org.firstinspires.ftc.robotcore.external.Telemetry;
 import org.firstinspires.ftc.teamcode.subsystems.Drivetrain;
 import org.firstinspires.ftc.teamcode.subsystems.Gate;
+import org.firstinspires.ftc.teamcode.subsystems.HiveVision;
 import org.firstinspires.ftc.teamcode.subsystems.Intake;
 import org.firstinspires.ftc.teamcode.subsystems.Launcher;
 import org.firstinspires.ftc.teamcode.subsystems.Led;
@@ -32,6 +33,7 @@ public class Robot {
     public final Gate gate;
     public final Launcher launcher;
     public final Led led;
+    public final HiveVision hiveVision;
 
     private final List<LynxModule> hubs;
     private final Subsystem[] subsystems;
@@ -46,9 +48,11 @@ public class Robot {
         gate = new Gate(hardwareMap);
         launcher = new Launcher(hardwareMap);
         led = new Led(hardwareMap, launcher);
+        hiveVision = new HiveVision(hardwareMap); // off until an OpMode enables it
 
-        // Launcher before Led, so the light shows this loop's launcher state
-        subsystems = new Subsystem[]{drivebase, intake, gate, launcher, led};
+        // Hive vision first, so this loop aims at the cell it just read; launcher before Led, so the light shows
+        // this loop's launcher state
+        subsystems = new Subsystem[]{hiveVision, drivebase, intake, gate, launcher, led};
     }
 
     // ---- Hive ----
@@ -62,8 +66,12 @@ public class Robot {
         return launcher.distanceTo(drivebase.getPose(), hiveTarget());
     }
 
+    /** The operator says which cell is up. Hive vision gives a hand-set state a moment before it overrules it. */
     public Command setHive(Hive side) {
-        return parallel(instant(() -> MatchState.hive = side), led.flash());
+        return parallel(instant(() -> {
+            MatchState.hive = side;
+            hiveVision.manualSet();
+        }), led.flash());
     }
 
     /** After a tip, the other cell is up. */
