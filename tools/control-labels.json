@@ -34,6 +34,11 @@
     "init.gamepad1.dpad_down": "Next routine"
   },
 
+  "Planned Path Test": {
+    "init.gamepad1.dpad_up": "Previous chain",
+    "init.gamepad1.dpad_down": "Next chain"
+  },
+
   "Turret Tuner": {
     "gamepad1.square": "Jump target left by stepDegrees",
     "gamepad1.cross": "Jump target to center",

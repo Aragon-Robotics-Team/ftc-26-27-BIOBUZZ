@@ -17,6 +17,7 @@ import org.firstinspires.ftc.teamcode.Robot;
 import org.firstinspires.ftc.teamcode.routines.AutoRoutine;
 import org.firstinspires.ftc.teamcode.routines.Routines;
 import org.firstinspires.ftc.teamcode.util.Html;
+import org.firstinspires.ftc.teamcode.util.PathLog;
 
 import java.util.List;
 
@@ -29,6 +30,7 @@ public class Auto extends OpMode {
     private Robot robot;
     private Follower follower;
     private List<Routines> routines;
+    private PathLog pathLog;
     private final ElapsedTime loopTimer = new ElapsedTime();
 
     @Override
@@ -68,6 +70,8 @@ public class Auto extends OpMode {
         follower.setPose(routine.startPose());
 
         robot.start();
+        // Every run is logged for the path planner (tools/path-planner, Logs tab)
+        pathLog = PathLog.start(hardwareMap, follower, selected.toString(), MatchState.alliance);
         schedule(routine.autoRoutine());
         loopTimer.reset();
     }
@@ -98,6 +102,7 @@ public class Auto extends OpMode {
     @Override
     public void stop() {
         Scheduler.reset();
+        if (pathLog != null) pathLog.close();
         robot.stop();
     }
 }
