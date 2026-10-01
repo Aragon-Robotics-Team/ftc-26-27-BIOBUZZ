@@ -14,45 +14,38 @@ import org.firstinspires.ftc.teamcode.Robot;
 
 /** Shoot the preloads, intake the garden balls and shoot them, then park in the loading zone. */
 public class CycleGardenPark extends AutoRoutine {
-    // Poses
-    private final Pose startPose = poseFactory.of(56, 8, 90);
-    private final Pose startLaunchPose = poseFactory.of(56, 20.219975, 90);
-    private final Pose gardenBorderPose = poseFactory.of(28.4, 9.3, 180);
-    private final Pose gardenIntakePose = poseFactory.of(8.47877, 8.4, 185);
-    private final Pose bottomParkPose = poseFactory.of(12.2616, 91.7745, 90);
-
     public CycleGardenPark(Robot robot, Alliance alliance) {
         super(robot, alliance);
     }
 
     @Override
     public Pose startPose() {
-        return startPose;
+        return poses.start;
     }
 
     // Path methods
     private Path startToLaunch() {
-        return line(startPose, startLaunchPose).linear(startPose, startLaunchPose);
+        return line(poses.start, poses.startLaunch).linear(poses.start, poses.startLaunch);
     }
 
     private Path prepareGardenIntake() {
-        return line(startLaunchPose, gardenBorderPose).linear(startLaunchPose, gardenBorderPose);
+        return line(poses.startLaunch, poses.gardenBorder).linear(poses.startLaunch, poses.gardenBorder);
     }
 
     private Path gardenIntake() {
-        return line(gardenBorderPose, gardenIntakePose).linear(gardenBorderPose, gardenIntakePose);
+        return line(poses.gardenBorder, poses.gardenIntake).linear(poses.gardenBorder, poses.gardenIntake);
     }
 
     private Path finishGardenIntake() {
-        return line(gardenIntakePose, gardenBorderPose).linear(gardenIntakePose, gardenBorderPose);
+        return line(poses.gardenIntake, poses.gardenBorder).linear(poses.gardenIntake, poses.gardenBorder);
     }
 
     private Path gardenToLaunch() {
-        return line(gardenBorderPose, startLaunchPose).linear(gardenBorderPose, startLaunchPose);
+        return line(poses.gardenBorder, poses.startLaunch).linear(poses.gardenBorder, poses.startLaunch);
     }
 
     private Path park() {
-        return line(startLaunchPose, bottomParkPose).linear(startLaunchPose, bottomParkPose);
+        return line(poses.startLaunch, poses.bottomPark).linear(poses.startLaunch, poses.bottomPark);
     }
 
     @Override
