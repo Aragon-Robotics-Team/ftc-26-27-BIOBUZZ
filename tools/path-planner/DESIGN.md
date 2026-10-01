@@ -52,19 +52,35 @@ manual (Fig 9-8). Pedro frame, inches: x from the red wall, y from the audience 
 
 ## Speed model
 
-Fastest speed along the path, forward and backward pass:
+The planner predicts how Pedro (Foresight, 3.0.1) would drive a path; it doesn't replace Pedro. Two parts:
 
-- direction limit: `|v·cos α|/vForward + |v·sin α|/vStrafe + |ω|/omegaMax ≤ 1` (α = travel direction relative to heading)
-- curvature: `v²·|κ| ≤ aLateral`, with κ the sharper of the curvature at a sample and the turn between neighbouring
-  samples (so a hook tighter than the sampling can't be taken at speed)
-- turning back on itself (more than 90° between two samples) means stopping, halfway between them; the panel then
-  says to split the path there, because Pedro only brakes at the end of a path
-- acceleration / deceleration, direction-dependent the same way (forward and strafe values)
-- speeds scale with battery voltage / nominal voltage
+**What the drivetrain can do** (`src/core/drivetrain.ts`), from the motor (free speed, stall torque), gearing, wheel
+size, wheelbase and track width, mass and grip. Each wheel's motor has a voltage budget shared between spinning and
+pushing, and mecanum wheels add up what forward, sideways and turning ask of them, per axis and with sign:
+
+- `|vx/vF + ax/aF| + |vy/vS + ay/aS| + |ω/ωMax + α/αMax| ≤ battery / spec voltage` (x = robot forward, y = left)
+- `|ax| + |ay| + |α|·I/(m·R) ≤ grip · g`
+
+So acceleration falls with speed (motor torque does), strafing is slower by the strafe efficiency, and turning takes
+both top speed and acceleration. Top speeds come out as free speed × efficiency.
+
+**How Pedro drives** (`src/core/model.ts`, forward and backward pass over 0.5 in samples): corrections first
+(centripetal push for the curve, turning to the planned heading), drive power gets what's left, and it brakes only for
+the end of the path (never ahead of a curve). Where the corrections don't fit even with drive at zero, the robot
+coasts and the push it's missing becomes **drift** wide of the path (and the turning it's missing becomes **heading
+lag**); both recover with a 0.3 s time constant. More than 1 in of drift or 5° of lag breaks the plan.
+
+- turning back on itself (more than 90° between two samples) breaks the plan: Pedro only brakes at the end of a path,
+  so it would overshoot. To stop somewhere, end the path there and start another
+- speeds scale with battery voltage (12.5 V assumed) / the motors' spec voltage
 - a fixed overhead per stop (settling at the end of a chain)
 
-Numbers come from pasting the Foresight Tuner output, then from fitting logs. When imported logs disagree with the
-model by more than 5 % across several runs, the planner flags it; refitting is a manual step.
+Numbers start as a sample: goBILDA 312 RPM motors on 104 mm mecanum wheels, with mass, top speeds and coasting from
+the Pedro quickstart's tuned `FollowerConstants`; grip 0.5 and 90 % drive efficiency are typical guesses. Pasting the
+Foresight Tuner output sets the efficiencies and coasting from measured values; fitting logs adjusts efficiencies,
+grip, mass, coasting and settling. When imported logs disagree with the model by more than 5 % across several runs,
+the planner flags it; refitting is a manual step. If logs show Pedro doing something this doesn't capture, the next
+step is to simulate Pedro's own control loop.
 
 ## Paths
 
@@ -89,17 +105,24 @@ model by more than 5 % across several runs, the planner flags it; refitting is a
 - Seeds: shortest routes through a visibility graph of the inflated obstacle corners, one per distinct way around.
 - Variables: cubic Bezier legs with smooth (G1) joins (joint positions, tangent directions, handle lengths) and
   heading knots.
-- CMA-ES with a fixed random seed. Each route gets two independent runs, plus up to two more with a bigger population
-  if it still breaks a limit; a route is skipped when even driving its corners flat out can't beat the best found.
-  Hard limits become steep penalties and the result must have none left. Paths are scored at 0.5 in during the
-  search and in the final report alike (scoring coarser made the search favour shortcuts that only looked good at
-  the coarse resolution). Runs end when the best time stops improving by 0.1 ms, after 12,000 evaluations, or on Stop.
+- CMA-ES with a fixed random seed. Every route gets a short screening run (2,500 evaluations); the two most
+  promising get two full runs each (the first carrying on from screening), plus up to two more with a bigger
+  population if they still break a limit. A route is skipped when even driving its corners flat out can't beat the
+  best found. Hard limits become steep penalties and the result must have none left. Paths are scored at 0.5 in
+  during the search and in the final report alike; during the search the footprint is checked at every other sample
+  with 0.2 in of extra margin. Runs end when the best time stops improving, after 12,000 evaluations, or on Stop.
+- Long paths have several good local optima. **Optimize again** on an unchanged path searches with a new seed and
+  keeps whichever plan is faster.
 - While it runs, the panel shows the route and run, evaluations and elapsed time, the current run's best time and
   whether it fits, and the best fitting time so far.
 - Reports: time, closest approach to each obstacle, and which limit is holding it back.
 
 ## Robot code
 
+- **.pp** downloads the plan for the Pedro Visualizer: one line per curve, each with a piecewise heading through the
+  planned breakpoints (within Pedro's own small warp between them), plus the robot's size and speeds. The visualizer
+  times every line as its own start-and-stop move, so its clock and animation speed don't match the plan; the
+  planner's playback does.
 - **Copy code** gives a short method to paste into a routine:
 
   ```java

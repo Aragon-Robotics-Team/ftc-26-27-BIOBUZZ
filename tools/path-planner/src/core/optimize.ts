@@ -9,6 +9,7 @@ import { cmaes } from './cmaes.ts';
 import { CENTERLINE_X, RED_HIVE_TARGET, WALL_MAX, WALL_MIN } from './field.ts';
 import { add, angleOf, convexDistance, dist, fromAngle, rad, sub, wrap, type Vec } from './geom.ts';
 import { smoothHeading, toPieces } from './heading.ts';
+import { drivetrain } from './drivetrain.ts';
 import { speedProfile, type Limit } from './model.ts';
 import { marginsFor, turretRange, type Chain, type Margins, type Settings } from './project.ts';
 import { localFootprint, placeFootprint } from './robot.ts';
@@ -45,15 +46,19 @@ export interface Plan {
   length: number;
   segments: PlannedSegment[];
   markers: PlannedMarker[];
-  check: Pick<Check, 'clearances' | 'rules' | 'worst'>;
+  check: Pick<Check, 'clearances' | 'rules' | 'worst'> & { drift?: Drift; lag?: Drift };
   /** Share of the path each limit holds the speed down, for the report. */
   limits: Partial<Record<Limit, number>>;
   seeds: number;
   evals: number;
   modelSource: string;
+  /** How many differently seeded searches this plan is the best of (Optimize again on an unchanged path adds one). */
+  searches?: number;
 }
 
 export interface Progress {
+  /** Screening every route briefly, or refining the most promising ones. */
+  phase: 'screen' | 'refine';
   /** Which starting route is being searched (0-based), of how many. */
   seed: number;
   seeds: number;
@@ -78,8 +83,12 @@ export interface OptimizeOptions {
   seed?: number;
   maxEvalsPerSeed?: number;
   maxSeeds?: number;
-  /** Independent CMA-ES runs per route. */
+  /** Independent CMA-ES runs per route that makes the final round. */
   runsPerRoute?: number;
+  /** Evaluations for each route's screening run. */
+  screenEvals?: number;
+  /** How many routes get full runs after screening. */
+  finalRoutes?: number;
   /** Extra runs, each with a bigger population, for a route whose runs all break a limit. */
   restarts?: number;
   onProgress?: (p: Progress) => boolean | void;
@@ -124,8 +133,8 @@ interface Layout {
   baseH: number[];
 }
 
-/** About one heading knot every 10 in, at least two per segment, so turns can happen where they're needed. */
-const KNOT_SPACING = 10;
+/** About one heading knot every 14 in, at least two per segment, so turns can happen where they're needed. */
+const KNOT_SPACING = 14;
 
 /** Rough cost (seconds, plus heavy penalties where there's no room) of moving between two poses in a straight line. */
 type Steer = (a: Vec, ha: number, b: Vec, hb: number) => number;
@@ -314,20 +323,49 @@ function decode(x: Float64Array, joints: Joint[], L: Layout): Decoded {
 export interface Evaluation {
   time: number;
   check: Check;
+  /** How far wide of the path Pedro would drift where a curve asks more than the wheels have. */
+  drift: Drift;
+  /** How far Pedro's heading would fall behind where the plan turns faster than the robot can. */
+  lag: Drift;
   cost: number;
   length: number;
   limits: Partial<Record<Limit, number>>;
+  /** Places where it turns back on itself mid-path, which Pedro can't drive (it brakes only at the end). */
+  reversals: number;
+  /** Keeps every gap, heading rule and the wheels' limits, and never turns back on itself. */
+  fits: boolean;
 }
 
-export function evaluate(segments: PlannedSegment[], project: Settings, chain: Chain, margins: Margins, ds = 0.5): Evaluation {
+export interface Drift {
+  /** The worst of it: inches off the path (drift) or radians behind (heading lag). */
+  worst: number;
+  /** Arc length where it happens, in. */
+  at: number;
+}
+
+/** Drifting this far wide is within what Pedro corrects and the model's own precision, in. */
+export const DRIFT_LIMIT = 1;
+/** And the heading falling this far behind, rad (5°). */
+export const LAG_LIMIT = (5 * Math.PI) / 180;
+/** A radian of heading lag counts like this many inches of drift. */
+const LAG_WEIGHT = 10;
+
+/** `stride`: check the footprint at every n-th sample (the search uses 2, with a little extra margin). */
+export function evaluate(segments: PlannedSegment[], project: Settings, chain: Chain, margins: Margins, ds = 0.5, stride = 1): Evaluation {
   const sampled = sampleChain(segments, ds);
-  const profile = speedProfile(sampled.samples, project.model, { endStopped: chain.endStopped });
-  const check = checkChain(sampled.samples, project, chain, margins, chainObstacles(project, chain, margins));
-  const cost = profile.total + 2 * check.penalty + 20 * check.worst + (check.worst > 1e-3 ? 3 : 0);
+  const profile = speedProfile(sampled.samples, project, { endStopped: chain.endStopped });
+  const check = checkChain(sampled.samples, project, chain, margins, chainObstacles(project, chain, margins), stride);
+  // Drifting wide counts like breaking a gap: a path Pedro can't hold isn't the path that was checked for clearance.
+  let driftArea = 0;
+  for (let i = 1; i < sampled.samples.length; i++) driftArea += Math.max(0, profile.drift[i] - DRIFT_LIMIT) * (sampled.samples[i].s - sampled.samples[i - 1].s);
+  for (let i = 1; i < sampled.samples.length; i++) driftArea += LAG_WEIGHT * Math.max(0, profile.lag[i] - LAG_LIMIT) * (sampled.samples[i].s - sampled.samples[i - 1].s);
+  const driftExcess = Math.max(0, profile.worstDrift - DRIFT_LIMIT) + LAG_WEIGHT * Math.max(0, profile.worstLag - LAG_LIMIT);
+  const broken = check.worst > 1e-3 || driftExcess > 0 || profile.reversals > 0;
+  const cost = profile.total + 2 * check.penalty + 20 * check.worst + 2 * driftArea + 20 * driftExcess + 5 * profile.reversals + (broken ? 3 : 0);
   const limits: Partial<Record<Limit, number>> = {};
   const n = sampled.samples.length;
   for (let i = 0; i < n; i++) limits[profile.limit[i]] = (limits[profile.limit[i]] ?? 0) + 1 / n;
-  return { time: profile.total, check, cost, length: sampled.length, limits };
+  return { time: profile.total, check, drift: { worst: profile.worstDrift, at: profile.driftAt }, lag: { worst: profile.worstLag, at: profile.lagAt }, reversals: profile.reversals, cost, length: sampled.length, limits, fits: !broken };
 }
 
 /** Where each marker lands: segment index and curve parameter. */
@@ -354,7 +392,7 @@ export function chainSpecHash(settings: Settings, chain: Chain): string {
 }
 
 /** Bump when the optimizer's output changes for the same input, so saved plans get redone. */
-export const PLANNER_VERSION = 2;
+export const PLANNER_VERSION = 4;
 
 export function optimizeChain(project: Settings, chain: Chain, opts: OptimizeOptions = {}): Plan {
   const margins = marginsFor(project, chain);
@@ -392,7 +430,7 @@ export function optimizeChain(project: Settings, chain: Chain, opts: OptimizeOpt
     }
     return r;
   };
-  const m = project.model;
+  const m = drivetrain(project.model, project.robot);
   const steer: Steer = (a, ha, b, hb) => {
     const d = dist(a, b);
     const travel = angleOf(sub(b, a));
@@ -411,7 +449,7 @@ export function optimizeChain(project: Settings, chain: Chain, opts: OptimizeOpt
 
   // The optimum sits right on a limit, and penalties let it lean a hair past. Searching with slightly wider margins
   // lands it just inside the real ones.
-  const searchMargins: Margins = { ...margins, obstacle: margins.obstacle + 0.1, centerline: margins.centerline + 0.1 };
+  const searchMargins: Margins = { ...margins, obstacle: margins.obstacle + 0.2, centerline: margins.centerline + 0.2 };
 
   let best: { segments: PlannedSegment[]; ev: Evaluation } | null = null;
   let evals = 0;
@@ -422,59 +460,98 @@ export function optimizeChain(project: Settings, chain: Chain, opts: OptimizeOpt
   // limit gets more, each with a bigger population (IPOP-style).
   const runs = opts.runsPerRoute ?? 2;
   const extra = opts.restarts ?? 2;
-  const fastest = Math.max(project.model.vForward, project.model.vStrafe);
+  const fastest = Math.max(m.vForward, m.vStrafe);
   const maxEvals = opts.maxEvalsPerSeed ?? 12000;
-  combos.forEach((combo, seedIdx) => {
+  const screenEvals = Math.min(maxEvals, opts.screenEvals ?? 2500);
+  // Every route gets a short screening run; the most promising few get full runs (successive halving), so the work
+  // goes where the fastest path is likely to be.
+  interface Route {
+    index: number;
+    joints: Joint[];
+    L: Layout;
+    f: (x: Float64Array) => number;
+    x: Float64Array;
+    cost: number;
+  }
+  const turret = turretRange(project.robot);
+  const turretMid = rad((turret.min + turret.max) / 2);
+  const run = (route: Route, x0: Float64Array, attempt: number, budget: number, lambda: number | undefined, progress: (done: number) => number, phase: Progress['phase']) => {
+    const result = cmaes(route.f, x0, {
+      sigma: 0.4,
+      seed: (opts.seed ?? 1) + route.index * 7919 + attempt * 104729,
+      maxEvals: budget,
+      lambda,
+      tolFun: 2e-3,
+      onGeneration: (g) => {
+        if (!opts.onProgress) return;
+        const now = Date.now();
+        if (now - lastReport < 150) return;
+        lastReport = now;
+        const segs = decode(g.x, route.joints, route.L).segments;
+        const ev = evaluate(segs, project, chain, margins, SEARCH_DS);
+        const keepGoing = opts.onProgress({
+          phase,
+          seed: route.index,
+          seeds: combos.length,
+          attempt,
+          runs,
+          attempts: runs + extra,
+          evals: evals + g.evals,
+          bestTime: ev.time,
+          feasible: ev.fits,
+          bestSoFar,
+          fraction: Math.min(1, progress(g.evals / budget)),
+          segments: segs,
+        });
+        if (keepGoing === false) {
+          stop = true;
+          return false;
+        }
+      },
+    });
+    evals += result.evals;
+    const segments = decode(result.x, route.joints, route.L).segments;
+    const ev = evaluate(segments, project, chain, margins, SEARCH_DS);
+    if (!best || ev.cost < best.ev.cost) best = { segments, ev };
+    if (ev.fits && (bestSoFar === null || ev.time < bestSoFar)) bestSoFar = ev.time;
+    if (ev.cost < route.cost) {
+      route.cost = ev.cost;
+      route.x = result.x;
+    }
+    return ev;
+  };
+
+  const screened: Route[] = [];
+  combos.forEach((combo, index) => {
     if (stop) return;
     // Skip a route that can't beat the best path found, even driven flat out along its corners.
     if (bestSoFar !== null && (0.9 * polyLength(combo)) / fastest >= bestSoFar) return;
     const joints = buildJoints(chain, combo);
-    const turret = turretRange(project.robot);
-    const L = layout(joints, chain, steer, rad((turret.min + turret.max) / 2));
-    const f = (x: Float64Array) => evaluate(decode(x, joints, L).segments, project, chain, searchMargins, SEARCH_DS).cost;
-    const baseLambda = 4 + Math.floor(3 * Math.log(Math.max(L.n, 1)));
-    let routeFits = false;
-    for (let attempt = 0; attempt < runs + extra && !stop; attempt++) {
-      if (attempt >= runs && routeFits) break;
-      const result = cmaes(f, new Float64Array(L.n), {
-        sigma: 0.4,
-        seed: (opts.seed ?? 1) + seedIdx * 7919 + attempt * 104729,
-        maxEvals,
-        lambda: attempt >= runs ? 2 ** (attempt - runs + 1) * baseLambda : undefined,
-        onGeneration: (g) => {
-          if (!opts.onProgress) return;
-          const now = Date.now();
-          if (now - lastReport < 150) return;
-          lastReport = now;
-          const segs = decode(g.x, joints, L).segments;
-          const ev = evaluate(segs, project, chain, margins, SEARCH_DS);
-          const keepGoing = opts.onProgress({
-            seed: seedIdx,
-            seeds: combos.length,
-            attempt,
-            runs,
-            attempts: runs + extra,
-            evals: evals + g.evals,
-            bestTime: ev.time,
-            feasible: ev.check.worst <= 1e-3,
-            bestSoFar,
-            fraction: Math.min(1, (seedIdx + (Math.min(attempt, runs - 1) + Math.min(1, g.evals / maxEvals)) / runs) / combos.length),
-            segments: segs,
-          });
-          if (keepGoing === false) {
-            stop = true;
-            return false;
-          }
-        },
-      });
-      evals += result.evals;
-      const segments = decode(result.x, joints, L).segments;
-      const ev = evaluate(segments, project, chain, margins, SEARCH_DS);
-      if (!best || ev.cost < best.ev.cost) best = { segments, ev };
-      if (ev.check.worst <= 1e-3) {
-        routeFits = true;
-        if (bestSoFar === null || ev.time < bestSoFar) bestSoFar = ev.time;
-      }
+    const L = layout(joints, chain, steer, turretMid);
+    const route: Route = {
+      index,
+      joints,
+      L,
+      f: (x) => evaluate(decode(x, joints, L).segments, project, chain, searchMargins, SEARCH_DS, 2).cost,
+      x: new Float64Array(L.n),
+      cost: Infinity,
+    };
+    run(route, new Float64Array(L.n), 0, screenEvals, undefined, (d) => (0.3 * (index + d)) / combos.length, 'screen');
+    screened.push(route);
+  });
+
+  const finalists = [...screened].sort((a, b) => a.cost - b.cost).slice(0, opts.finalRoutes ?? 2);
+  finalists.forEach((route, rank) => {
+    const baseLambda = 4 + Math.floor(3 * Math.log(Math.max(route.L.n, 1)));
+    let fits = false;
+    for (let attempt = 1; attempt <= runs + extra && !stop; attempt++) {
+      if (attempt > runs && fits) break;
+      // The first full run carries on from the screening result; the others start afresh, with a bigger population
+      // for retries.
+      const x0 = attempt === 1 ? route.x : new Float64Array(route.L.n);
+      const lambda = attempt > runs ? 2 ** (attempt - runs) * baseLambda : undefined;
+      const ev = run(route, x0, attempt, maxEvals, lambda, (d) => 0.3 + (0.7 * (rank + (Math.min(attempt, runs) - 1 + d) / runs)) / finalists.length, 'refine');
+      if (ev.fits) fits = true;
     }
   });
   const found = best as { segments: PlannedSegment[]; ev: Evaluation } | null;
@@ -486,12 +563,12 @@ export function optimizeChain(project: Settings, chain: Chain, opts: OptimizeOpt
     chain: chain.name,
     specHash: chainSpecHash(project, chain),
     geometryHash: geometryHash(chosen.segments),
-    feasible: chosen.ev.check.worst <= 1e-3,
+    feasible: chosen.ev.fits,
     time: chosen.ev.time,
     length: chosen.ev.length,
     segments: chosen.segments,
     markers: placeMarkers(chain, chosen.segments),
-    check: { clearances: chosen.ev.check.clearances, rules: chosen.ev.check.rules, worst: chosen.ev.check.worst },
+    check: { clearances: chosen.ev.check.clearances, rules: chosen.ev.check.rules, worst: chosen.ev.check.worst, drift: chosen.ev.drift, lag: chosen.ev.lag },
     limits: chosen.ev.limits,
     seeds: combos.length,
     evals,

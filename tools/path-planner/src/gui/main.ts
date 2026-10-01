@@ -1,5 +1,6 @@
 /** Path Planner page: wires the field, the side panel, the dialogs and the optimizer together. */
 import { toPp } from '../core/export.ts';
+import { chainSpecHash } from '../core/optimize.ts';
 import type { Chain } from '../core/project.ts';
 import { drawChart } from './chart.ts';
 import { confirmDialog, copyDialog, helpDialog, logsDialog, pasteDialog, refreshRuns, settingsDialog } from './dialogs.ts';
@@ -51,19 +52,31 @@ async function runOptimize(force = false): Promise<void> {
     confirmDialog('Some points can\'t fit where they are', forced.map((f) => f.message), 'Optimize anyway', () => void runOptimize(true));
     return;
   }
+  // Optimizing an unchanged path again searches with a new seed and keeps whichever is faster: on long paths the
+  // search can settle in different local optima, so a few tries can find a quicker one.
+  const prev = state.plans.get(chain.name);
+  const again = !!prev && prev.specHash === chainSpecHash(state.settings, chain);
+  const seed = again ? (prev.searches ?? 1) + 1 : 1;
   state.running = { chain: chain.name, progress: null, startedAt: performance.now(), shown: 0 };
   changed('running');
   try {
-    const plan = await optimize(structuredClone(state.settings), structuredClone(chain), (p) => {
+    let plan = await optimize(structuredClone(state.settings), structuredClone(chain), seed, (p) => {
       if (state.running) {
         state.running.progress = p;
         state.running.shown = Math.max(state.running.shown, p.fraction);
       }
       changed('progress');
     });
+    if (again && prev.feasible && (!plan.feasible || plan.time >= prev.time - 1e-6)) {
+      plan = { ...prev, searches: seed };
+      toast(`No faster path this time, kept ${prev.time.toFixed(2)} s.`);
+    } else {
+      plan = { ...plan, searches: seed };
+      if (again && prev.feasible) toast(`Found a faster path: ${plan.time.toFixed(2)} s (was ${prev.time.toFixed(2)} s).`);
+      else if (!plan.feasible) toast(`${chain.name} can't keep every gap. See the note in the panel.`, 5000);
+    }
     state.plans.set(chain.name, plan);
     state.playTime = 0;
-    if (!plan.feasible) toast(`${chain.name} can't keep every gap. See the note in the panel.`, 5000);
   } catch (e) {
     if ((e as Error).message !== 'stopped') toast((e as Error).message, 6000);
   }

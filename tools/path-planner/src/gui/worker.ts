@@ -3,9 +3,9 @@
 import { optimizeChain } from '../core/optimize.ts';
 import type { Chain, Settings } from '../core/project.ts';
 
-self.onmessage = (e: MessageEvent<{ settings: Settings; chain: Chain }>) => {
+self.onmessage = (e: MessageEvent<{ settings: Settings; chain: Chain; seed: number }>) => {
   try {
-    const plan = optimizeChain(e.data.settings, e.data.chain, { onProgress: (p) => void self.postMessage({ type: 'progress', progress: p }) });
+    const plan = optimizeChain(e.data.settings, e.data.chain, { seed: e.data.seed, onProgress: (p) => void self.postMessage({ type: 'progress', progress: p }) });
     self.postMessage({ type: 'done', plan });
   } catch (err) {
     self.postMessage({ type: 'error', message: err instanceof Error ? err.message : String(err) });

@@ -2,7 +2,7 @@
 import type { PathLog, Run, RunComparison } from '../core/logs.ts';
 import { chainSpecHash, type Plan, type Progress } from '../core/optimize.ts';
 import { precheck, type PointIssue } from '../core/planner.ts';
-import { defaultSettings, type Chain, type Settings } from '../core/project.ts';
+import { defaultSettings, migrateSettings, type Chain, type Settings } from '../core/project.ts';
 
 export type Selection =
   | { kind: 'point'; index: number }
@@ -103,7 +103,7 @@ export function restore(): boolean {
     const raw = localStorage.getItem(KEY);
     if (!raw) return false;
     const saved = JSON.parse(raw) as { settings: Settings; chains: Chain[]; plans: Plan[]; copied: [string, string][]; selected: string | null };
-    state.settings = saved.settings;
+    state.settings = migrateSettings(saved.settings);
     state.chains = saved.chains;
     state.plans = new Map(saved.plans.map((p) => [p.chain, p]));
     state.copied = new Map(saved.copied);

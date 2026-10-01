@@ -14,10 +14,11 @@
  */
 import type { PlannedSegment } from './chain.ts';
 import { fieldObstacles } from './field.ts';
+import { drivetrain } from './drivetrain.ts';
 import { convexHull, deg } from './geom.ts';
 import { chainSpecHash, evaluate, placeMarkers, type Plan } from './optimize.ts';
 import { fromRow, geometryHash, n, rows, roundSegments } from './rows.ts';
-import { marginsFor, ProjectError, validateChain, validateSettings, type Chain, type Settings } from './project.ts';
+import { marginsFor, migrateSettings, ProjectError, validateChain, validateSettings, type Chain, type Settings } from './project.ts';
 
 export { geometryHash, roundSegments } from './rows.ts';
 
@@ -51,12 +52,12 @@ export function planFromSegments(settings: Settings, chain: Chain, segments: Pla
     chain: chain.name,
     specHash: chainSpecHash(settings, chain),
     geometryHash: geometryHash(segments),
-    feasible: ev.check.worst <= 1e-3,
+    feasible: ev.fits,
     time: ev.time,
     length: ev.length,
     segments,
     markers: placeMarkers(chain, segments),
-    check: { clearances: ev.check.clearances, rules: ev.check.rules, worst: ev.check.worst },
+    check: { clearances: ev.check.clearances, rules: ev.check.rules, worst: ev.check.worst, drift: ev.drift, lag: ev.lag },
     limits: ev.limits,
     seeds: 0,
     evals: 0,
@@ -82,6 +83,7 @@ export function fromJava(text: string): Imported[] {
       const meta = JSON.parse(m[1]) as { v: number; chain: Chain; settings: Settings; legs: number[] };
       if (meta.v !== EXPORT_VERSION) throw new Error(`made by a different planner version (${meta.v})`);
       validateChain(meta.chain);
+      meta.settings = migrateSettings(meta.settings);
       validateSettings(meta.settings);
       const call = body.indexOf('PlannedPath.of(');
       if (call < 0) throw new Error("the PlannedPath.of(…) call after it is missing");
@@ -100,31 +102,60 @@ export function fromJava(text: string): Imported[] {
 }
 
 /**
- * A path as a Pedro Visualizer file (format 1.5.0), for viewing it there. One line per Bezier segment; the visualizer
- * sweeps each line's heading linearly from start to end, so headings in between are approximate. Field obstacles at
- * the robot's height and the path's avoid zones are included as shapes.
+ * A path as a Pedro Visualizer file (format 1.5.0), for viewing it there: one line per curve, its heading a piecewise
+ * sweep through the planned breakpoints (the visualizer, like Pedro, places them by arc length), with the robot's size
+ * and speeds and, as shapes, the field obstacles at the robot's height and the path's avoid zones.
+ *
+ * The visualizer times every line as its own start-and-stop move, so its clock and animation speed don't match the
+ * plan; the planner's own playback does.
  */
 export function toPp(chain: Chain, settings: Settings, plan: Plan): string {
   const segments = roundSegments(plan.segments);
   const colors = ['#2563eb', '#7c3aed', '#16a34a', '#d97706', '#db2777', '#0891b2'];
   const r = (v: number) => Math.round(v * 10000) / 10000;
-  const lines = segments.map((seg, i) => ({
-    id: `line-${chain.name}-${i + 1}`,
-    color: colors[i % colors.length],
-    name: `${chain.name} ${i + 1}`,
-    locked: false,
-    waitBeforeMs: 0,
-    waitAfterMs: 0,
-    waitBeforeName: '',
-    waitAfterName: '',
-    kind: 'atomic',
-    endPoint: { x: seg.curve[3].x, y: seg.curve[3].y },
-    controlPoints: [
-      { x: seg.curve[1].x, y: seg.curve[1].y },
-      { x: seg.curve[2].x, y: seg.curve[2].y },
-    ],
-    heading: { type: 'linear', startDeg: r(deg(seg.heading.H[0])), endDeg: r(deg(seg.heading.H[seg.heading.H.length - 1])) },
-  }));
+  const lines = segments.map((seg, i) => {
+    const { F, H } = seg.heading;
+    const pieces = F.slice(1).map((f, j) => ({
+      startProgress: r(F[j]),
+      endProgress: r(f),
+      interpolationType: 'linear',
+      // The sweep's direction: the visualizer otherwise takes the short way round.
+      reversed: Math.abs(H[j + 1] - H[j]) > Math.PI,
+      parameters: { startDeg: r(deg(H[j])), endDeg: r(deg(H[j + 1])) },
+    }));
+    return {
+      id: `line-${chain.name}-${i + 1}`,
+      color: colors[i % colors.length],
+      name: `${chain.name} ${i + 1}`,
+      locked: false,
+      waitBeforeMs: 0,
+      waitAfterMs: 0,
+      waitBeforeName: '',
+      waitAfterName: '',
+      kind: 'atomic',
+      endPoint: { x: seg.curve[3].x, y: seg.curve[3].y },
+      controlPoints: [
+        { x: seg.curve[1].x, y: seg.curve[1].y },
+        { x: seg.curve[2].x, y: seg.curve[2].y },
+      ],
+      heading: pieces.length === 1 && !pieces[0].reversed
+        ? { type: 'linear', startDeg: r(deg(H[0])), endDeg: r(deg(H[1])) }
+        : { type: 'piecewise', piecewiseHeading: { segments: pieces } },
+    };
+  });
+  const d = drivetrain(settings.model, settings.robot);
+  const k = 12.5 / settings.model.nominalVoltage;
+  const launch = Math.min(d.aForward * k, d.traction);
+  const vizSettings = {
+    rWidth: settings.robot.width,
+    rHeight: settings.robot.length,
+    xVelocity: r(d.vForward * k),
+    yVelocity: r(d.vStrafe * k),
+    aVelocity: r(d.omegaMax * k),
+    maxVelocity: r(d.vForward * k),
+    maxAcceleration: r(launch),
+    maxDeceleration: r(Math.min(d.traction, launch + settings.model.coastForward)),
+  };
   const margins = marginsFor(settings, chain);
   const shapes = [
     ...fieldObstacles(settings.robot.height + margins.headroom).map((o) => ({ name: o.name, vertices: o.polygon, color: '#52525b', fillColor: '#a1a1aa' })),
@@ -138,6 +169,7 @@ export function toPp(chain: Chain, settings: Settings, plan: Plan): string {
         lines,
         shapes,
         sequence: lines.map((l) => ({ kind: 'path', lineId: l.id })),
+        settings: vizSettings,
         fieldPoints: [],
         version: '1.5.0',
         timestamp: new Date().toISOString(),

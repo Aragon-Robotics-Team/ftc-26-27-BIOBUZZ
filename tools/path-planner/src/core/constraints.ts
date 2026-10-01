@@ -117,11 +117,11 @@ export function checkChain(
     for (let j = 0; j < obstacles.length; j++) {
       const ob = obstacleBounds[j];
       const cl = clear[j + first];
-      // Far away: the bounding-box gap is a lower bound on the real gap, and close enough to report.
+      // Not near the margin: the bounding-box gap is a lower bound on the real gap, and close enough to report.
       const bx = Math.max(ob.x0 - x1, x0 - ob.x1, 0);
       const by = Math.max(ob.y0 - y1, y0 - ob.y1, 0);
       const boxGap = Math.sqrt(bx * bx + by * by);
-      if (boxGap > cl.margin + 4) {
+      if (boxGap > cl.margin + 0.5) {
         if (boxGap < cl.gap) {
           cl.gap = boxGap;
           cl.at = smp.s;

@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { sampleChain } from '../src/core/chain.ts';
-import { optimizeChain } from '../src/core/optimize.ts';
+import { evaluate, optimizeChain } from '../src/core/optimize.ts';
+import { marginsFor } from '../src/core/project.ts';
 import { defaultSettings, type Chain } from '../src/core/project.ts';
 import { garden } from './fixtures/garden.ts';
 
@@ -29,7 +30,7 @@ describe('optimizer', () => {
     expect(plan.time).toBeLessThan(6);
     // ends exactly on the poses it was given
     const last = plan.segments[plan.segments.length - 1];
-    expect(last.curve[3]).toEqual({ x: 56, y: 20.22 });
+    expect(last.curve[3]).toEqual({ x: 12, y: 12 });
     expect(plan.markers).toHaveLength(1);
   }, 60_000);
 
@@ -46,4 +47,14 @@ describe('optimizer', () => {
     const b = optimizeChain(settings, chains[1], { maxEvalsPerSeed: 1500 });
     expect(a.segments).toEqual(b.segments);
   }, 60_000);
+
+  it("doesn't count a path that turns back on itself as fitting: Pedro would overshoot", () => {
+    const settings = defaultSettings();
+    const chain: Chain = { ...underHive, name: 'outAndBack', points: [{ kind: 'fixed', x: 30, y: 30, heading: 0, headingTol: 0 }, { kind: 'fixed', x: 30, y: 60, heading: 0, headingTol: 0 }] };
+    const out = { curve: [{ x: 30, y: 30 }, { x: 30, y: 45 }, { x: 30, y: 55 }, { x: 30, y: 70 }] as const, heading: { F: [0, 1], H: [0, 0] }, leg: 0 };
+    const back = { curve: [{ x: 30, y: 70 }, { x: 30, y: 66 }, { x: 30, y: 63 }, { x: 30, y: 60 }] as const, heading: { F: [0, 1], H: [0, 0] }, leg: 0 };
+    const ev = evaluate([out, back].map((s) => ({ ...s, curve: [...s.curve] })), settings, chain, marginsFor(settings, chain));
+    expect(ev.reversals).toBe(1);
+    expect(ev.fits).toBe(false);
+  });
 });

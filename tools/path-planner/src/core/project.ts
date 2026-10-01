@@ -40,25 +40,76 @@ export interface Margins {
   headroom: number;
 }
 
+/**
+ * The drivetrain, physically: four mecanum wheels, each driven by a DC motor whose force falls as it spins faster.
+ * The planner derives top speeds, launch acceleration, turning and grip limits from these (see drivetrain.ts).
+ */
 export interface ModelConfig {
-  /** Where the numbers came from, e.g. "placeholder", "Foresight Tuner 2026-10-04", "fit from 12 runs". */
+  /** Where the numbers came from, e.g. "sample", "Foresight Tuner 2026-10-04", "fit from 12 runs". */
   source: string;
-  /** Top speeds, in/s. */
-  vForward: number;
-  vStrafe: number;
-  /** Fastest turn, rad/s, while not translating. */
-  omegaMax: number;
-  /** Accelerations, in/s². */
-  aForward: number;
-  aStrafe: number;
-  dForward: number;
-  dStrafe: number;
-  /** Largest sideways (centripetal) acceleration, in/s². */
-  aLateral: number;
+  /** Motor output shaft at the spec voltage: free speed (RPM) and stall torque (N·m). */
+  motorRpm: number;
+  motorStallTorque: number;
+  /** Extra reduction between motor and wheel (motor turns per wheel turn; 1 = direct). */
+  reduction: number;
+  /** Wheel diameter, inches. */
+  wheelDiameter: number;
+  /** Distance between the front and back axles, and between the left and right wheels, inches. */
+  wheelbase: number;
+  trackWidth: number;
+  /** Robot mass, kg. */
+  mass: number;
+  /** How hard the wheels can push before slipping, as a fraction of the robot's weight (μ). */
+  grip: number;
+  /** Top speed forward as a fraction of the wheels' free speed (gearbox and roller losses). */
+  driveEfficiency: number;
+  /** Top speed sideways as a fraction of the top speed forward (mecanum rollers lose some). */
+  strafeEfficiency: number;
+  /** Slowing down with no power (friction), in/s²: the Foresight Tuner's natural decelerations. */
+  coastForward: number;
+  coastStrafe: number;
   /** Added once at the end of a path that stops: settling on the end pose, s. */
   stopOverhead: number;
-  /** Battery voltage the speeds were measured at. */
+  /** Voltage the motor specs are for. */
   nominalVoltage: number;
+}
+
+/** goBILDA 5203 Yellow Jacket motors at 12 V (goBILDA spec sheets). */
+export const MOTORS: { name: string; rpm: number; stallTorque: number }[] = [
+  { name: 'goBILDA 223 RPM', rpm: 223, stallTorque: 3.73 }, // 38.0 kg·cm
+  { name: 'goBILDA 312 RPM', rpm: 312, stallTorque: 2.38 }, // 24.3 kg·cm
+  { name: 'goBILDA 435 RPM', rpm: 435, stallTorque: 1.83 }, // 18.7 kg·cm
+  { name: 'goBILDA 1150 RPM', rpm: 1150, stallTorque: 0.775 }, // 7.9 kg·cm
+];
+
+/**
+ * Starting numbers until the robot is measured: the drive motors in pedro/Constants.java (goBILDA 312 RPM), 104 mm
+ * mecanum wheels, and the sample robot from Pedro's quickstart for mass, strafe/forward speed ratio (65.4 / 81.3) and
+ * coasting decelerations (34.6, 78.2 in/s²). Grip (mecanum rollers on tiles) and drive efficiency are typical values.
+ */
+export const SAMPLE_MODEL: ModelConfig = {
+  source: 'sample (not measured)',
+  motorRpm: 312,
+  motorStallTorque: 2.38,
+  reduction: 1,
+  wheelDiameter: 4.094,
+  wheelbase: 10,
+  trackWidth: 13,
+  mass: 10.66,
+  grip: 0.5,
+  driveEfficiency: 0.9,
+  strafeEfficiency: 0.8,
+  coastForward: 34.6,
+  coastStrafe: 78.2,
+  stopOverhead: 0.25,
+  nominalVoltage: 12,
+};
+
+/** Settings saved before the drivetrain was modelled physically get the sample drivetrain. */
+export function migrateSettings(s: Settings): Settings {
+  const m = s.model as unknown as Record<string, unknown> | undefined;
+  if (m && typeof m.motorRpm === 'number') return s;
+  return { ...s, model: { ...SAMPLE_MODEL, stopOverhead: typeof m?.stopOverhead === 'number' ? m.stopOverhead : SAMPLE_MODEL.stopOverhead } };
 }
 
 /** The robot, margins and speed model: shared by every path. */
@@ -128,25 +179,12 @@ export interface Chain {
   margins?: Partial<Margins>;
 }
 
-export const PLACEHOLDER_MODEL: ModelConfig = {
-  source: 'placeholder (not measured)',
-  vForward: 60,
-  vStrafe: 48,
-  omegaMax: 6,
-  aForward: 70,
-  aStrafe: 55,
-  dForward: 60,
-  dStrafe: 45,
-  aLateral: 80,
-  stopOverhead: 0.25,
-  nominalVoltage: 12.5,
-};
 
 export function defaultSettings(): Settings {
   return {
     robot: { width: 16, length: 14, height: 14, protrusions: [], turretMin: -90, turretMax: 90 },
     margins: { obstacle: 2, centerline: 1, headroom: 2 },
-    model: { ...PLACEHOLDER_MODEL },
+    model: { ...SAMPLE_MODEL },
   };
 }
 
@@ -174,7 +212,7 @@ export function validateSettings(s: Settings): void {
   if (s.robot?.turretMin !== undefined) num(s.robot.turretMin, 'turret range start');
   if (s.robot?.turretMax !== undefined) num(s.robot.turretMax, 'turret range end');
   if (s.robot && turretRange(s.robot).max <= turretRange(s.robot).min) problems.push('the turret range must end after it starts');
-  for (const k of ['vForward', 'vStrafe', 'omegaMax', 'aForward', 'aStrafe', 'dForward', 'dStrafe', 'aLateral', 'nominalVoltage'] as const) {
+  for (const k of ['motorRpm', 'motorStallTorque', 'reduction', 'wheelDiameter', 'wheelbase', 'trackWidth', 'mass', 'grip', 'driveEfficiency', 'strafeEfficiency', 'coastForward', 'coastStrafe', 'nominalVoltage'] as const) {
     num(s.model?.[k], k, 1e-6);
   }
   num(s.model?.stopOverhead, 'stopOverhead', 0);

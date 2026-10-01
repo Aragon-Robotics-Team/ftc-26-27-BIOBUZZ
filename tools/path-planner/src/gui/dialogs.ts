@@ -1,9 +1,10 @@
 /** Dialogs: copy code, paste code, robot & speed settings, logs, help. */
 import { fromJava, planFromSegments, toJava, type Imported } from '../core/export.ts';
 import { compareRun, drift, extractRuns, fitModel, parseLog, type FitResult } from '../core/logs.ts';
-import { PLACEHOLDER_MODEL, ProjectError, turretRange, type ModelConfig, type Side } from '../core/project.ts';
+import { drivetrain } from '../core/drivetrain.ts';
+import { MOTORS, ProjectError, SAMPLE_MODEL, turretRange, type ModelConfig, type Settings, type Side } from '../core/project.ts';
 import { fmt, h, num, select, toast } from './dom.ts';
-import { parseForesight } from './foresight.ts';
+import { applyForesight, parseForesight } from './foresight.ts';
 import { changed, selectedChain, state } from './state.ts';
 
 function dialog(title: string, cls: string, ...body: (HTMLElement | null)[]): HTMLDialogElement {
@@ -101,18 +102,33 @@ export function pasteDialog(): void {
   area.focus();
 }
 
-const MODEL_FIELDS: [keyof ModelConfig, string, string][] = [
-  ['vForward', 'Top speed forward', 'in/s'],
-  ['vStrafe', 'Top speed sideways', 'in/s'],
-  ['omegaMax', 'Fastest turn', 'rad/s'],
-  ['aForward', 'Speeding up, forward', 'in/s²'],
-  ['aStrafe', 'Speeding up, sideways', 'in/s²'],
-  ['dForward', 'Braking, forward', 'in/s²'],
-  ['dStrafe', 'Braking, sideways', 'in/s²'],
-  ['aLateral', 'Grip on curves', 'in/s²'],
-  ['stopOverhead', 'Settling at the end', 's'],
-  ['nominalVoltage', 'Battery when measured', 'V'],
+/** Drivetrain inputs, in the order shown. [field, label, unit, how many decimals to show] */
+const DRIVE_FIELDS: [keyof ModelConfig, string, string, number][] = [
+  ['motorRpm', 'Motor free speed', 'RPM', 0],
+  ['motorStallTorque', 'Motor stall torque', 'N·m', 3],
+  ['reduction', 'Extra gear reduction (1 = none)', '×', 2],
+  ['wheelDiameter', 'Wheel diameter', 'in', 3],
+  ['wheelbase', 'Front to back axles', 'in', 2],
+  ['trackWidth', 'Left to right wheels', 'in', 2],
+  ['mass', 'Robot mass', 'kg', 2],
+  ['grip', 'Grip (μ)', '', 2],
+  ['driveEfficiency', 'Speed reached, of free speed', '×', 3],
+  ['strafeEfficiency', 'Sideways speed, of forward', '×', 3],
+  ['coastForward', 'Coasting, forward', 'in/s²', 1],
+  ['coastStrafe', 'Coasting, sideways', 'in/s²', 1],
+  ['stopOverhead', 'Settling at the end', 's', 2],
+  ['nominalVoltage', 'Motor specs are at', 'V', 1],
 ];
+/** The ones logs can fit. */
+const FIT_FIELDS = DRIVE_FIELDS.filter(([k]) => ['driveEfficiency', 'strafeEfficiency', 'grip', 'mass', 'coastForward', 'coastStrafe', 'stopOverhead'].includes(k));
+
+/** What the drivetrain can do, in a line, at a typical 12.5 V battery. */
+function capabilities(model: ModelConfig, robot: Settings['robot']): string {
+  const d = drivetrain(model, robot);
+  const k = 12.5 / model.nominalVoltage;
+  const launch = Math.min(d.aForward * k, d.traction);
+  return `${Math.round(d.vForward * k)} in/s forward, ${Math.round(d.vStrafe * k)} sideways · turns ${(d.omegaMax * k).toFixed(1)} rad/s · starts at ${Math.round(launch)} in/s²${launch === d.traction ? ' (grip-limited)' : ''}`;
+}
 
 export function settingsDialog(): void {
   const s = state.settings;
@@ -129,14 +145,39 @@ export function settingsDialog(): void {
   renderProtrusions();
   const paste = h('textarea', { class: 'code', rows: 4, placeholder: 'Paste the Foresight Tuner output', spellcheck: 'false' });
   const model = h('div', {});
-  const renderModel = () => model.replaceChildren(
-    h('p', { class: `dim${/placeholder/i.test(s.model.source) ? ' warn' : ''}` }, `From: ${s.model.source}`),
-    ...MODEL_FIELDS.map(([k, label, unit]) => row(label, unit, num(s.model[k] as number, (v) => {
-      (s.model[k] as number) = v;
+  const motorPick = () => {
+    const preset = MOTORS.find((m) => m.rpm === s.model.motorRpm && Math.abs(m.stallTorque - s.model.motorStallTorque) < 0.01);
+    return select(preset?.name ?? 'custom', [...MOTORS.map((m) => [m.name, m.name] as [string, string]), ['custom', 'Other motor']], (name) => {
+      const m = MOTORS.find((x) => x.name === name);
+      if (!m) return;
+      s.model.motorRpm = m.rpm;
+      s.model.motorStallTorque = m.stallTorque;
       if (!/, edited$/.test(s.model.source)) s.model.source += ', edited';
+      renderModel();
+      refreshSummary();
+      edit();
+    }, 'Drive motor');
+  };
+  const source = h('p', {});
+  const caps = h('p', { class: 'capabilities' });
+  // Editing a field updates the summary in place, so tabbing to the next field keeps working.
+  const refreshSummary = () => {
+    source.className = `dim${/sample|placeholder/i.test(s.model.source) ? ' warn' : ''}`;
+    source.textContent = `From: ${s.model.source}`;
+    caps.textContent = capabilities(s.model, s.robot);
+  };
+  const renderModel = () => model.replaceChildren(
+    source,
+    caps,
+    h('label', { class: 'set-row motor' }, h('span', {}, 'Drive motor'), motorPick()),
+    ...DRIVE_FIELDS.map(([key, label, unit]) => row(label, unit, num(s.model[key] as number, (v) => {
+      (s.model[key] as number) = v;
+      if (!/, edited$/.test(s.model.source)) s.model.source += ', edited';
+      refreshSummary();
       edit();
     }, { min: 0, label }))));
   renderModel();
+  refreshSummary();
   const locked = !!state.running;
   dialog('Robot & speed', 'sheet',
     h('fieldset', { class: 'lock', disabled: locked, title: locked ? 'Editing is paused while a path optimizes' : '' },
@@ -156,24 +197,25 @@ export function settingsDialog(): void {
     row('From obstacles and walls', 'in', num(s.margins.obstacle, (v) => ((s.margins.obstacle = v), edit()), { min: 0, label: 'Obstacles' })),
     row('From the centerline', 'in', num(s.margins.centerline, (v) => ((s.margins.centerline = v), edit()), { min: 0, label: 'Centerline' })),
     row('Above the robot (hive frame)', 'in', num(s.margins.headroom, (v) => ((s.margins.headroom = v), edit()), { min: 0, label: 'Headroom' })),
-    h('h3', {}, 'Speed model'),
+    h('h3', {}, 'Drivetrain'),
     model,
     paste,
     h('div', { class: 'actions' },
       h('button', { class: 'btn', type: 'button', onclick: () => {
         try {
-          Object.assign(s.model, parseForesight(paste.value).values);
-          s.model.source = `Foresight Tuner, ${new Date().toISOString().slice(0, 10)}`;
+          s.model = { ...applyForesight(s.model, parseForesight(paste.value)), source: `Foresight Tuner, ${new Date().toISOString().slice(0, 10)}` };
           paste.value = '';
           renderModel();
+          refreshSummary();
           edit();
         } catch (e) {
           toast((e as Error).message, 5000);
         }
       } }, 'Use tuner numbers'),
       h('button', { class: 'link', type: 'button', onclick: () => {
-        s.model = { ...PLACEHOLDER_MODEL };
+        s.model = { ...SAMPLE_MODEL };
         renderModel();
+        refreshSummary();
         edit();
       } }, 'Reset'))),
   );
@@ -186,7 +228,7 @@ let fit: FitResult | null = null;
 export function refreshRuns(): void {
   const plans = [...state.plans.values()];
   state.runs = state.logs.flatMap((log) => extractRuns(log, plans));
-  state.comparisons = state.runs.map((r) => compareRun(r, state.settings.model));
+  state.comparisons = state.runs.map((r) => compareRun(r, state.settings));
 }
 
 export function logsDialog(): void {
@@ -218,7 +260,7 @@ export function logsDialog(): void {
         h('div', { class: 'actions' },
           h('button', { class: 'btn', type: 'button', onclick: () => {
             try {
-              fit = fitModel(state.runs, state.settings.model);
+              fit = fitModel(state.runs, state.settings);
             } catch (e) {
               toast((e as Error).message);
             }
@@ -232,7 +274,7 @@ export function logsDialog(): void {
       parts.push(
         h('table', { class: 'data' },
           h('thead', {}, h('tr', {}, h('th', {}, ''), h('th', { class: 'num' }, 'Now'), h('th', { class: 'num' }, 'Fitted'))),
-          h('tbody', {}, ...MODEL_FIELDS.filter(([k]) => k !== 'nominalVoltage').map(([k, label]) => h('tr', {}, h('td', {}, label), h('td', { class: 'num dim' }, fmt(state.settings.model[k] as number, 2)), h('td', { class: 'num' }, fmt(f.model[k] as number, 2)))))),
+          h('tbody', {}, ...FIT_FIELDS.map(([k, label, , digits]) => h('tr', {}, h('td', {}, label), h('td', { class: 'num dim' }, fmt(state.settings.model[k] as number, digits)), h('td', { class: 'num' }, fmt(f.model[k] as number, digits)))))),
         h('div', { class: 'actions' }, h('button', { class: 'btn primary', type: 'button', disabled: !!state.running, title: state.running ? 'Wait for the optimizer to finish' : '', onclick: () => {
           state.settings.model = { ...f.model, source: `${f.model.source}, ${new Date().toISOString().slice(0, 10)}`, nominalVoltage: state.settings.model.nominalVoltage };
           fit = null;

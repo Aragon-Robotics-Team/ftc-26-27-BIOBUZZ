@@ -13,6 +13,7 @@ export const LIMIT_COLORS: Record<Limit, string> = {
   turn: '#7c3aed',
   curvature: '#0891b2',
   accel: '#16a34a',
+  grip: '#dc2626',
   decel: '#d97706',
   stop: '#6b7280',
 };
@@ -21,6 +22,7 @@ export const LIMIT_NAMES: Record<Limit, string> = {
   turn: 'turning',
   curvature: 'curve',
   accel: 'speeding up',
+  grip: 'drifting wide',
   decel: 'braking',
   stop: 'stop',
 };

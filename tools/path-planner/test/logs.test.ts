@@ -2,11 +2,12 @@ import { describe, expect, it } from 'vitest';
 import { sampleChain } from '../src/core/chain.ts';
 import { compareRun, drift, extractRuns, fitModel, parseLog, syntheticLog } from '../src/core/logs.ts';
 import { optimizeChain, type Plan } from '../src/core/optimize.ts';
-import { PLACEHOLDER_MODEL, type ModelConfig } from '../src/core/project.ts';
+import { defaultSettings, SAMPLE_MODEL, type Settings } from '../src/core/project.ts';
 import { garden } from './fixtures/garden.ts';
 
-// The "real" robot: clearly slower than the placeholder guesses, especially strafing and braking.
-const truth: ModelConfig = { ...PLACEHOLDER_MODEL, vForward: 50, vStrafe: 34, aForward: 55, dForward: 40, dStrafe: 30 };
+// The "real" robot: clearly slower than the sample numbers, especially strafing, and with less grip.
+const sample: Settings = defaultSettings();
+const truth: Settings = { ...sample, model: { ...SAMPLE_MODEL, driveEfficiency: 0.75, strafeEfficiency: 0.65, grip: 0.35, mass: 13 } };
 
 let plans: Plan[] | null = null;
 function getPlans(): Plan[] {
@@ -56,11 +57,11 @@ describe('logs', () => {
 
   it('flags the placeholder model as out of date, and fitting fixes it', () => {
     const runs = getPlans().flatMap((plan, i) => [1, 2].flatMap((k) => extractRuns(logFor(plan, 10 * i + k, 12 + k * 0.3), getPlans())));
-    const before = drift(runs.map((r) => compareRun(r, PLACEHOLDER_MODEL)));
+    const before = drift(runs.map((r) => compareRun(r, sample)));
     expect(before.flagged).toBe(true);
-    const fit = fitModel(runs, PLACEHOLDER_MODEL, { maxEvals: 2500 });
+    const fit = fitModel(runs, sample, { maxEvals: 2500 });
     expect(fit.after).toBeLessThan(fit.before);
-    const after = drift(runs.map((r) => compareRun(r, fit.model)));
+    const after = drift(runs.map((r) => compareRun(r, { ...sample, model: fit.model })));
     expect(after.flagged).toBe(false);
     expect(fit.model.stopOverhead).toBeCloseTo(0.3, 1);
     expect(fit.model.source).toMatch(/fit from 4 runs/);

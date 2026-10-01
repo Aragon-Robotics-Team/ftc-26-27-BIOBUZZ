@@ -2,7 +2,7 @@
 import { sampleChain } from '../core/chain.ts';
 import { wrap, type Vec } from '../core/geom.ts';
 import type { Limit } from '../core/model.ts';
-import type { Plan } from '../core/optimize.ts';
+import { DRIFT_LIMIT, LAG_LIMIT, type Plan } from '../core/optimize.ts';
 import { pointLabel } from '../core/planner.ts';
 import { JAVA_NAME, MARKER_NAME, type Chain, type ChainPoint, type HeadingRule } from '../core/project.ts';
 import { LIMIT_COLORS, LIMIT_NAMES } from './chart.ts';
@@ -67,9 +67,11 @@ function progressStats(): HTMLElement {
   const bar = h('div', { class: 'progress', role: 'progressbar', 'aria-valuemin': '0', 'aria-valuemax': '100', 'aria-valuenow': String(Math.round(r.shown * 100)) },
     h('i', { style: `width:${(3 + 97 * r.shown).toFixed(1)}%` }));
   if (!p) return h('div', {}, bar, h('div', { class: 'stats' }, h('span', {}, 'Finding routes around obstacles…'), h('span', {}, elapsed)));
-  const retry = p.attempt < p.runs ? ` · run ${p.attempt + 1} of ${p.runs}` : ` · retry ${p.attempt - p.runs + 1} of ${p.attempts - p.runs}`;
+  const what = p.phase === 'screen'
+    ? `Trying route ${p.seed + 1} of ${p.seeds}`
+    : `Refining route ${p.seed + 1}${p.attempt <= p.runs ? ` · run ${p.attempt} of ${p.runs}` : ` · retry ${p.attempt - p.runs} of ${p.attempts - p.runs}`}`;
   return h('div', {}, bar, h('div', { class: 'stats' },
-    h('span', {}, `Route ${p.seed + 1} of ${p.seeds}${retry}`),
+    h('span', {}, what),
     h('span', {}, `${p.evals.toLocaleString()} tries · ${elapsed}`),
     h('span', {}, 'This route ', h('b', {}, `${p.bestTime.toFixed(2)} s`), ' ', p.feasible ? h('span', { class: 'good' }, 'fits') : h('span', { class: 'warn' }, 'not clear yet')),
     h('span', {}, 'Best so far ', h('b', {}, p.bestSoFar === null ? '—' : `${p.bestSoFar.toFixed(2)} s`))));
@@ -78,14 +80,18 @@ function progressStats(): HTMLElement {
 /** The first thing wrong with the plan, in words. */
 function problem(chain: Chain): string | null {
   const plan = state.plans.get(chain.name);
-  if (plan && planStatus(chain) === 'ok') {
-    const at = reversal(plan);
-    if (at) {
-      const near = chain.points.reduce((best, p, i) => (Math.hypot(p.x - at.x, p.y - at.y) < Math.hypot(chain.points[best].x - at.x, chain.points[best].y - at.y) ? i : best), 0);
-      return `It reverses near ${pointLabel(chain, near)}, and Pedro won't stop there mid-path. Split the path at ${pointLabel(chain, near)}.`;
-    }
+  if (!plan || planStatus(chain) === 'stale') return null;
+  // Older plans could turn back on themselves and still count as fitting.
+  const at = reversal(plan);
+  if (at) {
+    const near = chain.points.reduce((best, p, i) => (Math.hypot(p.x - at.x, p.y - at.y) < Math.hypot(chain.points[best].x - at.x, chain.points[best].y - at.y) ? i : best), 0);
+    return `It turns back on itself near ${pointLabel(chain, near)}. Pedro only brakes at the end of a path, so it would overshoot there. Optimize again, or end this path at ${pointLabel(chain, near)} and start a new one there.`;
   }
   if (!plan || planStatus(chain) !== 'infeasible') return null;
+  const drift = plan.check.drift;
+  if (drift && drift.worst > DRIFT_LIMIT) return `Pedro would drift ${drift.worst.toFixed(1)} in wide ${Math.round(drift.at)} in along: it can't slow down for a curve that tight. Round it out or move a point.`;
+  const lag = plan.check.lag;
+  if (lag && lag.worst > LAG_LIMIT) return `Pedro's heading would fall ${Math.round((lag.worst * 180) / Math.PI)}° behind ${Math.round(lag.at)} in along: the plan turns faster than the robot can there.`;
   const c = [...plan.check.clearances].sort((a, b) => a.gap - a.margin - (b.gap - b.margin))[0];
   if (c && c.gap < c.margin - 1e-3) return `Too close to ${c.name.toLowerCase()}: ${Math.max(0, c.gap).toFixed(1)} in (needs ${c.margin}).`;
   const r = plan.check.rules[0];
@@ -303,7 +309,7 @@ function header(chain: Chain, actions: PanelActions): HTMLElement {
     h('div', { class: 'actions' },
       running
         ? h('button', { class: 'btn', type: 'button', onclick: actions.stop }, 'Stop')
-        : h('button', { class: 'btn primary', type: 'button', onclick: actions.optimize }, 'Optimize'),
+        : h('button', { class: 'btn primary', type: 'button', title: planStatus(chain) === 'ok' ? 'Search again with a different start; keeps the faster path' : '', onclick: actions.optimize }, planStatus(chain) === 'ok' ? 'Optimize again' : 'Optimize'),
       h('button', { class: `btn${notCopied(chain) ? ' attention' : ''}`, type: 'button', disabled: !plan || running, title: notCopied(chain) ? 'Changed since you last copied it' : '', onclick: actions.copy }, 'Copy code'),
       plan && !running ? h('button', { class: 'link minor', type: 'button', title: 'Download a file for the Pedro Visualizer', onclick: actions.downloadPp }, '.pp') : null,
       plan && !running ? h('button', { class: 'link minor clear', type: 'button', title: 'Remove the optimized path', onclick: actions.clear }, 'Clear') : null),

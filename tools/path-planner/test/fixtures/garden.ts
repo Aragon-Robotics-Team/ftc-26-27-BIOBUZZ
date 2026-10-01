@@ -12,9 +12,9 @@ export function garden(): { settings: Settings; chains: Chain[] } {
           launch,
           { kind: 'fixed', x: 28.4, y: 12, heading: 180, headingTol: 10 },
           { kind: 'fixed', x: 12, y: 12, heading: 180, headingTol: 10 },
-          launch,
         ],
-        legs: [{ rules: [] }, { rules: [{ type: 'front-first', tol: 15 }] }, { rules: [] }],
+        // Into the garden corner, intake first. It backs out again on a path of its own: Pedro only stops at the end.
+        legs: [{ rules: [] }, { rules: [{ type: 'front-first', tol: 15 }] }],
         endStopped: true,
         matchStart: false,
         markers: [{ name: 'INTAKE_ON', leg: 0, at: 0.6 }],

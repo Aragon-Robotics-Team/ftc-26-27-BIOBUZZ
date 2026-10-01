@@ -5,7 +5,7 @@ import OptimizerWorker from './worker.ts?worker&inline';
 
 let worker: Worker | null = null;
 
-export function optimize(settings: Settings, chain: Chain, onProgress: (p: Progress) => void): Promise<Plan> {
+export function optimize(settings: Settings, chain: Chain, seed: number, onProgress: (p: Progress) => void): Promise<Plan> {
   stop();
   const w = new OptimizerWorker();
   worker = w;
@@ -25,7 +25,7 @@ export function optimize(settings: Settings, chain: Chain, onProgress: (p: Progr
       if (worker === w) worker = null;
       reject(new Error(e.message || 'The optimizer stopped unexpectedly'));
     };
-    w.postMessage({ settings, chain });
+    w.postMessage({ settings, chain, seed });
     (w as Worker & { cancel?: () => void }).cancel = () => reject(new Error('stopped'));
   });
 }

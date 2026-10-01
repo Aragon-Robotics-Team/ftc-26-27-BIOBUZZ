@@ -17,8 +17,8 @@
 import { sampleChain, type Sample } from './chain.ts';
 import { cmaes } from './cmaes.ts';
 import { wrap } from './geom.ts';
-import { speedProfile } from './model.ts';
 import type { Plan } from './optimize.ts';
+import { speedProfile, type DriveSettings } from './model.ts';
 import type { ModelConfig } from './project.ts';
 
 export const LOG_COLUMNS = ['t', 'voltage', 'x', 'y', 'heading', 'mode', 'busy', 'path', 'segment', 'tparam'] as const;
@@ -278,9 +278,9 @@ export interface RunComparison {
   predictedSpeed: number[];
 }
 
-export function compareRun(run: Run, model: ModelConfig): RunComparison {
+export function compareRun(run: Run, settings: DriveSettings): RunComparison {
   // The follow ends at the parametric end, before the settle, so leave the stop overhead out here.
-  const profile = speedProfile(run.samples, { ...model, stopOverhead: 0 }, {
+  const profile = speedProfile(run.samples, { ...settings, model: { ...settings.model, stopOverhead: 0 } }, {
     endStopped: run.endStopped,
     voltage: Number.isFinite(run.voltage) ? run.voltage : undefined,
   });
@@ -319,7 +319,8 @@ export function drift(comparisons: RunComparison[], limit = 0.05): Drift {
   };
 }
 
-const FIT_KEYS = ['vForward', 'vStrafe', 'omegaMax', 'aForward', 'aStrafe', 'dForward', 'dStrafe', 'aLateral'] as const;
+/** The drivetrain numbers logs can pin down; motor specs and sizes come from the spec sheets. */
+const FIT_KEYS = ['driveEfficiency', 'strafeEfficiency', 'grip', 'mass', 'coastForward', 'coastStrafe'] as const;
 
 export interface FitResult {
   model: ModelConfig;
@@ -329,10 +330,11 @@ export interface FitResult {
 }
 
 /**
- * Fits the speed limits to logged runs: least squares on speed along each run plus total time, in log space so every
+ * Fits the drivetrain's unknowns (efficiencies, grip, mass, coasting) to logged runs: least squares on speed along each run plus total time, in log space so every
  * value stays positive. The stop overhead is the median measured settle time.
  */
-export function fitModel(runs: Run[], start: ModelConfig, opts: { maxEvals?: number; seed?: number } = {}): FitResult {
+export function fitModel(runs: Run[], settings: DriveSettings, opts: { maxEvals?: number; seed?: number } = {}): FitResult {
+  const start = settings.model;
   const usable = runs.filter((r) => r.samples.length >= 5);
   if (!usable.length) throw new Error('No runs of planned paths in these logs.');
   const toModel = (x: Float64Array): ModelConfig => {
@@ -344,7 +346,7 @@ export function fitModel(runs: Run[], start: ModelConfig, opts: { maxEvals?: num
     let sum = 0;
     let count = 0;
     for (const r of usable) {
-      const c = compareRun(r, m);
+      const c = compareRun(r, { ...settings, model: m });
       for (let q = 0; q < c.predictedSpeed.length; q++) {
         const e = c.predictedSpeed[q] - r.measuredSpeed[q];
         sum += e * e;
@@ -375,11 +377,11 @@ export function fitModel(runs: Run[], start: ModelConfig, opts: { maxEvals?: num
 export function syntheticLog(
   chain: string,
   samples: Sample[],
-  model: ModelConfig,
+  settings: DriveSettings,
   opts: { endStopped: boolean; voltage?: number; hz?: number; noise?: number; seed?: number; settle?: number },
 ): string {
-  const voltage = opts.voltage ?? model.nominalVoltage;
-  const profile = speedProfile(samples, { ...model, stopOverhead: 0 }, { endStopped: opts.endStopped, voltage });
+  const voltage = opts.voltage ?? 12.5;
+  const profile = speedProfile(samples, { ...settings, model: { ...settings.model, stopOverhead: 0 } }, { endStopped: opts.endStopped, voltage });
   const hz = opts.hz ?? 50;
   let seed = opts.seed ?? 1;
   const noise = () => {

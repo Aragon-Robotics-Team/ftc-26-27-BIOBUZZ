@@ -22,48 +22,143 @@ export interface CmaResult {
   evals: number;
 }
 
-/** Eigen-decomposition of a symmetric matrix (cyclic Jacobi). Returns eigenvalues and column eigenvectors. */
+/**
+ * Eigen-decomposition of a symmetric matrix: Householder reduction to tridiagonal form, then the implicit QL method
+ * (tred2 / tql2, as in EISPACK and JAMA). Returns eigenvalues and the eigenvectors as columns of B.
+ */
 function eigen(C: Float64Array[], n: number): { d: Float64Array; B: Float64Array[] } {
-  const A = C.map((r) => Float64Array.from(r));
-  const V = Array.from({ length: n }, (_, i) => {
-    const r = new Float64Array(n);
-    r[i] = 1;
-    return r;
-  });
-  for (let sweep = 0; sweep < 50; sweep++) {
-    let off = 0;
-    for (let p = 0; p < n; p++) for (let q = p + 1; q < n; q++) off += A[p][q] * A[p][q];
-    if (off < 1e-22) break;
-    for (let p = 0; p < n; p++) {
-      for (let q = p + 1; q < n; q++) {
-        if (Math.abs(A[p][q]) < 1e-300) continue;
-        const theta = (A[q][q] - A[p][p]) / (2 * A[p][q]);
-        const t = Math.sign(theta || 1) / (Math.abs(theta) + Math.sqrt(theta * theta + 1));
-        const c = 1 / Math.sqrt(t * t + 1);
-        const s = t * c;
-        for (let k = 0; k < n; k++) {
-          const akp = A[k][p];
-          const akq = A[k][q];
-          A[k][p] = c * akp - s * akq;
-          A[k][q] = s * akp + c * akq;
+  const V = C.map((r) => Float64Array.from(r));
+  const d = new Float64Array(n);
+  const e = new Float64Array(n);
+  // tred2
+  for (let j = 0; j < n; j++) d[j] = V[n - 1][j];
+  for (let i = n - 1; i > 0; i--) {
+    let scale = 0;
+    let h = 0;
+    for (let k = 0; k < i; k++) scale += Math.abs(d[k]);
+    if (scale === 0) {
+      e[i] = d[i - 1];
+      for (let j = 0; j < i; j++) {
+        d[j] = V[i - 1][j];
+        V[i][j] = 0;
+        V[j][i] = 0;
+      }
+    } else {
+      for (let k = 0; k < i; k++) {
+        d[k] /= scale;
+        h += d[k] * d[k];
+      }
+      let f = d[i - 1];
+      let g = Math.sqrt(h);
+      if (f > 0) g = -g;
+      e[i] = scale * g;
+      h -= f * g;
+      d[i - 1] = f - g;
+      for (let j = 0; j < i; j++) e[j] = 0;
+      for (let j = 0; j < i; j++) {
+        f = d[j];
+        V[j][i] = f;
+        g = e[j] + V[j][j] * f;
+        for (let k = j + 1; k <= i - 1; k++) {
+          g += V[k][j] * d[k];
+          e[k] += V[k][j] * f;
         }
-        for (let k = 0; k < n; k++) {
-          const apk = A[p][k];
-          const aqk = A[q][k];
-          A[p][k] = c * apk - s * aqk;
-          A[q][k] = s * apk + c * aqk;
-        }
-        for (let k = 0; k < n; k++) {
-          const vkp = V[k][p];
-          const vkq = V[k][q];
-          V[k][p] = c * vkp - s * vkq;
-          V[k][q] = s * vkp + c * vkq;
-        }
+        e[j] = g;
+      }
+      f = 0;
+      for (let j = 0; j < i; j++) {
+        e[j] /= h;
+        f += e[j] * d[j];
+      }
+      const hh = f / (h + h);
+      for (let j = 0; j < i; j++) e[j] -= hh * d[j];
+      for (let j = 0; j < i; j++) {
+        f = d[j];
+        g = e[j];
+        for (let k = j; k <= i - 1; k++) V[k][j] -= f * e[k] + g * d[k];
+        d[j] = V[i - 1][j];
+        V[i][j] = 0;
       }
     }
+    d[i] = h;
   }
-  const d = new Float64Array(n);
-  for (let i = 0; i < n; i++) d[i] = Math.max(A[i][i], 1e-20);
+  for (let i = 0; i < n - 1; i++) {
+    V[n - 1][i] = V[i][i];
+    V[i][i] = 1;
+    const h = d[i + 1];
+    if (h !== 0) {
+      for (let k = 0; k <= i; k++) d[k] = V[k][i + 1] / h;
+      for (let j = 0; j <= i; j++) {
+        let g = 0;
+        for (let k = 0; k <= i; k++) g += V[k][i + 1] * V[k][j];
+        for (let k = 0; k <= i; k++) V[k][j] -= g * d[k];
+      }
+    }
+    for (let k = 0; k <= i; k++) V[k][i + 1] = 0;
+  }
+  for (let j = 0; j < n; j++) {
+    d[j] = V[n - 1][j];
+    V[n - 1][j] = 0;
+  }
+  V[n - 1][n - 1] = 1;
+  e[0] = 0;
+  // tql2
+  for (let i = 1; i < n; i++) e[i - 1] = e[i];
+  e[n - 1] = 0;
+  let f = 0;
+  let tst1 = 0;
+  const eps = 2 ** -52;
+  for (let l = 0; l < n; l++) {
+    tst1 = Math.max(tst1, Math.abs(d[l]) + Math.abs(e[l]));
+    let m = l;
+    while (m < n && Math.abs(e[m]) > eps * tst1) m++;
+    if (m > l) {
+      for (let iter = 0; iter < 60; iter++) {
+        let g = d[l];
+        let p = (d[l + 1] - g) / (2 * e[l]);
+        let r = Math.hypot(p, 1);
+        if (p < 0) r = -r;
+        d[l] = e[l] / (p + r);
+        d[l + 1] = e[l] * (p + r);
+        const dl1 = d[l + 1];
+        let h = g - d[l];
+        for (let i = l + 2; i < n; i++) d[i] -= h;
+        f += h;
+        p = d[m];
+        let c = 1;
+        let c2 = c;
+        let c3 = c;
+        const el1 = e[l + 1];
+        let s = 0;
+        let s2 = 0;
+        for (let i = m - 1; i >= l; i--) {
+          c3 = c2;
+          c2 = c;
+          s2 = s;
+          g = c * e[i];
+          h = c * p;
+          r = Math.hypot(p, e[i]);
+          e[i + 1] = s * r;
+          s = e[i] / r;
+          c = p / r;
+          p = c * d[i] - s * g;
+          d[i + 1] = h + s * (c * g + s * d[i]);
+          for (let k = 0; k < n; k++) {
+            h = V[k][i + 1];
+            V[k][i + 1] = s * V[k][i] + c * h;
+            V[k][i] = c * V[k][i] - s * h;
+          }
+        }
+        p = (-s * s2 * c3 * el1 * e[l]) / dl1;
+        e[l] = s * p;
+        d[l] = c * p;
+        if (Math.abs(e[l]) <= eps * tst1) break;
+      }
+    }
+    d[l] += f;
+    e[l] = 0;
+  }
+  for (let i = 0; i < n; i++) d[i] = Math.max(d[i], 1e-20);
   return { d, B: V };
 }
 
@@ -102,7 +197,7 @@ export function cmaes(f: (x: Float64Array) => number, x0: Float64Array, opts: Cm
   let best: CmaResult = { x: Float64Array.from(x0), f: f(x0), evals: 1 };
   let evals = 1;
   const history: number[] = [];
-  const patience = opts.patience ?? 10 + Math.ceil((30 * n) / lambda);
+  const patience = opts.patience ?? 10 + Math.ceil((15 * n) / lambda);
   const tolFun = opts.tolFun ?? 1e-4;
 
   while (evals < opts.maxEvals) {

@@ -40,7 +40,7 @@ export function derive(plan: Plan, chain: Chain): Derived {
   let d = cache.get(plan);
   if (!d) {
     const samples = sampleChain(plan.segments, 0.5).samples;
-    d = { samples, profile: speedProfile(samples, state.settings.model, { endStopped: chain.endStopped }) };
+    d = { samples, profile: speedProfile(samples, state.settings, { endStopped: chain.endStopped }) };
     cache.set(plan, d);
   }
   return d;
