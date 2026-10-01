@@ -6,8 +6,10 @@
 import { sampleChain, type PlannedSegment, type Sample } from '../core/chain.ts';
 import { CENTERLINE_X, FIELD_MARKINGS, fieldObstacles, WALL_MAX, WALL_MIN } from '../core/field.ts';
 import { convexHull, deg, offsetConvex, pointInConvex, pointSegmentDistance, rad, wrap, type Polygon, type Pose, type Vec } from '../core/geom.ts';
-import { speedProfile, type Profile } from '../core/model.ts';
-import type { Plan } from '../core/optimize.ts';
+import type { Limit } from '../core/model.ts';
+import { evaluate, type Plan } from '../core/optimize.ts';
+import type { ShotResult } from '../core/shooting.ts';
+import { cachedZone, type Cell } from '../core/shot.ts';
 import { marginsFor, type Chain, type ChainPoint } from '../core/project.ts';
 import { localFootprint, placeFootprint } from '../core/robot.ts';
 import { changed, planStatus, pointIssues, selectedChain, state } from './state.ts';
@@ -26,8 +28,11 @@ const toField = (px: number, py: number): Vec => ({ x: (px - PAD) / scale(), y: 
 const css = (name: string) => getComputedStyle(document.documentElement).getPropertyValue(name).trim();
 
 export interface Derived {
+  /** The whole path, every Pedro path of it in turn (arc length and segment index along the whole path). */
   samples: Sample[];
-  profile: Profile;
+  /** Speed, time (including stops to shoot, where the robot holds still) and what limits it, per sample. */
+  profile: { v: Float64Array; time: Float64Array; limit: Limit[] };
+  shots: ShotResult[];
 }
 let cache = new WeakMap<Plan, Derived>();
 
@@ -35,14 +40,46 @@ export function clearDerived(): void {
   cache = new WeakMap();
 }
 
-/** Samples and the predicted speed of a plan (cached). */
+/** The plan as the robot drives it, on one timeline (cached). */
 export function derive(plan: Plan, chain: Chain): Derived {
   let d = cache.get(plan);
-  if (!d) {
-    const samples = sampleChain(plan.segments, 0.5).samples;
-    d = { samples, profile: speedProfile(samples, state.settings, { endStopped: chain.endStopped }) };
-    cache.set(plan, d);
-  }
+  if (d) return d;
+  const ev = evaluate(plan.segments, state.settings, chain, marginsFor(state.settings, chain), 0.5);
+  const samples: Sample[] = [];
+  const v: number[] = [];
+  const time: number[] = [];
+  const limit: Limit[] = [];
+  const pause = new Map(ev.shots.filter((sh) => sh.mode === 'stop').map((sh) => [sh.point, sh.wait + state.settings.shooter.volley]));
+  let clock = pause.get(0) ?? 0;
+  let off = 0;
+  ev.runs.forEach((run, p) => {
+    const segOff = ev.pieces[p];
+    run.samples.forEach((smp, i) => {
+      if (i === 0 && p === 0 && clock > 0) {
+        samples.push({ ...smp, seg: segOff });
+        v.push(0);
+        time.push(0);
+        limit.push('stop');
+      }
+      samples.push({ ...smp, s: smp.s + off, seg: smp.seg + segOff });
+      v.push(run.profile.v[i]);
+      time.push(clock + run.profile.time[i]);
+      limit.push(run.profile.limit[i]);
+    });
+    clock += run.profile.total;
+    const endPoint = p + 1 < ev.pieces.length ? plan.segments[ev.pieces[p + 1]].leg : chain.points.length - 1;
+    clock += pause.get(endPoint) ?? 0;
+    const last = samples[samples.length - 1];
+    if (clock > time[time.length - 1] + 1e-9) {
+      samples.push({ ...last });
+      v.push(0);
+      time.push(clock);
+      limit.push('stop');
+    }
+    off = last.s;
+  });
+  d = { samples, profile: { v: Float64Array.from(v), time: Float64Array.from(time), limit }, shots: ev.shots };
+  cache.set(plan, d);
   return d;
 }
 
@@ -240,6 +277,10 @@ function drawChain(chain: Chain): void {
   const progress = state.running?.chain === chain.name ? state.running.progress : null;
   const sel = state.selection;
 
+  // Where a standing shot scores, for the selected shooting point's cell.
+  const shooter = sel?.kind === 'point' ? chain.points[sel.index]?.shoot : undefined;
+  if (shooter) zoneOverlay(shooter.cell);
+
   chain.keepOut.forEach((k, i) => {
     poly(convexHull(k.points as Polygon));
     ctx.fillStyle = css('--keepout-fill');
@@ -303,6 +344,29 @@ function drawChain(chain: Chain): void {
 
   if (plan && !progress) {
     const d = derive(plan, chain);
+    // Stretches driven with a speed cap (shooting on the move), and where each ball leaves.
+    plan.segments.forEach((seg) => {
+      if (seg.maxSpeed === undefined) return;
+      curves([seg]);
+      ctx.save();
+      ctx.strokeStyle = css('--shot');
+      ctx.lineWidth = 6;
+      ctx.globalAlpha = 0.45;
+      ctx.stroke();
+      ctx.restore();
+    });
+    for (const sh of d.shots) {
+      for (const b of sh.balls) {
+        const [x, y] = toPx(b.p);
+        ctx.beginPath();
+        ctx.arc(x, y, 4, 0, 2 * Math.PI);
+        ctx.fillStyle = css(sh.deficit > 1e-6 ? '--bad' : '--shot');
+        ctx.fill();
+        ctx.strokeStyle = css('--view');
+        ctx.lineWidth = 1.5;
+        ctx.stroke();
+      }
+    }
     // where the plan breaks a margin
     for (const c of plan.check.clearances) {
       if (c.gap >= c.margin - 1e-3) continue;
@@ -310,7 +374,8 @@ function drawChain(chain: Chain): void {
       robot({ x: at.p.x, y: at.p.y, h: at.h }, css('--bad'), css('--bad-fill'), 2, false);
     }
     for (const m of plan.markers) {
-      const s = d.samples.find((x) => x.seg === m.seg && x.t >= m.t) ?? d.samples[d.samples.length - 1];
+      const seg = (plan.pieces ?? [0])[m.piece] + m.seg;
+      const s = d.samples.find((x) => x.seg === seg && x.t >= m.t) ?? d.samples[d.samples.length - 1];
       const [x, y] = toPx(s.p);
       ctx.beginPath();
       ctx.moveTo(x, y - 6);
@@ -337,6 +402,26 @@ function drawChain(chain: Chain): void {
     }
     badge(String(i + 1), p, css(bad ? '--bad' : p.kind === 'region' ? '--region' : '--accent'), on);
   });
+}
+
+/** Shades the field where a standing shot into `cell` scores despite the robot's errors. */
+function zoneOverlay(cell: Cell): void {
+  const zone = cachedZone(state.settings.shooter, cell);
+  const half = zone.step / 2;
+  ctx.save();
+  ctx.fillStyle = css('--shot');
+  ctx.globalAlpha = 0.16;
+  ctx.beginPath();
+  for (let j = 0; j < zone.ny; j++) {
+    for (let i = 0; i < zone.nx; i++) {
+      if (!(zone.margin[j * zone.nx + i] >= 0)) continue;
+      const [x0, y0] = toPx({ x: Math.max(WALL_MIN, i * zone.step - half), y: Math.min(WALL_MAX, j * zone.step + half) });
+      const [x1, y1] = toPx({ x: Math.min(WALL_MAX, i * zone.step + half), y: Math.max(WALL_MIN, j * zone.step - half) });
+      ctx.rect(x0, y0, x1 - x0, y1 - y0);
+    }
+  }
+  ctx.fill();
+  ctx.restore();
 }
 
 // ---- Editing ----

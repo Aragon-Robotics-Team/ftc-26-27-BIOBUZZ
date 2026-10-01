@@ -8,6 +8,44 @@ export interface PlannedSegment {
   heading: HeadingPieces;
   /** Which leg of the chain spec this segment belongs to. */
   leg: number;
+  /** Pedro's maxPathSpeed while on this segment, in/s (for shooting on the move). */
+  maxSpeed?: number;
+}
+
+/** Splits a segment where `c` of its length is behind it: the same curve and headings, as two segments. */
+export function splitSegment(seg: PlannedSegment, c: number): [PlannedSegment, PlannedSegment] {
+  const t = tableFor(seg.curve).parameter(c);
+  const [p0, p1, p2, p3] = seg.curve;
+  const l = (a: Vec, b: Vec) => ({ x: a.x + (b.x - a.x) * t, y: a.y + (b.y - a.y) * t });
+  const p01 = l(p0, p1);
+  const p12 = l(p1, p2);
+  const p23 = l(p2, p3);
+  const p012 = l(p01, p12);
+  const p123 = l(p12, p23);
+  const mid = l(p012, p123);
+  const { F, H } = seg.heading;
+  let k = 0;
+  while (k < F.length - 2 && F[k + 1] < c) k++;
+  const hc = H[k] + ((H[k + 1] - H[k]) * (c - F[k])) / Math.max(F[k + 1] - F[k], 1e-12);
+  const leftF: number[] = [];
+  const leftH: number[] = [];
+  const rightF = [0];
+  const rightH = [hc];
+  F.forEach((f, i) => {
+    if (f < c - 1e-6) {
+      leftF.push(f / c);
+      leftH.push(H[i]);
+    } else if (f > c + 1e-6) {
+      rightF.push((f - c) / (1 - c));
+      rightH.push(H[i]);
+    }
+  });
+  leftF.push(1);
+  leftH.push(hc);
+  return [
+    { curve: [p0, p01, p012, mid], heading: { F: leftF, H: leftH }, leg: seg.leg, maxSpeed: seg.maxSpeed },
+    { curve: [mid, p123, p23, p3], heading: { F: rightF, H: rightH }, leg: seg.leg, maxSpeed: seg.maxSpeed },
+  ];
 }
 
 export interface Sample {

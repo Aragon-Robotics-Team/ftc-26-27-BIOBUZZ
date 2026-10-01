@@ -82,6 +82,31 @@ grip, mass, coasting and settling. When imported logs disagree with the model by
 the planner flags it; refitting is a manual step. If logs show Pedro doing something this doesn't capture, the next
 step is to simulate Pedro's own control loop.
 
+## Shooting
+
+A point (or area) can shoot at a hive cell, in one of two ways:
+
+- **Stop and shoot**: the robot stops there, waits until the launcher is ready, fires a volley, and drives on. Pedro
+  only stops at the end of a path, so the path is driven as separate Pedro paths with `robot.shoot()` between them;
+  the robot may leave a stop in any direction. Allowed on any point, including the start and the end.
+- **Shoot on the move**: the volley is centred on a point in the middle of the path, on a stretch where Pedro's speed
+  is capped (`maxPathSpeed`, set per segment). Pedro doesn't slow down ahead of a cap, and on a capped segment it
+  coasts while too fast, so the capped stretch starts where coasting from the planned speed reaches the cap in time.
+
+Shots are simulated with TeamCode's `ShotSolver`, ported line for line (`src/core/shot.ts`): ball flight with drag and
+backspin, launched with the robot's velocity, giving exit speed, turret angle and how much error each can take. A ball
+scores when the robot's **aim accuracy** (± degrees) fits in the angle tolerance and its **flywheel speed accuracy**
+(± percent) plus how far the flywheel lags fits in the speed tolerance, and the turret can turn that far.
+
+The flywheel (motor torque and the **flywheel inertia**) is followed along the whole path, chasing the speed the next
+shot needs; every ball takes energy from it (about 2.5× the ball's kinetic energy), and it has to recover before the
+next. Balls leave evenly over the **volley length** (`Gate.AUTO_SHOOT_MS`). A stop waits for the launcher to be ready
+(within half the tolerance, as `Launcher.isReady()`); a shot on the move must be ready when the gate opens.
+
+The shaded zone on the field (shown while a shooting point is selected) is where a standing shot scores despite the
+robot's errors. Before optimizing, a shooting point that can't score from anywhere it allows, or whose headings keep
+the cell out of the turret's range, is flagged.
+
 ## Paths
 
 - A **path** (internally a chain) is a sequence of points optimized together and driven as one Pedro compound path
@@ -119,6 +144,10 @@ step is to simulate Pedro's own control loop.
 
 ## Robot code
 
+- A path that stops to shoot exports one method per Pedro path (`name`, `name2`, …) and a comment saying how to drive
+  them with the volleys between. A shot on the move exports a marker where the gate should open and a comment with
+  the `deadline(follow(…), sequential(passed(…), robot.shoot()))` to use. Capped segments start with
+  `PlannedPath.SLOW, <in/s>`.
 - **.pp** downloads the plan for the Pedro Visualizer: one line per curve, each with a piecewise heading through the
   planned breakpoints (within Pedro's own small warp between them), plus the robot's size and speeds. The visualizer
   times every line as its own start-and-stop move, so its clock and animation speed don't match the plan; the
@@ -152,6 +181,7 @@ step is to simulate Pedro's own control loop.
   (`http://192.168.43.1:8080/pathlogs`), with copying over USB as the fallback.
 - The GUI imports logs, plots predicted vs measured, fits the model, and flags drift. Fitting is tested on synthetic
   logs from the model itself.
-- Runs are matched to their path by the id in `PlannedPath.of` ("name#geometry"); if the path has changed since, the
-  planner rebuilds the driven path from the logged poses instead.
+- Runs are matched to their path by the id in `PlannedPath.of` ("name#geometry", or "name.2#geometry" for the second
+  Pedro path of one that stops to shoot); if the path has changed since, the planner rebuilds the driven path from
+  the logged poses instead.
 - The `Planned Path Test` OpMode builds every routine to find the planned paths they use, then drives one and logs it.

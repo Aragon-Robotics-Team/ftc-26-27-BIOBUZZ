@@ -3,6 +3,7 @@ import { fromJava, planFromSegments, toJava, type Imported } from '../core/expor
 import { compareRun, drift, extractRuns, fitModel, parseLog, type FitResult } from '../core/logs.ts';
 import { drivetrain } from '../core/drivetrain.ts';
 import { MOTORS, ProjectError, SAMPLE_MODEL, turretRange, type ModelConfig, type Settings, type Side } from '../core/project.ts';
+import { DEFAULT_SHOOTER, Flywheel, flywheelMaxTicks, type ShooterConfig } from '../core/shot.ts';
 import { fmt, h, num, select, toast } from './dom.ts';
 import { applyForesight, parseForesight } from './foresight.ts';
 import { changed, selectedChain, state } from './state.ts';
@@ -178,6 +179,25 @@ export function settingsDialog(): void {
     }, { min: 0, label }))));
   renderModel();
   refreshSummary();
+  const shooter = h('div', {});
+  const renderShooter = () => {
+    const summary = h('p', { class: 'capabilities' }, flywheelSummary(s.shooter));
+    const input = ([key, label, unit]: [keyof ShooterConfig, string, string, number]) => row(label, unit, num(s.shooter[key], (v) => {
+      s.shooter[key] = v;
+      summary.textContent = flywheelSummary(s.shooter);
+      edit();
+    }, { min: 0, label }));
+    shooter.replaceChildren(
+      summary,
+      ...SHOT_FIELDS.map(input),
+      h('details', { class: 'fold' }, h('summary', {}, 'Ball flight (as in RobotConstants.Launcher)'), ...FLIGHT_FIELDS.map(input)),
+      h('div', { class: 'actions' }, h('button', { class: 'link', type: 'button', onclick: () => {
+        s.shooter = { ...DEFAULT_SHOOTER };
+        renderShooter();
+        edit();
+      } }, 'Reset')));
+  };
+  renderShooter();
   const locked = !!state.running;
   dialog('Robot & speed', 'sheet',
     h('fieldset', { class: 'lock', disabled: locked, title: locked ? 'Editing is paused while a path optimizes' : '' },
@@ -217,8 +237,39 @@ export function settingsDialog(): void {
         renderModel();
         refreshSummary();
         edit();
-      } }, 'Reset'))),
+      } }, 'Reset')),
+    h('h3', {}, 'Shooter'),
+    shooter),
   );
+}
+
+/** Shooter inputs: [field, label, unit, decimals]. The first ones decide where shots work; the rest mirror
+ *  RobotConstants.Launcher's flight model. */
+const SHOT_FIELDS: [keyof ShooterConfig, string, string, number][] = [
+  ['balls', 'Balls per volley', '', 0],
+  ['volley', 'Volley length (gate open)', 's', 2],
+  ['aimAccuracy', 'Aim accuracy', '± °', 1],
+  ['speedAccuracy', 'Flywheel speed accuracy', '± %', 1],
+  ['inertia', 'Flywheel inertia', 'kg·cm²', 2],
+];
+const FLIGHT_FIELDS: [keyof ShooterConfig, string, string, number][] = [
+  ['motorRpm', 'Flywheel motor free speed', 'RPM', 0],
+  ['motorStallTorque', 'Flywheel motor stall torque', 'N·m', 3],
+  ['ticksPerExitSpeed', 'Ticks/s per in/s of ball speed', '', 2],
+  ['hoodAngle', 'Hood angle', '°', 2],
+  ['exitHeight', 'Ball leaves at height', 'in', 1],
+  ['drag', 'Drag coefficient', '', 2],
+  ['lift', 'Backspin lift coefficient', '', 2],
+  ['scoringMargin', 'Ball clears the opening by', 'in', 2],
+];
+
+/** How the flywheel behaves, in a line: spinning up, and what a ball costs it. */
+function flywheelSummary(cfg: ShooterConfig): string {
+  const fw = new Flywheel(cfg);
+  const typical = 0.75 * flywheelMaxTicks(cfg);
+  const exit = typical / cfg.ticksPerExitSpeed;
+  const after = fw.afterBall(typical, exit);
+  return `Spins up from rest in ${fw.timeTo(0, typical, typical * 0.01).toFixed(2)} s · loses ${(((typical - after) / typical) * 100).toFixed(1)}% per ball, back in ${fw.timeTo(after, typical, typical * 0.005).toFixed(2)} s`;
 }
 
 // ---- Logs ----

@@ -15,7 +15,7 @@ import { drivetrain } from './drivetrain.ts';
 import { wrap } from './geom.ts';
 import type { ModelConfig, RobotConfig } from './project.ts';
 
-export type Limit = 'direction' | 'turn' | 'curvature' | 'accel' | 'grip' | 'decel' | 'stop';
+export type Limit = 'direction' | 'turn' | 'curvature' | 'accel' | 'grip' | 'decel' | 'stop' | 'shot';
 
 export interface Profile {
   /** Speed at each sample, in/s. */
@@ -37,6 +37,20 @@ export interface Profile {
   lagAt: number;
   /** Places where the path turns back on itself (more than 90° between samples). Pedro won't stop there mid-path. */
   reversals: number;
+  /** Per speed cap: arc length where Pedro's capped stretch has to begin so it has coasted down by the cap's `from`. */
+  capStarts: number[];
+}
+
+/**
+ * Drive no faster than `vmax` from `from` to `to` (arc length): Pedro's maxPathSpeed on that stretch of the path. Pedro
+ * doesn't slow down ahead of it, and on a capped stretch it cuts drive power and coasts while it's too fast, so the
+ * capped stretch starts early enough to coast down in time (`capStarts`); with `fixedStart`, it starts at `from`.
+ */
+export interface SpeedCap {
+  from: number;
+  to: number;
+  vmax: number;
+  fixedStart?: boolean;
 }
 
 export interface DriveSettings {
@@ -110,7 +124,7 @@ const gripRange = new Float64Array(2);
 /** Pedro's translational correction pulls a drift back in roughly this long, s. */
 const RECOVERY = 0.3;
 
-export function speedProfile(samples: Sample[], settings: DriveSettings, opts: { endStopped: boolean; voltage?: number }): Profile {
+export function speedProfile(samples: Sample[], settings: DriveSettings, opts: { endStopped: boolean; voltage?: number; caps?: SpeedCap[] }): Profile {
   const { model } = settings;
   const dt = drivetrain(model, settings.robot);
   const k = (opts.voltage ?? 12.5) / model.nominalVoltage; // the battery's voltage budget, relative to the motor specs
@@ -188,6 +202,33 @@ export function speedProfile(samples: Sample[], settings: DriveSettings, opts: {
     return from + sign * top;
   };
 
+  // Speed caps: the cap inside, and before it the speed it could still coast down from in time (per sample, the
+  // lowest over the caps ahead, and which cap that is).
+  const caps = opts.caps ?? [];
+  const envelope = new Float64Array(n).fill(Infinity);
+  const envCap = new Int16Array(n).fill(-1);
+  const inside = new Int16Array(n).fill(-1);
+  const capStarts = caps.map((c) => c.from);
+  caps.forEach((c, ci) => {
+    let env = c.vmax;
+    for (let i = n - 1; i >= 0; i--) {
+      const si = samples[i].s;
+      if (si > c.to) continue;
+      if (si >= c.from) {
+        inside[i] = ci;
+      } else {
+        if (c.fixedStart) break;
+        env = Math.sqrt(env * env + 2 * coast[i] * (samples[i + 1].s - si));
+      }
+      const e = si >= c.from ? c.vmax : env;
+      if (e < envelope[i]) {
+        envelope[i] = e;
+        envCap[i] = ci;
+      }
+    }
+  });
+  const capActive = new Int16Array(n).fill(-1);
+
   // Forward: from rest, full drive power with what the corrections leave.
   let lateralErr = 0; // in/s, drifting outwards
   let wide = 0; // in
@@ -218,6 +259,9 @@ export function speedProfile(samples: Sample[], settings: DriveSettings, opts: {
       limit[i + 1] = 'grip';
     }
     if (limit[i + 1] === 'grip') a -= coast[i]; // friction on top of the motors' braking while it coasts
+    // On a capped stretch and too fast: Pedro cuts drive power and coasts.
+    const capped = capActive[i] >= 0 ? capActive[i] : -1;
+    if (capped >= 0 && u > caps[capped].vmax + 1e-9) a = Math.min(a, -coast[i]);
     const next0 = Math.sqrt(Math.max(0.25, u * u + 2 * a * ds)); // never quite stops on its own
     const step = (2 * ds) / Math.max(u + next0, 1e-3);
     if (limit[i + 1] === 'grip') {
@@ -240,6 +284,18 @@ export function speedProfile(samples: Sample[], settings: DriveSettings, opts: {
       const launch = Math.max(0, reach(i + 1, 0, 1, k) || 0);
       next = Math.min(next, Math.sqrt(launch * ds)); // v² = 2·a·(ds / 2)
       limit[i + 1] = 'curvature';
+    }
+    // Speed caps: stay on a capped stretch until its end; start one where the speed has to begin coasting down for
+    // it, or on reaching it.
+    let on = capped >= 0 && samples[i + 1].s <= caps[capped].to ? capped : -1;
+    if (on < 0 && envCap[i + 1] >= 0 && (next > envelope[i + 1] + 1e-9 || inside[i + 1] === envCap[i + 1])) {
+      on = envCap[i + 1];
+      if (next > envelope[i + 1] + 1e-9) capStarts[on] = Math.min(capStarts[on], samples[i].s);
+    }
+    if (on >= 0) {
+      capActive[i + 1] = on;
+      next = Math.min(next, Math.max(caps[on].vmax, envelope[i + 1]));
+      if (inside[i + 1] === on || u > caps[on].vmax + 1e-9) limit[i + 1] = 'shot';
     }
     v[i + 1] = next;
   }
@@ -291,5 +347,5 @@ export function speedProfile(samples: Sample[], settings: DriveSettings, opts: {
   const total = time[n - 1] + (opts.endStopped ? model.stopOverhead : 0);
   let reversals = 0;
   for (let i = 0; i + 1 < n; i++) reversals += reversesAfter[i];
-  return { v, time, limit, total, drift, worstDrift, driftAt, lag, worstLag, lagAt, reversals };
+  return { v, time, limit, total, drift, worstDrift, driftAt, lag, worstLag, lagAt, reversals, capStarts };
 }

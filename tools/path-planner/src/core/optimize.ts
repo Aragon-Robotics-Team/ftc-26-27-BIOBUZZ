@@ -3,14 +3,16 @@
  * joint positions (within regions), joint tangent directions, Bezier handle lengths and heading knots.
  */
 import { ArcTable, tableFor, type Cubic } from './bezier.ts';
-import { sampleChain, type PlannedSegment } from './chain.ts';
+import { sampleChain, splitSegment, type PlannedSegment, type Sample } from './chain.ts';
 import { chainObstacles, checkChain, type Check } from './constraints.ts';
 import { cmaes } from './cmaes.ts';
 import { CENTERLINE_X, RED_HIVE_TARGET, WALL_MAX, WALL_MIN } from './field.ts';
 import { add, angleOf, convexDistance, dist, fromAngle, rad, sub, wrap, type Vec } from './geom.ts';
 import { smoothHeading, toPieces } from './heading.ts';
 import { drivetrain } from './drivetrain.ts';
-import { speedProfile, type Limit } from './model.ts';
+import { speedProfile, type Limit, type SpeedCap } from './model.ts';
+import { moveWindows, pieceStarts, simulateShots, type PieceRun, type ShotResult } from './shooting.ts';
+import { cellTarget, type Cell } from './shot.ts';
 import { marginsFor, turretRange, type Chain, type Margins, type Settings } from './project.ts';
 import { localFootprint, placeFootprint } from './robot.ts';
 import { routeWorld, seedRoutes } from './routes.ts';
@@ -24,11 +26,17 @@ interface Joint {
   heading: JointHeading;
   /** Leg of the segment that leaves this joint. */
   leg: number;
+  /** The robot stops here (to shoot), so the path may leave in a different direction than it came in. */
+  stop?: boolean;
+  /** The hive cell it shoots at from here, if it does. */
+  cell?: Cell;
 }
 
 export interface PlannedMarker {
   name: string;
-  /** Segment index in the compound path (Pedro's pathIndex). */
+  /** Which of the Pedro paths it's on (0 unless the path stops to shoot). */
+  piece: number;
+  /** Segment index in that compound path (Pedro's pathIndex). */
   seg: number;
   /** Curve parameter within that segment (Pedro's parametricCompletion). */
   t: number;
@@ -47,6 +55,9 @@ export interface Plan {
   segments: PlannedSegment[];
   markers: PlannedMarker[];
   check: Pick<Check, 'clearances' | 'rules' | 'worst'> & { drift?: Drift; lag?: Drift };
+  /** Every shot along the path, and the first segment of each Pedro path it's driven as. */
+  shots?: ShotResult[];
+  pieces?: number[];
   /** Share of the path each limit holds the speed down, for the report. */
   limits: Partial<Record<Limit, number>>;
   seeds: number;
@@ -107,8 +118,10 @@ function buildJoints(chain: Chain, vias: Vec[][]): Joint[] {
   chain.points.forEach((pt, i) => {
     const legAfter = Math.min(i, chain.legs.length - 1);
     const heading: JointHeading = { kind: 'fixed', h: rad(pt.heading), tol: rad(pt.headingTol) };
-    if (pt.kind === 'fixed') joints.push({ pos: { kind: 'fixed', p: { x: pt.x, y: pt.y } }, heading, leg: legAfter });
-    else joints.push({ pos: { kind: 'region', c: { x: pt.x, y: pt.y }, hw: pt.halfWidth, hh: pt.halfHeight }, heading, leg: legAfter });
+    const stop = pt.shoot?.mode === 'stop' && i > 0 && i < chain.points.length - 1;
+    const cell = pt.shoot?.cell;
+    if (pt.kind === 'fixed') joints.push({ pos: { kind: 'fixed', p: { x: pt.x, y: pt.y } }, heading, leg: legAfter, stop, cell });
+    else joints.push({ pos: { kind: 'region', c: { x: pt.x, y: pt.y }, hw: pt.halfWidth, hh: pt.halfHeight }, heading, leg: legAfter, stop, cell });
     if (i < chain.points.length - 1) for (const v of vias[i] ?? []) joints.push({ pos: { kind: 'via', p0: v }, heading: { kind: 'free' }, leg: i });
   });
   return joints;
@@ -122,13 +135,15 @@ function seedPos(j: Joint): Vec {
 interface Layout {
   n: number;
   posIdx: number[]; // index of x (y follows), or -1
-  psiIdx: number[];
+  psiIdx: number[]; // direction leaving the joint
+  psiInIdx: number[]; // direction arriving (the same one unless the robot stops there)
   headIdx: number[]; // -1 when fixed exactly
   handleIdx: number[]; // per segment, a then b
   knotIdx: number[]; // per segment, first interior knot
   /** Per segment, where its interior heading knots sit, as fractions of its length. */
   knotF: number[][];
   psi0: number[];
+  psiIn0: number[];
   /** Unwrapped reference heading for every knot, in chain order: joint 0, interior…, joint 1, … */
   baseH: number[];
 }
@@ -175,11 +190,13 @@ function layout(joints: Joint[], chain: Chain, steer: Steer, turretMid: number):
   let n = 0;
   const posIdx: number[] = [];
   const psiIdx: number[] = [];
+  const psiInIdx: number[] = [];
   const headIdx: number[] = [];
   for (const j of joints) {
     posIdx.push(j.pos.kind === 'fixed' ? -1 : n);
     if (j.pos.kind !== 'fixed') n += 2;
     psiIdx.push(n++);
+    psiInIdx.push(j.stop ? n++ : psiIdx[psiIdx.length - 1]);
     if (j.heading.kind === 'free' || j.heading.tol > 1e-9) headIdx.push(n++);
     else headIdx.push(-1);
   }
@@ -202,6 +219,13 @@ function layout(joints: Joint[], chain: Chain, steer: Steer, turretMid: number):
     const d = sub(b, a);
     return Math.hypot(d.x, d.y) > 1e-9 ? angleOf(d) : 0;
   });
+  // At a stop, arriving and leaving are seeded separately: straight in from the previous joint, straight out to the next.
+  const psiIn0 = psi0.slice();
+  joints.forEach((j, i) => {
+    if (!j.stop || i === 0 || i === pts.length - 1) return;
+    psiIn0[i] = angleOf(sub(pts[i], pts[i - 1]));
+    psi0[i] = angleOf(sub(pts[i + 1], pts[i]));
+  });
   // Reference headings: fixed where given; front-first legs face along the travel; turret legs face the hive;
   // anything else in between is interpolated.
   const ruleOf = (leg: number) => chain.legs[leg]?.rules ?? [];
@@ -219,7 +243,14 @@ function layout(joints: Joint[], chain: Chain, steer: Steer, turretMid: number):
   const travelAt: number[] = [];
   for (let i = 0; i < joints.length; i++) {
     const j = joints[i];
-    raw.push(j.heading.kind === 'fixed' ? j.heading.h : preferred(j.leg, pts[i], psi0[i]));
+    // A shooting point with heading to spare starts out facing so the hive cell sits mid-turret.
+    let h0 = j.heading.kind === 'fixed' ? j.heading.h : preferred(j.leg, pts[i], psi0[i]);
+    if (j.cell && j.heading.kind === 'fixed' && j.heading.tol > 1e-9) {
+      const c = cellTarget(j.cell);
+      const want = angleOf(sub(c, pts[i])) - turretMid;
+      h0 = j.heading.h + Math.max(-j.heading.tol, Math.min(j.heading.tol, wrap(want - j.heading.h)));
+    }
+    raw.push(h0);
     where.push(pts[i]);
     travelAt.push(psi0[i]);
     if (i < joints.length - 1) {
@@ -260,7 +291,7 @@ function layout(joints: Joint[], chain: Chain, steer: Steer, turretMid: number):
   const pick = viterbi(candidates, (i, a, b) => steer(where[i], a, where[i + 1], b));
   for (let i = 0; i < raw.length; i++) if (raw[i] === null) baseH[i] = pick[i];
   for (let i = 1; i < baseH.length; i++) baseH[i] = baseH[i - 1] + wrap(baseH[i] - baseH[i - 1]);
-  return { n, posIdx, psiIdx, headIdx, handleIdx, knotIdx, knotF, psi0, baseH };
+  return { n, posIdx, psiIdx, psiInIdx, headIdx, handleIdx, knotIdx, knotF, psi0, psiIn0, baseH };
 }
 
 interface Decoded {
@@ -275,6 +306,7 @@ function decode(x: Float64Array, joints: Joint[], L: Layout): Decoded {
     return { x: j.pos.p0.x + VIA_SCALE * x[k], y: j.pos.p0.y + VIA_SCALE * x[k + 1] };
   });
   const psi = joints.map((_, i) => L.psi0[i] + ANGLE_SCALE * x[L.psiIdx[i]]);
+  const psiIn = joints.map((_, i) => L.psiIn0[i] + ANGLE_SCALE * x[L.psiInIdx[i]]);
   const curves: Cubic[] = [];
   for (let s = 0; s < joints.length - 1; s++) {
     const a = pos[s];
@@ -282,7 +314,7 @@ function decode(x: Float64Array, joints: Joint[], L: Layout): Decoded {
     const chord = Math.max(dist(a, b), 1e-3);
     const ha = chord * (0.05 + 0.9 * sigmoid(x[L.handleIdx[s]] + HANDLE_U0));
     const hb = chord * (0.05 + 0.9 * sigmoid(x[L.handleIdx[s] + 1] + HANDLE_U0));
-    curves.push([a, add(a, fromAngle(psi[s], ha)), sub(b, fromAngle(psi[s + 1], hb)), b]);
+    curves.push([a, add(a, fromAngle(psi[s], ha)), sub(b, fromAngle(psiIn[s + 1], hb)), b]);
   }
   // Heading knots along the chain's arc length.
   const tables = curves.map(tableFor);
@@ -332,8 +364,24 @@ export interface Evaluation {
   limits: Partial<Record<Limit, number>>;
   /** Places where it turns back on itself mid-path, which Pedro can't drive (it brakes only at the end). */
   reversals: number;
-  /** Keeps every gap, heading rule and the wheels' limits, and never turns back on itself. */
+  /** Keeps every gap, heading rule and the wheels' limits, never turns back on itself, and every shot scores. */
   fits: boolean;
+  shots: ShotResult[];
+  /** First segment of each Pedro path it's driven as. */
+  pieces: number[];
+  /** Capped stretches for shooting on the move: piece, arc length along it, cap. */
+  windows: CapWindow[];
+  runs: PieceRun[];
+}
+
+export interface CapWindow {
+  piece: number;
+  from: number;
+  to: number;
+  vmax: number;
+  point: number;
+  /** Where the shot's point is along the piece. */
+  s: number;
 }
 
 export interface Drift {
@@ -350,49 +398,205 @@ export const LAG_LIMIT = (5 * Math.PI) / 180;
 /** A radian of heading lag counts like this many inches of drift. */
 const LAG_WEIGHT = 10;
 
-/** `stride`: check the footprint at every n-th sample (the search uses 2, with a little extra margin). */
-export function evaluate(segments: PlannedSegment[], project: Settings, chain: Chain, margins: Margins, ds = 0.5, stride = 1): Evaluation {
-  const sampled = sampleChain(segments, ds);
-  const profile = speedProfile(sampled.samples, project, { endStopped: chain.endStopped });
-  const check = checkChain(sampled.samples, project, chain, margins, chainObstacles(project, chain, margins), stride);
+/**
+ * Scores a path the way the robot would drive it: each Pedro path it splits into (at stops to shoot) driven on its own,
+ * speed caps where it shoots on the move, every shot along the way. `stride`: check the footprint at every n-th
+ * sample (the search uses 2, with a little extra margin).
+ */
+export function evaluate(segments: PlannedSegment[], project: Settings, chain: Chain, margins: Margins, ds = 0.5, stride = 1, shotSlack = 0): Evaluation {
+  const starts = pieceStarts(chain, segments);
+  const sampledPieces = starts.map((a, p) => sampleChain(segments.slice(a, starts[p + 1] ?? segments.length), ds));
+  const lengths = sampledPieces.flatMap((sp) => sp.tables.map((t) => t.length));
+  const windows = moveWindows(chain, project, segments, lengths, starts);
+  const runs: PieceRun[] = [];
+  const capStarts: number[] = windows.map((w) => w.cap.from);
+  let all: Sample[] = sampledPieces[0].samples;
+  if (sampledPieces.length > 1) {
+    all = [];
+    let off = 0;
+    for (const sp of sampledPieces) {
+      for (const smp of sp.samples) all.push({ ...smp, s: smp.s + off });
+      off += sp.length;
+    }
+  }
+  sampledPieces.forEach((sp, p) => {
+    // Capped segments (a finished plan) are capped from where they start, as Pedro does; otherwise the caps come from
+    // the shots and start where the robot has to begin coasting down.
+    const fixed: SpeedCap[] = [];
+    let s0 = 0;
+    for (let j = starts[p]; j < (starts[p + 1] ?? segments.length); j++) {
+      const len = sp.tables[j - starts[p]].length;
+      const cap = segments[j].maxSpeed;
+      if (cap !== undefined) {
+        const prev = fixed[fixed.length - 1];
+        if (prev && Math.abs(prev.to - s0) < 1e-6 && prev.vmax === cap) prev.to = s0 + len;
+        else fixed.push({ from: s0, to: s0 + len, vmax: cap, fixedStart: true });
+      }
+      s0 += len;
+    }
+    const mine = windows.map((w, i) => ({ w, i })).filter((x) => x.w.piece === p);
+    const caps = fixed.length ? fixed : mine.map((x) => x.w.cap);
+    const profile = speedProfile(sp.samples, project, { endStopped: p === starts.length - 1 ? chain.endStopped : true, caps });
+    if (!fixed.length) mine.forEach((x, q) => (capStarts[x.i] = profile.capStarts[q]));
+    runs.push({ samples: sp.samples, profile });
+  });
+  const check = checkChain(all, project, chain, margins, chainObstacles(project, chain, margins), stride);
   // Drifting wide counts like breaking a gap: a path Pedro can't hold isn't the path that was checked for clearance.
   let driftArea = 0;
-  for (let i = 1; i < sampled.samples.length; i++) driftArea += Math.max(0, profile.drift[i] - DRIFT_LIMIT) * (sampled.samples[i].s - sampled.samples[i - 1].s);
-  for (let i = 1; i < sampled.samples.length; i++) driftArea += LAG_WEIGHT * Math.max(0, profile.lag[i] - LAG_LIMIT) * (sampled.samples[i].s - sampled.samples[i - 1].s);
-  const driftExcess = Math.max(0, profile.worstDrift - DRIFT_LIMIT) + LAG_WEIGHT * Math.max(0, profile.worstLag - LAG_LIMIT);
-  const broken = check.worst > 1e-3 || driftExcess > 0 || profile.reversals > 0;
-  const cost = profile.total + 2 * check.penalty + 20 * check.worst + 2 * driftArea + 20 * driftExcess + 5 * profile.reversals + (broken ? 3 : 0);
+  let worstDrift = 0;
+  let driftAt = 0;
+  let worstLag = 0;
+  let lagAt = 0;
+  let reversals = 0;
+  let driveTime = 0;
+  let off = 0;
   const limits: Partial<Record<Limit, number>> = {};
-  const n = sampled.samples.length;
-  for (let i = 0; i < n; i++) limits[profile.limit[i]] = (limits[profile.limit[i]] ?? 0) + 1 / n;
-  return { time: profile.total, check, drift: { worst: profile.worstDrift, at: profile.driftAt }, lag: { worst: profile.worstLag, at: profile.lagAt }, reversals: profile.reversals, cost, length: sampled.length, limits, fits: !broken };
+  const total = all.length;
+  sampledPieces.forEach((sp, p) => {
+    const { profile } = runs[p];
+    const smp = sp.samples;
+    for (let i = 1; i < smp.length; i++) {
+      const step = smp[i].s - smp[i - 1].s;
+      driftArea += Math.max(0, profile.drift[i] - DRIFT_LIMIT) * step + LAG_WEIGHT * Math.max(0, profile.lag[i] - LAG_LIMIT) * step;
+    }
+    if (profile.worstDrift > worstDrift) {
+      worstDrift = profile.worstDrift;
+      driftAt = profile.driftAt + off;
+    }
+    if (profile.worstLag > worstLag) {
+      worstLag = profile.worstLag;
+      lagAt = profile.lagAt + off;
+    }
+    reversals += profile.reversals;
+    driveTime += profile.total;
+    for (let i = 0; i < smp.length; i++) limits[profile.limit[i]] = (limits[profile.limit[i]] ?? 0) + 1 / total;
+    off += sp.length;
+  });
+  const { shots, extra } = simulateShots(chain, project, runs, starts, segments, windows, shotSlack);
+  let shotDeficit = 0;
+  let worstShot = 0;
+  for (const sh of shots) {
+    shotDeficit += sh.deficit;
+    worstShot = Math.max(worstShot, sh.deficit);
+  }
+  const driftExcess = Math.max(0, worstDrift - DRIFT_LIMIT) + LAG_WEIGHT * Math.max(0, worstLag - LAG_LIMIT);
+  const broken = check.worst > 1e-3 || driftExcess > 0 || reversals > 0 || worstShot > 1e-6;
+  const time = driveTime + extra;
+  const cost = time + 2 * check.penalty + 20 * check.worst + 2 * driftArea + 20 * driftExcess + 5 * reversals + 2 * shotDeficit + 20 * worstShot + (broken ? 3 : 0);
+  return {
+    time,
+    check,
+    drift: { worst: worstDrift, at: driftAt },
+    lag: { worst: worstLag, at: lagAt },
+    reversals,
+    cost,
+    length: off,
+    limits,
+    fits: !broken,
+    shots,
+    pieces: starts,
+    windows: windows.map((w, i) => ({ piece: w.piece, from: capStarts[i], to: w.cap.to, vmax: w.cap.vmax, point: w.point, s: w.s })),
+    runs,
+  };
 }
 
-/** Where each marker lands: segment index and curve parameter. */
-export function placeMarkers(chain: Chain, segments: PlannedSegment[]): PlannedMarker[] {
+/** Which Pedro path and segment arc length `s` along piece `piece` falls in, as Pedro's (segment, parameter). */
+function locate(segments: PlannedSegment[], starts: number[], piece: number, s: number): { seg: number; t: number } {
+  const end = starts[piece + 1] ?? segments.length;
+  let left = s;
+  for (let j = starts[piece]; j < end; j++) {
+    const table = tableFor(segments[j].curve);
+    if (left <= table.length + 1e-9 || j === end - 1) return { seg: j - starts[piece], t: table.parameter(Math.min(1, Math.max(0, left / Math.max(table.length, 1e-9)))) };
+    left -= table.length;
+  }
+  return { seg: 0, t: 0 };
+}
+
+/** The marker name a shot on the move fires at, e.g. SHOT_3 for point 3. */
+export const shotMarkerName = (point: number) => `SHOT_${point + 1}`;
+
+/**
+ * Where each marker lands: which Pedro path, segment index and curve parameter. Shots on the move add a marker where
+ * the gate should open.
+ */
+export function placeMarkers(chain: Chain, segments: PlannedSegment[], ev?: Pick<Evaluation, 'pieces' | 'shots'>): PlannedMarker[] {
+  const starts = ev?.pieces ?? pieceStarts(chain, segments);
   const tables = segments.map((s) => new ArcTable(s.curve, 128));
-  return chain.markers.map((m) => {
+  const pieceOf = (seg: number) => {
+    let p = 0;
+    while (p + 1 < starts.length && starts[p + 1] <= seg) p++;
+    return p;
+  };
+  const out = chain.markers.map((m) => {
     const legSegs = segments.map((s, i) => ({ s, i })).filter((x) => x.s.leg === m.leg);
     const total = legSegs.reduce((acc, x) => acc + tables[x.i].length, 0);
     let target = m.at * total;
     for (const { i } of legSegs) {
       const len = tables[i].length;
       if (target <= len + 1e-9 || i === legSegs[legSegs.length - 1].i) {
-        return { name: m.name, seg: i, t: tables[i].parameter(len > 0 ? Math.min(target / len, 1) : 0) };
+        const piece = pieceOf(i);
+        return { name: m.name, piece, seg: i - starts[piece], t: tables[i].parameter(len > 0 ? Math.min(target / len, 1) : 0) };
       }
       target -= len;
     }
-    return { name: m.name, seg: 0, t: 0 };
+    return { name: m.name, piece: 0, seg: 0, t: 0 };
+  });
+  for (const sh of ev?.shots ?? []) {
+    if (!sh.openAt) continue;
+    out.push({ name: shotMarkerName(sh.point), piece: sh.openAt.piece, ...locate(segments, starts, sh.openAt.piece, sh.openAt.s) });
+  }
+  return out;
+}
+
+/**
+ * Splits the segments where each shot's capped stretch starts and ends, and caps the ones in between, so the Java
+ * gives Pedro exactly that stretch. Positions within 3 % of a segment's end snap to it.
+ */
+function applyCaps(segments: PlannedSegment[], ev: Evaluation): PlannedSegment[] {
+  if (!ev.windows.length) return segments;
+  const out = segments.map((s) => ({ ...s }));
+  const starts = ev.pieces;
+  // Global arc length positions to cut at, last first so earlier indices stay put.
+  const pieceOffset = (p: number) => {
+    let off = 0;
+    for (let j = 0; j < starts[p]; j++) off += tableFor(segments[j].curve).length;
+    return off;
+  };
+  const cuts = ev.windows.flatMap((w) => [pieceOffset(w.piece) + w.from, pieceOffset(w.piece) + w.to]).sort((a, b) => b - a);
+  for (const cut of cuts) {
+    let s0 = 0;
+    for (let j = 0; j < out.length; j++) {
+      const len = tableFor(out[j].curve).length;
+      if (cut < s0 + len - 1e-6) {
+        const c = (cut - s0) / len;
+        if (c > 0.03 && c < 0.97) out.splice(j, 1, ...splitSegment(out[j], c));
+        break;
+      }
+      s0 += len;
+    }
+  }
+  // Cap every segment whose middle is inside a stretch.
+  const spans = ev.windows.map((w) => ({ a: pieceOffset(w.piece) + w.from, b: pieceOffset(w.piece) + w.to, v: w.vmax }));
+  let s0 = 0;
+  return out.map((seg) => {
+    const len = tableFor(seg.curve).length;
+    const mid = s0 + len / 2;
+    s0 += len;
+    const span = spans.find((x) => mid > x.a && mid < x.b);
+    const { maxSpeed: _old, ...rest } = seg;
+    void _old;
+    return span ? { ...rest, maxSpeed: span.v } : rest;
   });
 }
 
 /** Everything a chain's result depends on, hashed: the chain, robot, margins and model. */
 export function chainSpecHash(settings: Settings, chain: Chain): string {
-  return fnv1a(JSON.stringify([chain, settings.robot, marginsFor(settings, chain), settings.model, PLANNER_VERSION]));
+  const shoots = chain.points.some((p) => p.shoot);
+  return fnv1a(JSON.stringify([chain, settings.robot, marginsFor(settings, chain), settings.model, shoots ? settings.shooter : null, PLANNER_VERSION]));
 }
 
 /** Bump when the optimizer's output changes for the same input, so saved plans get redone. */
-export const PLANNER_VERSION = 4;
+export const PLANNER_VERSION = 5;
 
 export function optimizeChain(project: Settings, chain: Chain, opts: OptimizeOptions = {}): Plan {
   const margins = marginsFor(project, chain);
@@ -532,7 +736,7 @@ export function optimizeChain(project: Settings, chain: Chain, opts: OptimizeOpt
       index,
       joints,
       L,
-      f: (x) => evaluate(decode(x, joints, L).segments, project, chain, searchMargins, SEARCH_DS, 2).cost,
+      f: (x) => evaluate(decode(x, joints, L).segments, project, chain, searchMargins, SEARCH_DS, 2, 1).cost,
       x: new Float64Array(L.n),
       cost: Infinity,
     };
@@ -556,21 +760,33 @@ export function optimizeChain(project: Settings, chain: Chain, opts: OptimizeOpt
   });
   const found = best as { segments: PlannedSegment[]; ev: Evaluation } | null;
   if (!found) throw new Error(`${chain.name}: nothing to optimize`);
-  // Report on the path exactly as the robot will get it: rounded the way the Java writes it.
-  const segments = roundSegments(found.segments);
-  const chosen = { segments, ev: evaluate(segments, project, chain, margins, SEARCH_DS) };
+  // Report on the path exactly as the robot will get it: rounded the way the Java writes it, with its capped stretches
+  // split out as their own segments.
+  let segments = roundSegments(found.segments);
+  let ev = evaluate(segments, project, chain, margins, SEARCH_DS);
+  if (ev.windows.length) {
+    segments = roundSegments(applyCaps(segments, ev));
+    ev = evaluate(segments, project, chain, margins, SEARCH_DS);
+  }
+  return planOf(project, chain, segments, ev, combos.length, evals);
+}
+
+/** The plan for these segments and their evaluation. */
+export function planOf(project: Settings, chain: Chain, segments: PlannedSegment[], ev: Evaluation, seeds: number, evals: number): Plan {
   return {
     chain: chain.name,
     specHash: chainSpecHash(project, chain),
-    geometryHash: geometryHash(chosen.segments),
-    feasible: chosen.ev.fits,
-    time: chosen.ev.time,
-    length: chosen.ev.length,
-    segments: chosen.segments,
-    markers: placeMarkers(chain, chosen.segments),
-    check: { clearances: chosen.ev.check.clearances, rules: chosen.ev.check.rules, worst: chosen.ev.check.worst, drift: chosen.ev.drift, lag: chosen.ev.lag },
-    limits: chosen.ev.limits,
-    seeds: combos.length,
+    geometryHash: geometryHash(segments),
+    feasible: ev.fits,
+    time: ev.time,
+    length: ev.length,
+    segments,
+    markers: placeMarkers(chain, segments, ev),
+    check: { clearances: ev.check.clearances, rules: ev.check.rules, worst: ev.check.worst, drift: ev.drift, lag: ev.lag },
+    limits: ev.limits,
+    shots: ev.shots,
+    pieces: ev.pieces,
+    seeds,
     evals,
     modelSource: project.model.source,
   };

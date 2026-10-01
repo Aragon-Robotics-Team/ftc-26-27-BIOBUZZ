@@ -1,3 +1,5 @@
+import { DEFAULT_SHOOTER, type Cell, type ShooterConfig } from './shot.ts';
+
 /**
  * What a path is made from. Everything is red side, inches, degrees; the planner converts headings to radians.
  * A path (Chain) travels with its Settings inside the exported Java, so pasting the code back restores both.
@@ -105,18 +107,35 @@ export const SAMPLE_MODEL: ModelConfig = {
   nominalVoltage: 12,
 };
 
-/** Settings saved before the drivetrain was modelled physically get the sample drivetrain. */
+/** Settings saved before the drivetrain was modelled physically get the sample drivetrain; before shooting, the
+ *  default shooter. */
 export function migrateSettings(s: Settings): Settings {
   const m = s.model as unknown as Record<string, unknown> | undefined;
-  if (m && typeof m.motorRpm === 'number') return s;
-  return { ...s, model: { ...SAMPLE_MODEL, stopOverhead: typeof m?.stopOverhead === 'number' ? m.stopOverhead : SAMPLE_MODEL.stopOverhead } };
+  let out = s;
+  if (!(m && typeof m.motorRpm === 'number')) {
+    out = { ...out, model: { ...SAMPLE_MODEL, stopOverhead: typeof m?.stopOverhead === 'number' ? m.stopOverhead : SAMPLE_MODEL.stopOverhead } };
+  }
+  if (!out.shooter) out = { ...out, shooter: { ...DEFAULT_SHOOTER } };
+  return out;
 }
 
-/** The robot, margins and speed model: shared by every path. */
+/** The robot, margins, speed model and shooter: shared by every path. */
 export interface Settings {
   robot: RobotConfig;
   margins: Margins;
   model: ModelConfig;
+  shooter: ShooterConfig;
+}
+
+/**
+ * Shooting at a point: `stop` comes to rest there (or somewhere in the area), waits for the launcher to be ready and
+ * fires a volley, then drives on as a new Pedro path. `move` fires the volley while passing through, centred on the
+ * point, no faster than `maxSpeed` in/s.
+ */
+export interface ShootSpec {
+  mode: 'stop' | 'move';
+  cell: Cell;
+  maxSpeed: number;
 }
 
 /** A point the robot centre passes exactly, with its heading. */
@@ -127,6 +146,7 @@ export interface FixedPoint {
   heading: number;
   /** Allowed heading error here, degrees (0 = exact). */
   headingTol: number;
+  shoot?: ShootSpec;
 }
 
 /** An area the robot centre passes through somewhere; the optimizer picks where. */
@@ -138,6 +158,7 @@ export interface RegionPoint {
   halfHeight: number;
   heading: number;
   headingTol: number;
+  shoot?: ShootSpec;
 }
 
 export type ChainPoint = FixedPoint | RegionPoint;
@@ -185,6 +206,7 @@ export function defaultSettings(): Settings {
     robot: { width: 16, length: 14, height: 14, protrusions: [], turretMin: -90, turretMax: 90 },
     margins: { obstacle: 2, centerline: 1, headroom: 2 },
     model: { ...SAMPLE_MODEL },
+    shooter: { ...DEFAULT_SHOOTER },
   };
 }
 
@@ -216,6 +238,10 @@ export function validateSettings(s: Settings): void {
     num(s.model?.[k], k, 1e-6);
   }
   num(s.model?.stopOverhead, 'stopOverhead', 0);
+  for (const k of ['balls', 'volley', 'inertia', 'motorRpm', 'motorStallTorque', 'ticksPerExitSpeed', 'hoodAngle', 'exitHeight'] as const) {
+    num(s.shooter?.[k], `shooter ${k}`, 1e-6);
+  }
+  for (const k of ['aimAccuracy', 'speedAccuracy', 'drag', 'lift', 'scoringMargin'] as const) num(s.shooter?.[k], `shooter ${k}`, 0);
   if (problems.length) throw new ProjectError(problems);
 }
 
@@ -234,6 +260,12 @@ export function validateChain(c: Chain): void {
     if (![p.x, p.y, p.heading, p.headingTol].every(isNum)) problems.push(`${c.name}: a point has a missing number`);
     if (p.kind === 'region' && !(p.halfWidth >= 0 && p.halfHeight >= 0)) problems.push(`${c.name}: an area has a negative size`);
   }
+  (c.points ?? []).forEach((p, i) => {
+    if (!p.shoot) return;
+    if (!['stop', 'move'].includes(p.shoot.mode) || !['left', 'right'].includes(p.shoot.cell)) problems.push(`${c.name}: a shot has an unknown mode or cell`);
+    if (p.shoot.mode === 'move' && (i === 0 || i === c.points.length - 1)) problems.push(`${c.name}: shooting on the move needs a point in the middle of the path`);
+    if (p.shoot.mode === 'move' && !(isNum(p.shoot.maxSpeed) && p.shoot.maxSpeed > 0)) problems.push(`${c.name}: a shot on the move needs a top speed`);
+  });
   if (c.allowCrossing !== undefined && typeof c.allowCrossing !== 'boolean') problems.push(`${c.name}: allowCrossing must be true or false`);
   const names = new Set<string>();
   for (const m of c.markers ?? []) {

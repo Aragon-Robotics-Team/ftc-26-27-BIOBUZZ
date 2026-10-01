@@ -42,6 +42,13 @@ public final class PlannedPath {
         }
     }
 
+    /**
+     * Starts a row that's driven no faster than the number after it, in in/s ({@code SLOW, 20, x0, y0, …}): Pedro's
+     * maxPathSpeed while on that segment, for shooting on the move. Pedro coasts down to it, so the planner starts
+     * the capped stretch early enough.
+     */
+    public static final double SLOW = Double.NaN;
+
     private static final Map<Path, String> IDS = Collections.synchronizedMap(new WeakHashMap<Path, String>());
     private static final Map<String, Built> BUILT = Collections.synchronizedMap(new LinkedHashMap<String, Built>());
 
@@ -53,25 +60,34 @@ public final class PlannedPath {
      * @param id         "name#geometry", written to path logs so the planner can match runs to this path
      * @param stopAtEnd  false keeps the robot moving into whatever follows (no braking at the end)
      * @param segments   one array per cubic Bezier: x0, y0, … x3, y3 (red side), then pairs of heading breakpoint
-     *                   (fraction of the segment's length) and heading (red side, degrees), swept linearly between
+     *                   (fraction of the segment's length) and heading (red side, degrees), swept linearly between;
+     *                   optionally led by {@link #SLOW} and a speed cap
      */
     public static Path of(String id, PoseFactory f, boolean stopAtEnd, double[]... segments) {
         Path[] parts = new Path[segments.length];
         for (int s = 0; s < segments.length; s++) {
             double[] d = segments[s];
+            int o = offset(d);
             Pose[] points = new Pose[4];
-            for (int i = 0; i < 4; i++) points[i] = f.of(d[2 * i], d[2 * i + 1], 0);
+            for (int i = 0; i < 4; i++) points[i] = f.of(d[o + 2 * i], d[o + 2 * i + 1], 0);
             PiecewiseInterpolator heading = Interpolator.piecewise();
-            for (int k = 10; k < d.length; k += 2) {
+            for (int k = o + 10; k < d.length; k += 2) {
                 heading = heading.until(d[k], Interpolator.linear(f.of(0, 0, d[k - 1]).heading(), f.of(0, 0, d[k + 1]).heading()));
             }
             parts[s] = Paths.curve(points).heading(heading);
+            if (o > 0) parts[s] = parts[s].with(Constants.foresightConfig.maxPathSpeed.at(d[1]));
         }
         Path path = Paths.path(parts);
         if (!stopAtEnd) path = path.with(Constants.foresightConfig.brakeAtEnd.at(false));
         IDS.put(path, id);
-        BUILT.put(id.split("#")[0], new Built(path, f.of(segments[0][0], segments[0][1], segments[0][9])));
+        int o = offset(segments[0]);
+        BUILT.put(id.split("#")[0], new Built(path, f.of(segments[0][o], segments[0][o + 1], segments[0][o + 9])));
         return path;
+    }
+
+    /** Where a row's control points start: after {@link #SLOW} and its cap, if it has them. */
+    private static int offset(double[] row) {
+        return row.length > 1 && Double.isNaN(row[0]) ? 2 : 0;
     }
 
     /** The id a planned path was built with, or null for any other path. */

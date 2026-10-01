@@ -90,6 +90,8 @@ function problem(chain: Chain): string | null {
   if (!plan || planStatus(chain) !== 'infeasible') return null;
   const drift = plan.check.drift;
   if (drift && drift.worst > DRIFT_LIMIT) return `Pedro would drift ${drift.worst.toFixed(1)} in wide ${Math.round(drift.at)} in along: it can't slow down for a curve that tight. Round it out or move a point.`;
+  const badShot = (plan.shots ?? []).find((sh) => sh.deficit > 1e-6);
+  if (badShot) return `The volley at ${pointLabel(chain, badShot.point)} would miss: ${badShot.problem ?? 'the shot has too little room'}.`;
   const lag = plan.check.lag;
   if (lag && lag.worst > LAG_LIMIT) return `Pedro's heading would fall ${Math.round((lag.worst * 180) / Math.PI)}° behind ${Math.round(lag.at)} in along: the plan turns faster than the robot can there.`;
   const c = [...plan.check.clearances].sort((a, b) => a.gap - a.margin - (b.gap - b.margin))[0];
@@ -104,9 +106,13 @@ const reversals = new WeakMap<Plan, Vec | null>();
 /** Where a plan turns back on itself (and so must stop), if anywhere. Pedro only brakes at the end of a path. */
 function reversal(plan: Plan): Vec | null {
   if (!reversals.has(plan)) {
-    const smp = sampleChain(plan.segments, 0.5).samples;
+    // Each Pedro path on its own: at a stop to shoot, setting off the way it came is fine.
+    const starts = plan.pieces ?? [0];
     let at: Vec | null = null;
-    for (let i = 1; i < smp.length - 1 && !at; i++) if (Math.abs(wrap(smp[i].travel - smp[i - 1].travel)) > Math.PI / 2) at = smp[i].p;
+    starts.forEach((a, p) => {
+      const smp = sampleChain(plan.segments.slice(a, starts[p + 1] ?? plan.segments.length), 0.5).samples;
+      for (let i = 1; i < smp.length - 1 && !at; i++) if (Math.abs(wrap(smp[i].travel - smp[i - 1].travel)) > Math.PI / 2) at = smp[i].p;
+    });
     reversals.set(plan, at);
   }
   return reversals.get(plan) ?? null;
@@ -162,7 +168,7 @@ function pointRow(chain: Chain, i: number): HTMLElement {
     } },
       h('span', { class: `dot ${p.kind}${pointIssues(chain).some((f) => f.point === i) ? ' bad' : ''}` }, String(i + 1)),
       h('span', { class: 'pt-name' }, name),
-      h('span', { class: 'pt-sum' }, `${fmt(p.x, 1)}, ${fmt(p.y, 1)} · ${headingText}`)),
+      h('span', { class: 'pt-sum' }, `${fmt(p.x, 1)}, ${fmt(p.y, 1)} · ${headingText}${p.shoot ? (p.shoot.mode === 'stop' ? ' · shoots' : ' · shoots moving') : ''}`)),
   );
   if (!selected) return row;
   const set = (k: 'x' | 'y' | 'heading' | 'headingTol' | 'halfWidth' | 'halfHeight') => (v: number) => {
@@ -182,15 +188,37 @@ function pointRow(chain: Chain, i: number): HTMLElement {
   }, 'Heading here');
   const headingFields = anyHeading ? [] : [num(p.heading, set('heading'), { label: 'Heading', cls: 'tiny' }), h('span', { class: 'dim' }, '°')];
   if (!anyHeading && p.headingTol > 0) headingFields.push(h('span', { class: 'dim' }, '±'), num(p.headingTol, set('headingTol'), { min: 0, max: 179, label: 'Heading tolerance', cls: 'tiny' }), h('span', { class: 'dim' }, '°'));
+  // Shooting here: stop and shoot anywhere; on the move only in the middle of the path.
+  const shootModes: [string, string][] = [['none', 'No'], ['stop', 'Stop and shoot']];
+  if (!first && !last) shootModes.push(['move', 'On the move']);
+  const shootRow = h('div', { class: 'inline' },
+    h('span', { class: 'dim' }, 'Shoot'),
+    select(p.shoot?.mode ?? 'none', shootModes, (m) => {
+      if (m === 'none') delete p.shoot;
+      else p.shoot = { mode: m as 'stop' | 'move', cell: p.shoot?.cell ?? 'right', maxSpeed: p.shoot?.maxSpeed ?? 20 };
+      restructured();
+    }, 'Shoot here'),
+    p.shoot ? select(p.shoot.cell, [['right', 'right cell'], ['left', 'left cell']], (c) => {
+      if (p.shoot) p.shoot.cell = c as 'left' | 'right';
+      restructured();
+    }, 'Hive cell') : null,
+    ...(p.shoot?.mode === 'move'
+      ? [h('span', { class: 'dim' }, 'under'), num(p.shoot.maxSpeed, (v) => {
+          if (p.shoot) p.shoot.maxSpeed = v;
+          edited();
+        }, { min: 1, label: 'Top speed while shooting, in/s', cls: 'tiny' }), h('span', { class: 'dim' }, 'in/s')]
+      : []));
   row.append(h('div', { class: 'pt-edit' },
     h('div', { class: 'grid' }, ...fields),
     h('div', { class: 'inline' }, h('span', { class: 'dim' }, 'Heading'), headingSel, ...headingFields),
+    shootRow,
     !first && !last
       ? h('div', { class: 'inline' },
           select(p.kind, [['fixed', 'Point'], ['region', 'Area (passes somewhere inside)']], (k) => {
+            const shoot = p.shoot ? { shoot: p.shoot } : {};
             chain.points[i] = k === 'region'
-              ? { kind: 'region', x: p.x, y: p.y, halfWidth: 6, halfHeight: 6, heading: p.heading, headingTol: p.headingTol }
-              : { kind: 'fixed', x: p.x, y: p.y, heading: p.heading, headingTol: p.headingTol };
+              ? { kind: 'region', x: p.x, y: p.y, halfWidth: 6, halfHeight: 6, heading: p.heading, headingTol: p.headingTol, ...shoot }
+              : { kind: 'fixed', x: p.x, y: p.y, heading: p.heading, headingTol: p.headingTol, ...shoot };
             restructured();
           }, 'Point type'),
           h('button', { class: 'link danger', type: 'button', onclick: () => deletePoint(i) }, 'Remove'))
@@ -291,6 +319,16 @@ function details(chain: Chain): HTMLElement | null {
       h('span', {}, LIMIT_NAMES[k]),
       h('span', { class: 'bar' }, h('i', { style: `width:${(v * 100).toFixed(0)}%;background:${LIMIT_COLORS[k]}` })),
       h('span', { class: 'num' }, `${(v * 100).toFixed(0)}%`))),
+    ...((plan.shots ?? []).length ? [h('div', { class: 'sub' }, 'Volleys')] : []),
+    ...(plan.shots ?? []).map((sh) => {
+      const worst = Math.min(...sh.balls.map((b) => b.margin));
+      const lag = Math.max(...sh.balls.map((b) => b.lag));
+      const what = sh.mode === 'stop' ? (sh.wait > 0.005 ? `stops, waits ${sh.wait.toFixed(2)} s` : 'stops') : 'on the move';
+      return h('div', { class: 'bar-row', title: `Fires at ${sh.open.toFixed(2)} s. Room to spare: the smaller of degrees of aim and percent of speed beyond the robot's errors. Flywheel: how far it's off the speed the shot needs.` },
+        h('span', {}, `${pointLabel(chain, sh.point)}: ${what}`),
+        h('span', { class: 'dim' }, `flywheel off ${lag.toFixed(1)}%`),
+        h('span', { class: `num ${sh.deficit > 1e-6 ? 'bad' : ''}` }, Number.isFinite(worst) ? `${worst.toFixed(1)} spare` : 'no shot'));
+    }),
     h('div', { class: 'sub' }, 'Closest to'),
     ...clear.map((c) => h('div', { class: 'bar-row' },
       h('span', {}, c.name),

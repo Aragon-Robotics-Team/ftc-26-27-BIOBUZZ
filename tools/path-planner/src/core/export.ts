@@ -16,8 +16,9 @@ import type { PlannedSegment } from './chain.ts';
 import { fieldObstacles } from './field.ts';
 import { drivetrain } from './drivetrain.ts';
 import { convexHull, deg } from './geom.ts';
-import { chainSpecHash, evaluate, placeMarkers, type Plan } from './optimize.ts';
-import { fromRow, geometryHash, n, rows, roundSegments } from './rows.ts';
+import { evaluate, planOf, shotMarkerName, type Plan } from './optimize.ts';
+import { pointLabel } from './planner.ts';
+import { fromRow, geometryHash, n, rows, roundSegments, SLOW } from './rows.ts';
 import { marginsFor, migrateSettings, ProjectError, validateChain, validateSettings, type Chain, type Settings } from './project.ts';
 
 export { geometryHash, roundSegments } from './rows.ts';
@@ -27,42 +28,57 @@ const TAG = '// path-planner ';
 
 const constName = (chain: string, marker: string) => `${chain.replace(/([A-Z])/g, '_$1').toUpperCase()}_${marker}`;
 
+/** Method name of each Pedro path a planned path is driven as: name, name2, name3, … */
+export const pieceName = (chain: string, piece: number) => (piece === 0 ? chain : `${chain}${piece + 1}`);
+
 export function toJava(chain: Chain, settings: Settings, plan: Plan): string {
   const segments = roundSegments(plan.segments);
   const meta = { v: EXPORT_VERSION, chain, settings, legs: segments.map((s) => s.leg) };
   const r = rows(segments);
+  const starts = plan.pieces ?? [0];
+  const hash = geometryHash(segments);
+  const shots = plan.shots ?? [];
   const lines = [
     `    ${TAG}${JSON.stringify(meta)}`,
-    `    // ${chain.name}: ${plan.time.toFixed(2)} s planned${plan.feasible ? '' : ' (BREAKS A CLEARANCE LIMIT)'}. To change it, paste this into tools/path-planner.html.`,
+    `    // ${chain.name}: ${plan.time.toFixed(2)} s planned${shots.length ? `, ${shots.length} volley${shots.length > 1 ? 's' : ''}` : ''}${plan.feasible ? '' : ' (BREAKS A LIMIT)'}. To change it, paste this into tools/path-planner.html.`,
   ];
-  for (const m of placeMarkers(chain, segments)) {
-    lines.push(`    public static final PlannedPath.Marker ${constName(chain.name, m.name)} = new PlannedPath.Marker(${m.seg}, ${n(m.t)});`);
+  // How to drive it, when it's more than one follow(): the paths in order, with the stops' volleys between.
+  if (starts.length > 1 || shots.some((sh) => sh.mode === 'stop')) {
+    const steps: string[] = [];
+    if (chain.points[0].shoot?.mode === 'stop') steps.push('robot.shoot()');
+    starts.forEach((_, p) => {
+      steps.push(`follow(follower, ${pieceName(chain.name, p)}(f))`);
+      const endLeg = p + 1 < starts.length ? segments[starts[p + 1]].leg : chain.points.length - 1;
+      if (chain.points[endLeg].shoot?.mode === 'stop') steps.push('robot.shoot()');
+    });
+    lines.push(`    // Drive it as: ${steps.join(', ')}`);
   }
-  lines.push(`    static Path ${chain.name}(PoseFactory f) {`);
-  lines.push(`        return PlannedPath.of("${chain.name}#${geometryHash(segments)}", f, ${chain.endStopped},`);
-  r.forEach((row, i) => lines.push(`                new double[] {${row.join(', ')}}${i < r.length - 1 ? ',' : ');'}`));
-  lines.push('    }');
+  for (const sh of shots.filter((x) => x.mode === 'move')) {
+    const m = plan.markers.find((x) => x.name === shotMarkerName(sh.point));
+    if (!m) continue;
+    const path = `${pieceName(chain.name, m.piece)}(f)`;
+    lines.push(`    // Shoot on the move at ${pointLabel(chain, sh.point)}: Path p = ${path}; deadline(follow(follower, p), sequential(passed(p, ${constName(chain.name, m.name)}), robot.shoot()))`);
+  }
+  for (const m of plan.markers) {
+    const where = starts.length > 1 ? `   // on ${pieceName(chain.name, m.piece)}()` : '';
+    lines.push(`    public static final PlannedPath.Marker ${constName(chain.name, m.name)} = new PlannedPath.Marker(${m.seg}, ${n(m.t)});${where}`);
+  }
+  starts.forEach((start, p) => {
+    const end = starts[p + 1] ?? segments.length;
+    const name = pieceName(chain.name, p);
+    const stops = p + 1 < starts.length ? true : chain.endStopped;
+    lines.push(`    static Path ${name}(PoseFactory f) {`);
+    lines.push(`        return PlannedPath.of("${p === 0 ? chain.name : `${chain.name}.${p + 1}`}#${hash}", f, ${stops},`);
+    for (let i = start; i < end; i++) lines.push(`                new double[] {${r[i].join(', ')}}${i < end - 1 ? ',' : ');'}`);
+    lines.push('    }');
+  });
   return lines.join('\n') + '\n';
 }
 
 /** A plan for segments that came from pasted code: everything recomputed except the geometry. */
 export function planFromSegments(settings: Settings, chain: Chain, segments: PlannedSegment[]): Plan {
   const ev = evaluate(segments, settings, chain, marginsFor(settings, chain), 0.5);
-  return {
-    chain: chain.name,
-    specHash: chainSpecHash(settings, chain),
-    geometryHash: geometryHash(segments),
-    feasible: ev.fits,
-    time: ev.time,
-    length: ev.length,
-    segments,
-    markers: placeMarkers(chain, segments),
-    check: { clearances: ev.check.clearances, rules: ev.check.rules, worst: ev.check.worst, drift: ev.drift, lag: ev.lag },
-    limits: ev.limits,
-    seeds: 0,
-    evals: 0,
-    modelSource: settings.model.source,
-  };
+  return planOf(settings, chain, segments, ev, 0, 0);
 }
 
 export interface Imported {
@@ -87,9 +103,9 @@ export function fromJava(text: string): Imported[] {
       validateSettings(meta.settings);
       const call = body.indexOf('PlannedPath.of(');
       if (call < 0) throw new Error("the PlannedPath.of(…) call after it is missing");
-      const arrays = [...body.slice(call).matchAll(/new double\[\]\s*\{([^}]*)\}/g)].map((a) => a[1].split(',').map((x) => Number(x.trim())));
+      const arrays = [...body.slice(call).matchAll(/new double\[\]\s*\{([^}]*)\}/g)].map((a) => a[1].split(',').map((x) => (x.trim() === SLOW ? NaN : Number(x.trim()))));
       if (arrays.length !== meta.legs.length) throw new Error(`expected ${meta.legs.length} segments, found ${arrays.length}`);
-      if (arrays.some((a) => a.some((x) => !Number.isFinite(x)))) throw new Error('a number in the code is unreadable');
+      if (arrays.some((a) => a.some((x, i) => !Number.isFinite(x) && !(i === 0 && Number.isNaN(x))))) throw new Error('a number in the code is unreadable');
       const segments = arrays.map((a, i) => fromRow(a, meta.legs[i]));
       found.push({ chain: meta.chain, settings: meta.settings, plan: planFromSegments(meta.settings, meta.chain, segments) });
     } catch (e) {

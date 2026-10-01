@@ -18,7 +18,7 @@ import { sampleChain, type Sample } from './chain.ts';
 import { cmaes } from './cmaes.ts';
 import { wrap } from './geom.ts';
 import type { Plan } from './optimize.ts';
-import { speedProfile, type DriveSettings } from './model.ts';
+import { speedProfile, type DriveSettings, type SpeedCap } from './model.ts';
 import type { ModelConfig } from './project.ts';
 
 export const LOG_COLUMNS = ['t', 'voltage', 'x', 'y', 'heading', 'mode', 'busy', 'path', 'segment', 'tparam'] as const;
@@ -103,6 +103,8 @@ export interface Run {
   /** The driven path, resampled by arc length, with the measured speed at each sample. */
   samples: Sample[];
   measuredSpeed: number[];
+  /** Speed caps on the planned path it drove (shooting on the move). */
+  caps?: SpeedCap[];
 }
 
 /** Moving average over a window of samples, keeping the ends. */
@@ -139,9 +141,12 @@ export function extractRuns(log: PathLog, plans: Plan[] = [], ds = 0.5): Run[] {
       while (k < rows.length && rows[k].mode === 'HOLD' && rows[k].busy) k++;
       if (k < rows.length && rows[k].mode === 'HOLD') settle = rows[k].t - rows[j].t;
     }
-    const [name, geometry] = chain.split('#');
+    // "name#geometry", or "name.2#geometry" for the second Pedro path of one that stops to shoot.
+    const [id, geometry] = chain.split('#');
+    const piece = /\.(\d+)$/.exec(id);
+    const name = piece ? id.slice(0, piece.index) : id;
     const plan = plans.find((p) => p.chain === name && p.geometryHash === geometry);
-    const run = plan ? matchedRun(log.name, plan, part, endStopped, settle, ds) : buildRun(log.name, name, part, endStopped, settle, ds);
+    const run = plan ? matchedRun(log.name, plan, piece ? Number(piece[1]) - 1 : 0, part, endStopped, settle, ds) : buildRun(log.name, id, part, endStopped, settle, ds);
     if (run) runs.push(run);
     i = j + 1;
   }
@@ -175,9 +180,17 @@ function medianVoltage(part: LogRow[]): number {
 }
 
 /** A run of a known plan: the planned geometry, with the measured speed mapped onto it by distance driven. */
-function matchedRun(logName: string, plan: Plan, part: LogRow[], endStopped: boolean, settle: number | null, ds: number): Run | null {
+function matchedRun(logName: string, plan: Plan, piece: number, part: LogRow[], endStopped: boolean, settle: number | null, ds: number): Run | null {
   if (part.length < 5) return null;
-  const samples = sampleChain(plan.segments, ds).samples;
+  const starts = plan.pieces ?? [0];
+  if (piece >= starts.length) return null;
+  const segments = plan.segments.slice(starts[piece], starts[piece + 1] ?? plan.segments.length);
+  const sampled = sampleChain(segments, ds);
+  const samples = sampled.samples;
+  const caps: SpeedCap[] = [];
+  segments.forEach((seg, j) => {
+    if (seg.maxSpeed !== undefined) caps.push({ from: sampled.segStart[j], to: sampled.segStart[j + 1], vmax: seg.maxSpeed, fixedStart: true });
+  });
   const cum = driven(part);
   const total = cum[cum.length - 1];
   const planLength = samples[samples.length - 1].s;
@@ -199,6 +212,7 @@ function matchedRun(logName: string, plan: Plan, part: LogRow[], endStopped: boo
     voltage: medianVoltage(part),
     samples,
     measuredSpeed,
+    caps,
   };
 }
 
@@ -283,6 +297,7 @@ export function compareRun(run: Run, settings: DriveSettings): RunComparison {
   const profile = speedProfile(run.samples, { ...settings, model: { ...settings.model, stopOverhead: 0 } }, {
     endStopped: run.endStopped,
     voltage: Number.isFinite(run.voltage) ? run.voltage : undefined,
+    caps: run.caps,
   });
   return {
     run,

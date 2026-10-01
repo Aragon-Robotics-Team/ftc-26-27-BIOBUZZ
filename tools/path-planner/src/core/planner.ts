@@ -4,6 +4,7 @@ import { chainObstacles, checkChain, checkStartPose, ruleExcess, type Clearance,
 import { RED_HIVE_TARGET } from './field.ts';
 import { angleOf, rad, sub, type Vec } from './geom.ts';
 import { marginsFor, turretRange, type Chain, type ChainPoint, type Settings } from './project.ts';
+import { shotMargin, ShotSolver } from './shot.ts';
 
 /** G304 problems with a path's first point, if it is a match start. */
 export function startProblems(settings: Settings, chain: Chain): StartProblem[] {
@@ -110,6 +111,48 @@ export function precheck(settings: Settings, chain: Chain): PointIssue[] {
       }
     }
   });
+  chain.points.forEach((p, i) => {
+    const problem = shotProblem(settings, p);
+    if (problem) issues.push({ point: i, message: `${pointLabel(chain, i)} ${problem}` });
+  });
   for (const s of startProblems(settings, chain)) issues.push({ point: 0, message: `Start ${s.problem}.` });
   return issues;
+}
+
+/**
+ * Why a shooting point can't work, if it can't: no standing shot from anywhere it allows scores with the robot's
+ * accuracy, or none of its headings lets the turret face the hive. (Shots on the move are checked standing here; the
+ * optimizer checks them moving.)
+ */
+export function shotProblem(settings: Settings, p: ChainPoint): string | null {
+  if (!p.shoot) return null;
+  const cfg = settings.shooter;
+  const solver = new ShotSolver(cfg);
+  const turret = turretRange(settings.robot);
+  const headings = headingsOf(p, 5);
+  let bestMargin = -Infinity;
+  let anyShot = false;
+  let turretOk = false;
+  let bearing = 0;
+  for (const pos of positionsOf(p)) {
+    const shot = solver.solve(pos.x, pos.y, 0, 0, 0, 0, p.shoot.cell);
+    if (!shot.feasible) continue;
+    anyShot = true;
+    const m = shotMargin(shot, cfg);
+    bestMargin = Math.max(bestMargin, m);
+    if (m < 0) continue;
+    bearing = (shot.turretAngle * 180) / Math.PI; // relative to heading 0, so the field bearing of the aim
+    if (headings.some((h) => {
+      const rel = ((((bearing - (h * 180) / Math.PI) % 360) + 540) % 360) - 180;
+      return rel >= turret.min && rel <= turret.max;
+    })) {
+      turretOk = true;
+      break;
+    }
+  }
+  const where = p.kind === 'region' ? 'from anywhere in it' : 'from here';
+  if (!anyShot) return `can't shoot ${where}: no flywheel speed gets a ball into the ${p.shoot.cell} cell.`;
+  if (bestMargin < 0) return `can't shoot ${where} reliably: the shot has less room than the robot's aim (±${cfg.aimAccuracy}°) and flywheel (±${cfg.speedAccuracy}%) errors.`;
+  if (!turretOk) return `can't shoot ${where} at its heading (${facing(p)}): the turret can't turn to face the ${p.shoot.cell} cell.`;
+  return null;
 }

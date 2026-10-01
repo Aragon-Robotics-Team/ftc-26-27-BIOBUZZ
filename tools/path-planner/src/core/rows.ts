@@ -9,9 +9,13 @@ export function n(v: number): string {
   return s === '-0' ? '0' : s;
 }
 
+/** Starts the row of a segment driven with a speed cap: `PlannedPath.SLOW, 20, …` (in Java, a NaN marker). */
+export const SLOW = 'PlannedPath.SLOW';
+
 /** The numbers of each segment as they appear in the Java, already formatted. */
 export function rows(segments: PlannedSegment[]): string[][] {
   return segments.map((seg) => [
+    ...(seg.maxSpeed !== undefined ? [SLOW, n(seg.maxSpeed)] : []),
     ...seg.curve.flatMap((p) => [n(p.x), n(p.y)]),
     ...seg.heading.F.flatMap((f, i) => [n(f), n(deg(seg.heading.H[i]))]),
   ]);
@@ -22,7 +26,10 @@ export function roundSegments(segments: PlannedSegment[]): PlannedSegment[] {
   return segments.map((seg) => fromRow(rows([seg])[0].map(Number), seg.leg));
 }
 
-export function fromRow(nums: number[], leg: number): PlannedSegment {
+/** A row's numbers (a leading NaN is PlannedPath.SLOW, followed by the cap). */
+export function fromRow(row: number[], leg: number): PlannedSegment {
+  const capped = row.length > 1 && Number.isNaN(row[0]);
+  const nums = capped ? row.slice(2) : row;
   if (nums.length < 12 || nums.length % 2 !== 0) throw new Error('a segment needs 4 control points and at least 2 heading breakpoints');
   const curve = [0, 1, 2, 3].map((i) => ({ x: nums[2 * i], y: nums[2 * i + 1] })) as PlannedSegment['curve'];
   const F: number[] = [];
@@ -31,7 +38,7 @@ export function fromRow(nums: number[], leg: number): PlannedSegment {
     F.push(nums[i]);
     H.push(rad(nums[i + 1]));
   }
-  return { curve, heading: { F, H }, leg };
+  return capped ? { curve, heading: { F, H }, leg, maxSpeed: row[1] } : { curve, heading: { F, H }, leg };
 }
 
 /** Identifies the exact geometry; logged with every run so runs can be matched to their path. */
