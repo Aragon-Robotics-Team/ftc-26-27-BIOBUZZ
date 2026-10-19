@@ -39,6 +39,25 @@ public class RobotConstants {
 
     public static class Drive {
         public static double SLOW_MODE_SCALE = 0.4; // TODO: tune
+
+        /** How the TeleOp right stick turns the robot. */
+        public enum TurnMode {
+            TWIN_STICK, // the intake turns to face where the right stick points, and holds that heading when let go
+            RATE        // right stick x sets the turn speed
+        }
+        public static TurnMode TURN_MODE = TurnMode.TWIN_STICK;
+
+        // ---- Twin stick heading hold ----
+        // The right stick sets a new heading only when pushed further than this, so its spring-back to center
+        // when let go doesn't
+        public static double HEADING_STICK_THRESHOLD = 0.5;
+        // Radians counter-clockwise from the front of the robot (Pedro +x) to the intake. The intake is on the front.
+        public static double INTAKE_HEADING_OFFSET = 0;
+        // TODO: tune with the Heading Tuner OpMode
+        public static double HEADING_KP = 1.0;        // turn power per radian of error
+        public static double HEADING_KI = 0;          // turn power per radian-second
+        public static double HEADING_KD = 0;          // turn power per radian/sec of turn speed
+        public static double HEADING_MAX_POWER = 1.0; // full power: get to the heading as fast as possible
     }
 
     public static class Intake {

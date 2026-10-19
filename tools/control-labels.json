@@ -11,8 +11,8 @@
     "gamepad2": "Operator",
 
     "gamepad1.left_stick": "Drive (field-centric: forward = away from our driver station)",
-    "gamepad1.right_stick": "Turn",
-    "gamepad1.left_trigger": "Hold: slow mode",
+    "gamepad1.right_stick": "Point the intake this way (field-centric); holds that heading when let go",
+    "gamepad1.left_trigger": "Hold: slow mode (driving, not turning)",
     "gamepad1.right_trigger": "Hold: open gate and feed the shooter",
     "gamepad1.right_bumper": "Flywheel on",
     "gamepad1.left_bumper": "Flywheel off",
@@ -38,6 +38,15 @@
     "gamepad1.square": "Jump target left by stepDegrees",
     "gamepad1.cross": "Jump target to center",
     "gamepad1.circle": "Jump target right by stepDegrees"
+  },
+
+  "Heading Tuner": {
+    "gamepad1.left_stick": "Drive (forward = the way the robot faced at start)",
+    "gamepad1.right_stick": "Point the robot this way; holds that heading when let go",
+    "gamepad1.square": "Jump target heading left by stepDegrees",
+    "gamepad1.cross": "Jump target heading to the start heading",
+    "gamepad1.circle": "Jump target heading right by stepDegrees",
+    "gamepad1.triangle": "Turn the target heading around (180°)"
   },
 
   "Flywheel Tuner": {

@@ -2,6 +2,7 @@ package org.firstinspires.ftc.teamcode.opmodes;
 
 import static com.pedropathing.ivy.Scheduler.schedule;
 import static org.firstinspires.ftc.teamcode.RobotConstants.Drive.SLOW_MODE_SCALE;
+import static org.firstinspires.ftc.teamcode.RobotConstants.Drive.TURN_MODE;
 import static org.firstinspires.ftc.teamcode.RobotConstants.Field.RED_LEFT_CORNER;
 import static org.firstinspires.ftc.teamcode.RobotConstants.Field.RED_RIGHT_CORNER;
 import static org.firstinspires.ftc.teamcode.RobotConstants.Launcher.SHOOT_ON_THE_MOVE;
@@ -11,6 +12,7 @@ import static org.firstinspires.ftc.teamcode.util.Html.*;
 
 import com.pedropathing.ivy.Scheduler;
 import com.pedropathing.math.Pose;
+import com.pedropathing.utils.Angle;
 import com.qualcomm.robotcore.eventloop.opmode.OpMode;
 import com.qualcomm.robotcore.util.ElapsedTime;
 
@@ -19,6 +21,7 @@ import org.firstinspires.ftc.teamcode.Alliance;
 import org.firstinspires.ftc.teamcode.Hive;
 import org.firstinspires.ftc.teamcode.MatchState;
 import org.firstinspires.ftc.teamcode.Robot;
+import org.firstinspires.ftc.teamcode.RobotConstants.Drive.TurnMode;
 import org.firstinspires.ftc.teamcode.ShotSolver.Shot;
 import org.firstinspires.ftc.teamcode.subsystems.Intake;
 import org.firstinspires.ftc.teamcode.subsystems.Launcher;
@@ -28,8 +31,10 @@ import org.firstinspires.ftc.teamcode.util.Html;
 
 /**
  * Gamepad 1 (driver):
- *   sticks          field-centric drive (stick forward = away from our driver station)
- *   hold LT         slow mode
+ *   left stick      field-centric drive (stick forward = away from our driver station)
+ *   right stick     point the intake that way (same frame); the robot holds that heading when let go.
+ *                   With RobotConstants.Drive.TURN_MODE = RATE, right stick x sets the turn speed instead
+ *   hold LT         slow mode (driving only; with RATE, turning too)
  *   triangle        toggle intake        cross   toggle outtake
  *   RB              flywheel on          LB      flywheel off
  *   hold RT         open the gate and feed the shooter
@@ -79,12 +84,18 @@ public class TeleOp extends OpMode {
         double headingOffset = MatchState.alliance == Alliance.BLUE ? Math.PI : 0;
         // Always-on commands, running for the whole match
         schedule(
-                robot.drivebase.driveFieldCentric(
-                        () -> -gamepad1.left_stick_y * driveScale(),
-                        () -> -gamepad1.left_stick_x * driveScale(),
-                        () -> -gamepad1.right_stick_x * driveScale(),
-                        headingOffset
-                ),
+                TURN_MODE == TurnMode.TWIN_STICK
+                        ? robot.drivebase.driveTwinStick(
+                                () -> -gamepad1.left_stick_y * driveScale(),
+                                () -> -gamepad1.left_stick_x * driveScale(),
+                                () -> -gamepad1.right_stick_y,
+                                () -> -gamepad1.right_stick_x,
+                                headingOffset)
+                        : robot.drivebase.driveFieldCentric(
+                                () -> -gamepad1.left_stick_y * driveScale(),
+                                () -> -gamepad1.left_stick_x * driveScale(),
+                                () -> -gamepad1.right_stick_x * driveScale(),
+                                headingOffset),
                 robot.aimAtHive()
         );
         loopTimer.reset();
@@ -185,8 +196,12 @@ public class TeleOp extends OpMode {
             // How far off the hive the turret points to make up for the robot's motion
             telemetry.addLine(mono(String.format("Aim ahead %+.1f°", Math.toDegrees(shot.leadAngle))));
         }
-        telemetry.addLine(columns(String.format("Pose %.1f, %.1f", pose.x(), pose.y()),
-                String.format("Heading %.0f°", Math.toDegrees(pose.heading()))));
+        String heading = TURN_MODE == TurnMode.TWIN_STICK
+                // Where the robot is pointing → where the driver asked it to point
+                ? String.format("Heading %.0f° → %.0f°", Math.toDegrees(Angle.normalizeSigned(pose.heading())),
+                        Math.toDegrees(robot.drivebase.getTargetHeading()))
+                : String.format("Heading %.0f°", Math.toDegrees(pose.heading()));
+        telemetry.addLine(columns(String.format("Pose %.1f, %.1f", pose.x(), pose.y()), heading));
         telemetry.addLine(columns(String.format("Loop %.1f ms %.0f Hz", loopMs, 1000 / loopMs),
                 "Follower " + robot.drivebase.getFollower().mode()));
 
