@@ -42,7 +42,8 @@ import org.firstinspires.ftc.teamcode.util.Html;
  *   dpad left/right nudge turret         dpad up/down  nudge flywheel speed
  *   square / circle tap: hive LEFT / RIGHT cell is up (the Limelight keeps checking it)
  *                   hold 1 s: set that cell and lock / unlock automatic hive detection (short rumble)
- *   share / options reset pose: robot pushed into our LEFT / RIGHT corner, back to the alliance wall
+ *   share / options reset pose: robot pushed into our LEFT / RIGHT corner, back to the alliance wall.
+ *                   Also works during init (applied at start, replacing Auto's pose)
  */
 @com.qualcomm.robotcore.eventloop.opmode.TeleOp(name = "TeleOp", group = "Competition")
 public class TeleOp extends OpMode {
@@ -53,6 +54,8 @@ public class TeleOp extends OpMode {
     private final ElapsedTime clock = new ElapsedTime();
     private final HoldButton leftCellButton = new HoldButton(HOLD_TO_LOCK_S);
     private final HoldButton rightCellButton = new HoldButton(HOLD_TO_LOCK_S);
+    /** Red-side corner the operator picked during init, or null. */
+    private Pose initCorner = null;
 
     @Override
     public void init() {
@@ -62,7 +65,7 @@ public class TeleOp extends OpMode {
         robot = new Robot(hardwareMap);
         robot.hiveVision.setEnabled(true);
         // Pick up where Auto left off. Without an Auto run the robot starts at the origin with the turret
-        // forward; push it into a corner and use share / options to localize.
+        // forward; push it into a corner and use share / options (during init or after start) to localize.
         if (MatchState.pose != null) {
             robot.drivebase.setPose(MatchState.pose);
             robot.launcher.setCurrentTurretAngle(MatchState.turretAngle);
@@ -72,13 +75,23 @@ public class TeleOp extends OpMode {
     @Override
     public void init_loop() {
         MatchState.selectAlliance(gamepad1, telemetry);
+        // Only remembered here: the alliance can still change, so the corner is turned into a pose at start
+        if (gamepad2.shareWasPressed()) initCorner = RED_LEFT_CORNER;
+        if (gamepad2.optionsWasPressed()) initCorner = RED_RIGHT_CORNER;
         telemetry.addData("Hive", MatchState.hive);
-        telemetry.addData("Start pose", MatchState.pose != null ? MatchState.pose : "none (Auto didn't run)");
+        telemetry.addData("Start pose", startPoseText() + "   (gamepad 2 share / options = LEFT / RIGHT corner)");
         telemetry.update();
+    }
+
+    private String startPoseText() {
+        if (initCorner != null) return (initCorner == RED_LEFT_CORNER ? "LEFT" : "RIGHT") + " corner";
+        if (MatchState.pose != null) return "from Auto " + MatchState.pose;
+        return "none (Auto didn't run)";
     }
 
     @Override
     public void start() {
+        if (initCorner != null) robot.drivebase.setPose(MatchState.alliance.apply(initCorner));
         robot.start();
         // Stick forward points away from our driver station: +x for red, -x for blue
         double headingOffset = MatchState.alliance == Alliance.BLUE ? Math.PI : 0;
@@ -115,6 +128,9 @@ public class TeleOp extends OpMode {
     public void stop() {
         Scheduler.reset();
         robot.stop();
+        // This match's Auto pose is used up; a later TeleOp without Auto must not start from it
+        MatchState.pose = null;
+        MatchState.turretAngle = 0;
     }
 
     private double driveScale() {

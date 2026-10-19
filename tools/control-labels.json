@@ -26,7 +26,9 @@
     "gamepad2.square": "Tap: hive LEFT cell is up. Hold 1 s: also lock / unlock auto hive",
     "gamepad2.circle": "Tap: hive RIGHT cell is up. Hold 1 s: also lock / unlock auto hive",
     "gamepad2.share": "Reset pose: pushed into our LEFT corner, back to alliance wall",
-    "gamepad2.options": "Reset pose: pushed into our RIGHT corner, back to alliance wall"
+    "gamepad2.options": "Reset pose: pushed into our RIGHT corner, back to alliance wall",
+    "init.gamepad2.share": "Start pose: pushed into our LEFT corner, back to alliance wall",
+    "init.gamepad2.options": "Start pose: pushed into our RIGHT corner, back to alliance wall"
   },
 
   "Auto": {
