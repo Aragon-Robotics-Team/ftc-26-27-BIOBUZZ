@@ -20,6 +20,15 @@ public class FieldPoses {
     public final Pose gardenIntake;
     /** Bottom side of the loading zone. */
     public final Pose bottomPark;
+    /** Top side of the loading zone. **/
+    public final Pose topPark;
+
+    /** Lines up to travel through the middle of the hive on the garden side of red. **/
+    public final Pose gardenCenterLine;
+    /** Flower side launch zone on red. **/
+    public final Pose flowerLaunch;
+
+
 
     FieldPoses(PoseFactory poseFactory) {
         start = poseFactory.of(56, 8, 90);
@@ -27,5 +36,10 @@ public class FieldPoses {
         gardenBorder = poseFactory.of(28.4, 9.3, 180);
         gardenIntake = poseFactory.of(8.47877, 8.4, 185);
         bottomPark = poseFactory.of(12.2616, 91.7745, 90);
+        topPark = poseFactory.of(15,120, 90);
+        gardenCenterLine = poseFactory.of(60, 40, 90);
+        flowerLaunch = poseFactory.of(60, 119.7, 90);
+
+
     }
 }
