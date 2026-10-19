@@ -52,6 +52,15 @@
   },
 
   "Flywheel Tuner": {
-    "gamepad1.cross": "Toggle flywheel on / off"
+    "gamepad1.cross": "Toggle flywheel on / off"  },
+
+  "Motor Tester": {
+    "gamepad1.dpad_left": "Previous device",
+    "gamepad1.dpad_right": "Next device",
+    "gamepad1.right_bumper": "Motor: hold to spin forward. Servo: move + step",
+    "gamepad1.left_bumper": "Motor: hold to spin reverse. Servo: move - step",
+    "gamepad1.dpad_up": "Motor: more power. Servo: bigger step",
+    "gamepad1.dpad_down": "Motor: less power. Servo: smaller step",
+    "gamepad1.square": "Servo: go to 0.5"
   }
 }
