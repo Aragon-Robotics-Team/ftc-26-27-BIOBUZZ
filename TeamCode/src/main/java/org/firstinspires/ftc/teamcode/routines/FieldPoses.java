@@ -27,6 +27,10 @@ public class FieldPoses {
     public final Pose gardenCenterLine;
     /** Flower side launch zone on red. **/
     public final Pose flowerLaunch;
+    /** At the rear-wall flower, where the intake picks up its pollen. */
+    public final Pose flowerIntake;
+    /** Backed off the rear-wall flower, where the flower pollen is shot. */
+    public final Pose flowerShoot;
 
 
 
@@ -36,9 +40,11 @@ public class FieldPoses {
         gardenBorder = poseFactory.of(28.4, 9.3, 180);
         gardenIntake = poseFactory.of(8.47877, 8.4, 185);
         bottomPark = poseFactory.of(12.2616, 91.7745, 90);
-        topPark = poseFactory.of(15,120, 90);
+        topPark = poseFactory.of(15,120, 0);
         gardenCenterLine = poseFactory.of(60, 40, 90);
         flowerLaunch = poseFactory.of(60, 119.7, 90);
+        flowerIntake = poseFactory.of(51, 131, 95);
+        flowerShoot = poseFactory.of(56, 121, 95);
 
 
     }
