@@ -66,6 +66,10 @@
     "gamepad1.left_bumper": "Motor: hold to spin reverse. Servo: move - step",
     "gamepad1.dpad_up": "Motor: more power. Servo: bigger step",
     "gamepad1.dpad_down": "Motor: less power. Servo: smaller step",
-    "gamepad1.square": "Servo: go to 0.5"
+    "gamepad1.square": "Servo: go to 0.5",
+    "gamepad1.triangle": "Drive mode on / off (TeleOp driving)",
+    "gamepad1.left_stick": "Drive mode: drive (forward = the way the robot faced at start)",
+    "gamepad1.right_stick": "Drive mode: turn (same as TeleOp's turn mode)",
+    "gamepad1.left_trigger": "Drive mode: hold for slow mode"
   }
 }

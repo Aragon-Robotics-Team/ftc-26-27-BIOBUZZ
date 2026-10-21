@@ -1,8 +1,15 @@
 package org.firstinspires.ftc.teamcode.opmodes.tuning;
 
+import static com.pedropathing.ivy.Scheduler.schedule;
+import static org.firstinspires.ftc.teamcode.RobotConstants.Drive.SLOW_MODE_SCALE;
+import static org.firstinspires.ftc.teamcode.RobotConstants.Drive.TURN_MODE;
+
 import com.bylazar.configurables.annotations.Configurable;
 import com.bylazar.telemetry.PanelsTelemetry;
 import com.bylazar.telemetry.TelemetryManager;
+import com.pedropathing.ivy.Scheduler;
+import com.pedropathing.math.Pose;
+import com.pedropathing.utils.Angle;
 import com.qualcomm.robotcore.eventloop.opmode.OpMode;
 import com.qualcomm.robotcore.eventloop.opmode.TeleOp;
 import com.qualcomm.robotcore.hardware.CRServo;
@@ -15,7 +22,9 @@ import com.qualcomm.robotcore.util.Range;
 
 import org.firstinspires.ftc.robotcore.external.navigation.CurrentUnit;
 import org.firstinspires.ftc.teamcode.RobotConstants;
+import org.firstinspires.ftc.teamcode.RobotConstants.Drive.TurnMode;
 import org.firstinspires.ftc.teamcode.pedro.Constants;
+import org.firstinspires.ftc.teamcode.subsystems.Drivetrain;
 
 import java.util.ArrayList;
 import java.util.Comparator;
@@ -35,7 +44,11 @@ import java.util.Set;
  *   <li>Servo: RB = position + step, LB = position - step, square (X) = go to 0.5. D-pad up / down = bigger /
  *       smaller step (0.01, 0.05, 0.1). A servo isn't moved until you first press one of these.
  * </ul>
- * In Panels (Configurables > MotorTester): power, servoPosition (type a value and the selected servo goes there),
+ * Triangle (Y) switches to drive mode: the TeleOp drive, sticks and all (left stick drives, right stick turns per
+ * RobotConstants.Drive.TURN_MODE, hold LT = slow mode). Stick forward = the way the robot faced when drive mode
+ * started. Triangle again goes back to testing single devices.
+ *
+ * <p>In Panels (Configurables > MotorTester): power, servoPosition (type a value and the selected servo goes there),
  * servoMin / servoMax (keep a mechanism from binding).
  *
  * <p>Motors are driven directly (no encoder loop, no subsystem code). Motors the code knows use their
@@ -85,6 +98,9 @@ public class MotorTester extends OpMode {
     private int selected = 0;
     private double pushedServoPosition = Double.NaN;
     private TelemetryManager panels;
+    private Drivetrain drivetrain;
+    private String drivetrainError = null; // why drive mode can't run, e.g. a drive motor missing from the config
+    private boolean driveMode = false;
 
     @Override
     public void init() {
@@ -113,6 +129,14 @@ public class MotorTester extends OpMode {
                     location(servo.getController(), servo.getPortNumber())));
         }
         devices.sort(Comparator.comparing((Device d) -> d.name, String.CASE_INSENSITIVE_ORDER));
+
+        // Built after the devices so Pedro's motor setup is the one that sticks for the drive motors (same directions)
+        Scheduler.reset();
+        try {
+            drivetrain = new Drivetrain(hardwareMap);
+        } catch (RuntimeException e) {
+            drivetrainError = e.getMessage();
+        }
 
         panels = PanelsTelemetry.INSTANCE.getTelemetry();
         if (!devices.isEmpty()) onSelected();
@@ -145,6 +169,17 @@ public class MotorTester extends OpMode {
             return;
         }
 
+        if (gamepad1.triangleWasPressed()) {
+            if (driveMode) exitDriveMode();
+            else enterDriveMode();
+        }
+        if (driveMode) {
+            drivetrain.update();
+            Scheduler.execute();
+            showDriveTelemetry();
+            return;
+        }
+
         if (gamepad1.dpadRightWasPressed()) select(selected + 1);
         if (gamepad1.dpadLeftWasPressed()) select(selected - 1);
 
@@ -156,6 +191,43 @@ public class MotorTester extends OpMode {
         }
 
         showTelemetry(device);
+    }
+
+    /** Same drive as TeleOp, with stick forward = the way the robot faces now. */
+    private void enterDriveMode() {
+        if (drivetrain == null) return; // the error shows on the device screen
+        stopSpinners();
+        drivetrain.setPose(new Pose(0, 0, 0));
+        drivetrain.start();
+        schedule(TURN_MODE == TurnMode.TWIN_STICK
+                ? drivetrain.driveTwinStick(
+                        () -> -gamepad1.left_stick_y * driveScale(),
+                        () -> -gamepad1.left_stick_x * driveScale(),
+                        () -> -gamepad1.right_stick_y,
+                        () -> -gamepad1.right_stick_x,
+                        0)
+                : drivetrain.driveFieldCentric(
+                        () -> -gamepad1.left_stick_y * driveScale(),
+                        () -> -gamepad1.left_stick_x * driveScale(),
+                        () -> -gamepad1.right_stick_x * driveScale(),
+                        0));
+        driveMode = true;
+    }
+
+    /** Pedro's stop only idles the follower, so the wheels are zeroed here too. */
+    private void exitDriveMode() {
+        Scheduler.reset();
+        drivetrain.stop();
+        stopSpinners();
+        driveMode = false;
+    }
+
+    private double driveScale() {
+        return gamepad1.left_trigger > 0.5 ? SLOW_MODE_SCALE : 1.0;
+    }
+
+    private void stopSpinners() {
+        for (Device d : devices) setPower(d, 0);
     }
 
     /** Motors and CR servos: hold to spin. */
@@ -223,6 +295,9 @@ public class MotorTester extends OpMode {
 
     private void showTelemetry(Device device) {
         panels.addLine("== MOTOR TESTER (gamepad 1) ==");
+        panels.addLine(drivetrain != null
+                ? "TRIANGLE (Y): switch to drive mode"
+                : "Drive mode unavailable: " + drivetrainError);
         panels.addLine("D-pad LEFT / RIGHT: choose device");
         if (device.kind == Kind.SERVO) {
             panels.addLine("RB: move + step   LB: move - step");
@@ -266,8 +341,31 @@ public class MotorTester extends OpMode {
         panels.update(telemetry);
     }
 
+    private void showDriveTelemetry() {
+        panels.addLine("== DRIVE MODE (gamepad 1) ==");
+        panels.addLine("TRIANGLE (Y): back to single devices");
+        panels.addLine("Left stick: drive (forward = the way the robot faced at start)");
+        panels.addLine(TURN_MODE == TurnMode.TWIN_STICK
+                ? "Right stick: point the intake that way, holds when let go"
+                : "Right stick X: turn");
+        panels.addLine("Hold LT: slow mode");
+        panels.addLine("");
+
+        Pose pose = drivetrain.getPose();
+        panels.addData("Turn mode", TURN_MODE);
+        panels.addData("Slow mode", gamepad1.left_trigger > 0.5 ? "ON (" + SLOW_MODE_SCALE + "x)" : "off");
+        panels.addData("X / Y (in)", String.format("%.1f / %.1f", pose.x(), pose.y()));
+        panels.addData("Heading (deg)", String.format("%.0f", Math.toDegrees(Angle.normalizeSigned(pose.heading()))));
+        if (TURN_MODE == TurnMode.TWIN_STICK) {
+            panels.addData("Target heading (deg)", String.format("%.0f", Math.toDegrees(drivetrain.getTargetHeading())));
+        }
+        panels.update(telemetry);
+    }
+
     @Override
     public void stop() {
-        for (Device d : devices) setPower(d, 0);
+        Scheduler.reset();
+        if (drivetrain != null) drivetrain.stop();
+        stopSpinners();
     }
 }
