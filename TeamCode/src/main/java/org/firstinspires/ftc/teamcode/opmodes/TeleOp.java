@@ -56,6 +56,7 @@ public class TeleOp extends OpMode {
     private final HoldButton rightCellButton = new HoldButton(HOLD_TO_LOCK_S);
     /** Red-side corner the operator picked during init, or null. */
     private Pose initCorner = null;
+    private boolean started = false;
 
     @Override
     public void init() {
@@ -93,6 +94,7 @@ public class TeleOp extends OpMode {
     public void start() {
         if (initCorner != null) robot.drivebase.setPose(MatchState.alliance.apply(initCorner));
         robot.start();
+        started = true;
         // Stick forward points away from our driver station: +x for red, -x for blue
         double headingOffset = MatchState.alliance == Alliance.BLUE ? Math.PI : 0;
         // Always-on commands, running for the whole match
@@ -128,9 +130,12 @@ public class TeleOp extends OpMode {
     public void stop() {
         Scheduler.reset();
         robot.stop();
-        // This match's Auto pose is used up; a later TeleOp without Auto must not start from it
-        MatchState.pose = null;
-        MatchState.turretAngle = 0;
+        // This match's Auto pose is used up; a later TeleOp without Auto must not start from it.
+        // Not after an init-only stop: re-initializing TeleOp still needs it.
+        if (started) {
+            MatchState.pose = null;
+            MatchState.turretAngle = 0;
+        }
     }
 
     private double driveScale() {

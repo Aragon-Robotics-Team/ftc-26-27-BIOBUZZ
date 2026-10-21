@@ -48,6 +48,7 @@ public class Launcher implements Subsystem {
     private double flywheelVelocity = 0;
     private double turretTargetAngle = 0;
     private double turretTargetRate = 0; // rad/s the target is moving at, for the feedforward
+    private boolean turretTargetClipped = false; // the wanted angle is past a soft limit
     private double turretAngle = 0;
     private double turretAngleOffset = 0;
 
@@ -196,9 +197,12 @@ public class Launcher implements Subsystem {
         return turretNudge;
     }
 
-    /** Within the angle error the current shot can take (TURRET_ANGLE_TOLERANCE when not aiming at a target). */
+    /**
+     * Within the angle error the current shot can take (TURRET_ANGLE_TOLERANCE when not aiming at a target).
+     * Never while the wanted angle is past a soft limit: parked on the limit, the turret points the wrong way.
+     */
     public boolean isTurretOnTarget() {
-        return Math.abs(turretTargetAngle - getTurretAngle()) <= turretTolerance();
+        return !turretTargetClipped && Math.abs(turretTargetAngle - getTurretAngle()) <= turretTolerance();
     }
 
     private double turretTolerance() {
@@ -249,8 +253,9 @@ public class Launcher implements Subsystem {
     private void setTurretTarget(double angle, double rate) {
         double normalized = Angle.normalizeSigned(angle);
         turretTargetAngle = Range.clip(normalized, TURRET_MIN_ANGLE, TURRET_MAX_ANGLE);
+        turretTargetClipped = turretTargetAngle != normalized;
         // Parked on a soft limit: don't push into it
-        turretTargetRate = turretTargetAngle == normalized ? rate : 0;
+        turretTargetRate = turretTargetClipped ? 0 : rate;
     }
 
     @Override
