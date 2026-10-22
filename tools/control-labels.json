@@ -67,5 +67,12 @@
     "gamepad1.dpad_up": "Motor: more power. Servo: bigger step",
     "gamepad1.dpad_down": "Motor: less power. Servo: smaller step",
     "gamepad1.square": "Servo: go to 0.5"
+  },
+
+  "Intake + Flywheel Test": {
+    "gamepad1.right_bumper": "Hold: intake + flywheel forward",
+    "gamepad1.left_bumper": "Hold: intake + flywheel reverse",
+    "gamepad1.dpad_up": "More power (both)",
+    "gamepad1.dpad_down": "Less power (both)"
   }
 }
