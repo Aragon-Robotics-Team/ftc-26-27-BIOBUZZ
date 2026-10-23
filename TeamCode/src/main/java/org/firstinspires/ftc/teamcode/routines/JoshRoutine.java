@@ -51,25 +51,25 @@ public class JoshRoutine extends AutoRoutine {
     @Override
     public Command autoRoutine() {
         Command auto = sequential(
-                follow(follower, startToLaunch()),
+                follow(follower, path1()),
                 robot.shoot(),
                 // The preloads tip the hive, so the other cell is up now
                 robot.flipHive(),
 
                 // Run the intake on the way to the pickup, stop it on the way back
                 robot.intake.intake(),
-                follow(follower, launchToPickup()),
+                follow(follower, path2()),
                 waitMs(300),
                 robot.intake.off(),
-                follow(follower, pickupToLaunch()),
+                follow(follower, path3()),
                 robot.shoot()
         );
 
         return sequential(
                 // Keep the turret on the hive and the flywheel at the right speed while cycling
-                deadline(cycles, robot.aimAtHive(), robot.enableFlywheel()),
+                deadline(auto, robot.aimAtHive(), robot.enableFlywheel()),
                 robot.launcher.idle(),
-                follow(follower, park())
+                follow(follower, path4())
         );
     }
 }
