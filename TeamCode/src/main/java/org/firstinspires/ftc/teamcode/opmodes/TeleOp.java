@@ -60,6 +60,7 @@ public class TeleOp extends OpMode {
     private Pose initCorner = null;
     /** Right stick x turns at a rate instead of pointing the intake; picked at start. */
     private boolean rateTurn;
+    private boolean started = false;
 
     @Override
     public void init() {
@@ -97,6 +98,7 @@ public class TeleOp extends OpMode {
     public void start() {
         if (initCorner != null) robot.drivebase.setPose(MatchState.alliance.apply(initCorner));
         robot.start();
+        started = true;
         // Stick forward points away from our driver station: +x for red, -x for blue
         double headingOffset = MatchState.alliance == Alliance.BLUE ? Math.PI : 0;
         rateTurn = TURN_MODE == TurnMode.RATE || KeyboardBridge.isKeyboard(gamepad1);
@@ -133,9 +135,12 @@ public class TeleOp extends OpMode {
     public void stop() {
         Scheduler.reset();
         robot.stop();
-        // This match's Auto pose is used up; a later TeleOp without Auto must not start from it
-        MatchState.pose = null;
-        MatchState.turretAngle = 0;
+        // This match's Auto pose is used up; a later TeleOp without Auto must not start from it.
+        // Not after an init-only stop: re-initializing TeleOp still needs it.
+        if (started) {
+            MatchState.pose = null;
+            MatchState.turretAngle = 0;
+        }
     }
 
     private double driveScale() {

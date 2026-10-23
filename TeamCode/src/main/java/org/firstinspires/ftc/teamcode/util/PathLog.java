@@ -37,7 +37,7 @@ public class PathLog implements Consumer<FollowerLog> {
     private final File file;
     private final BufferedWriter out;
     private final long startNs = System.nanoTime();
-    private long voltageAtNs = Long.MIN_VALUE;
+    private long voltageAtNs = startNs - VOLTAGE_EVERY_NS; // read on the first row
     private long flushedNs = startNs;
     private double voltage = Double.NaN;
     private boolean closed;

@@ -1,5 +1,6 @@
 package org.firstinspires.ftc.teamcode;
 
+import static com.pedropathing.ivy.commands.Commands.conditional;
 import static com.pedropathing.ivy.commands.Commands.instant;
 import static com.pedropathing.ivy.commands.Commands.waitMs;
 import static com.pedropathing.ivy.commands.Commands.waitUntil;
@@ -101,13 +102,16 @@ public class Robot {
         return parallel(gate.close(), intake.stopFeeding());
     }
 
-    /** For Auto: wait until ready (max 1.5 s so a slow flywheel can't stall), then empty the robot. */
+    /**
+     * For Auto: wait until ready (max 1.5 s so a slow flywheel can't stall), then empty the robot.
+     * Keeps the balls if there's no shot from here.
+     */
     public Command shoot() {
         return sequential(
                 waitUntil(launcher::isReady).raceWith(waitMs(1500)),
-                startShooting(),
-                waitMs(AUTO_SHOOT_MS),
-                stopShooting()
+                conditional(launcher::hasShot,
+                        sequential(startShooting(), waitMs(AUTO_SHOOT_MS), stopShooting()),
+                        instant(() -> {}))
         );
     }
 

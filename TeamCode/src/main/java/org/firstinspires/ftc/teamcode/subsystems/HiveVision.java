@@ -131,8 +131,9 @@ public class HiveVision implements Subsystem {
         lastSeen = seen;
         lastFrame = HiveReader.read(tags, MatchState.alliance, LENS_HEIGHT, TILT, HEIGHT_THRESHOLD);
 
-        Hive next = tracker.onFrame(now(), result.getControlHubTimeStampNanos(), lastFrame.up, lastFrame.conflict,
-                MatchState.hive);
+        // The Limelight's own frame time: the hub's timestamp changes on every poll, even of the same frame
+        long frameId = Double.doubleToLongBits(result.getTimestamp());
+        Hive next = tracker.onFrame(now(), frameId, lastFrame.up, lastFrame.conflict, MatchState.hive);
         if (next != null) {
             MatchState.hive = next;
             switches++;
