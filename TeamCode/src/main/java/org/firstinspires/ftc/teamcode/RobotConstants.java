@@ -68,6 +68,7 @@ public class RobotConstants {
         // TODO: tune
         public static double INTAKE_POWER = 1.0;
         public static double OUTTAKE_POWER = -1.0;
+        public static double FLOWER_INTAKE_MS = 300; // how long Auto waits at a flower with the intake on
     }
 
     public static class Gate {
