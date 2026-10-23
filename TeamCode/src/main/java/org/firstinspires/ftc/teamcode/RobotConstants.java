@@ -35,6 +35,16 @@ public class RobotConstants {
         public static Pose RED_LEFT_CORNER = new Pose(9, 135, 0); // tile A6, alliance wall x rear wall
         // TODO: check against the real field (the GARDEN is in this corner; clear any balls first)
         public static Pose RED_RIGHT_CORNER = new Pose(9, 9, 0);  // tile A1, alliance wall x audience wall
+
+        // Where the pollen chase won't go for a ball. Both are symmetric about the field center, so they're the same
+        // for blue. The hive's frame stands on two foot bars, 2 in wide and 41 in long, 49.5 in apart across the
+        // hive (BiobuzzSim); robots drive between them. TODO: check against the real field
+        public static double[][] HIVE_FEET = {     // x0, y0, x1, y1
+                {46.27, 51.5, 48.27, 92.5},
+                {95.73, 51.5, 97.73, 92.5},
+        };
+        public static double FLOWER_KEEP_OUT = 5;  // inches from a flower column's center: inside it, or only the bottom one can be taken
+        public static double KEEP_OUT_MARGIN = 2;  // inches added around the hive's feet
     }
 
     public static class Drive {
@@ -104,6 +114,60 @@ public class RobotConstants {
         // Operator: hold square / circle this long to set that cell and lock (or unlock) automatic hive detection
         public static double HOLD_TO_LOCK_S = 1;
         public static int LOCK_RUMBLE_MS = 250;
+    }
+
+    /** Balls on the tiles from the Arducam OV9782 webcam by the intake (BallVision), and chasing pollen with it. */
+    public static class BallVision {
+        public static String WEBCAM_NAME = "webcam";
+        public static int FRAME_WIDTH = 640;  // the sensor's 1280x800 binned, so the field of view is the same
+        public static int FRAME_HEIGHT = 400;
+        // Manual exposure keeps motion blur down while driving; gain makes up the brightness.
+        // TODO: tune on the robot. 0 leaves the camera on auto exposure
+        public static double EXPOSURE_MS = 6;
+        public static int GAIN = 100;          // clamped to what the camera allows
+
+        // ---- Lens ----
+        // Nominal horizontal field of view, used until there's a calibration
+        public static double HORIZONTAL_FOV = Math.toRadians(70);
+        // From biobuzz_detection's calibrate_camera.py (camera_calib.json), solved at CALIBRATION_WIDTH x HEIGHT.
+        // TODO: calibrate. null = uncalibrated: HORIZONTAL_FOV, and frames aren't undistorted
+        public static int CALIBRATION_WIDTH = 1280;
+        public static int CALIBRATION_HEIGHT = 800;
+        public static double[] CAMERA_MATRIX = null; // fx, fy, cx, cy
+        public static double[] DISTORTION = null;    // k1, k2, p1, p2, k3
+
+        // ---- Mount ----
+        // On the intake's right side plate, toed in toward the center line, with the top of the frame at the horizon
+        // (tilt = half the ~47° vertical field of view). Lens position from the robot center, inches.
+        // TODO: placeholders; set from CAD
+        public static double LENS_FORWARD = 11;
+        public static double LENS_LEFT = -9;
+        public static double LENS_HEIGHT = 5;
+        public static double YAW = Math.toRadians(22);    // toe-in: + = turned left
+        public static double TILT = Math.toRadians(23.6); // below horizontal
+
+        // ---- Intake ---- TODO: set from CAD
+        public static double INTAKE_REACH = 11;     // inches from the robot center forward to the intake's mouth
+        public static double INTAKE_WIDTH = 14;     // inches across the mouth, centered on the robot's center line
+
+        // ---- Target ----
+        public static double LOCK_GATE = 6;         // inches: a pollen this close to the target's last spot is the target
+        public static double SMOOTHING = 0.5;       // weight of each new sighting in the target's position
+        public static double SWITCH_MARGIN = 0.75;  // another pollen takes over when closer than this x the target's distance
+        public static int SWITCH_FRAMES = 5;        // ...for this many frames in a row
+        // The camera can't see the last few inches before the mouth (with the placeholder mount, 3-10 in depending on
+        // where across the mouth). A target last seen within NEAR_MOUTH of the mouth, in front of it and touching the
+        // edge of the frame (within EDGE_MARGIN_PX), went into that blind spot rather than getting lost.
+        public static double NEAR_MOUTH = 12;
+        public static double EDGE_MARGIN_PX = 12;
+
+        // ---- Chase ----
+        public static double CHASE_MAX_SPEED = 30;  // in/s. TODO: tune
+        public static double OVERSHOOT = 4;         // inches the mouth drives past the ball
+        public static double REPLAN_DISTANCE = 2;   // inches the target has to move before the path is redone
+        public static double LOST_S = 0.5;          // a target out of view this long (not at the intake) is given up
+        public static double CONFIRM_S = 0.4;       // after driving over it, how long it has to stay gone to count
+        public static double GIVE_UP_S = 2;         // with no pollen in view this long, the chase ends
     }
 
     public static class Launcher {
