@@ -23,6 +23,7 @@ import org.firstinspires.ftc.teamcode.MatchState;
 import org.firstinspires.ftc.teamcode.Robot;
 import org.firstinspires.ftc.teamcode.RobotConstants.Drive.TurnMode;
 import org.firstinspires.ftc.teamcode.ShotSolver.Shot;
+import org.firstinspires.ftc.teamcode.keyboard.KeyboardBridge;
 import org.firstinspires.ftc.teamcode.subsystems.Intake;
 import org.firstinspires.ftc.teamcode.subsystems.Launcher;
 import org.firstinspires.ftc.teamcode.util.FieldDiagram;
@@ -33,7 +34,8 @@ import org.firstinspires.ftc.teamcode.util.Html;
  * Gamepad 1 (driver):
  *   left stick      field-centric drive (stick forward = away from our driver station)
  *   right stick     point the intake that way (same frame); the robot holds that heading when let go.
- *                   With RobotConstants.Drive.TURN_MODE = RATE, right stick x sets the turn speed instead
+ *                   With RobotConstants.Drive.TURN_MODE = RATE, right stick x sets the turn speed instead.
+ *                   So does driving from a laptop keyboard (keyboard.KeyboardBridge), which can't point a stick
  *   hold LT         slow mode (driving only; with RATE, turning too)
  *   triangle        toggle intake        cross   toggle outtake
  *   RB              flywheel on          LB      flywheel off
@@ -56,6 +58,8 @@ public class TeleOp extends OpMode {
     private final HoldButton rightCellButton = new HoldButton(HOLD_TO_LOCK_S);
     /** Red-side corner the operator picked during init, or null. */
     private Pose initCorner = null;
+    /** Right stick x turns at a rate instead of pointing the intake; picked at start. */
+    private boolean rateTurn;
 
     @Override
     public void init() {
@@ -95,9 +99,10 @@ public class TeleOp extends OpMode {
         robot.start();
         // Stick forward points away from our driver station: +x for red, -x for blue
         double headingOffset = MatchState.alliance == Alliance.BLUE ? Math.PI : 0;
+        rateTurn = TURN_MODE == TurnMode.RATE || KeyboardBridge.isKeyboard(gamepad1);
         // Always-on commands, running for the whole match
         schedule(
-                TURN_MODE == TurnMode.TWIN_STICK
+                !rateTurn
                         ? robot.drivebase.driveTwinStick(
                                 () -> -gamepad1.left_stick_y * driveScale(),
                                 () -> -gamepad1.left_stick_x * driveScale(),
@@ -212,7 +217,7 @@ public class TeleOp extends OpMode {
             // How far off the hive the turret points to make up for the robot's motion
             telemetry.addLine(mono(String.format("Aim ahead %+.1f°", Math.toDegrees(shot.leadAngle))));
         }
-        String heading = TURN_MODE == TurnMode.TWIN_STICK
+        String heading = !rateTurn
                 // Where the robot is pointing → where the driver asked it to point
                 ? String.format("Heading %.0f° → %.0f°", Math.toDegrees(Angle.normalizeSigned(pose.heading())),
                         Math.toDegrees(robot.drivebase.getTargetHeading()))

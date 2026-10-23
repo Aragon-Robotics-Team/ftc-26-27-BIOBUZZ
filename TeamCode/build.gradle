@@ -68,6 +68,16 @@ tasks.register('controlLayout') {
 }
 tasks.named('preBuild') { dependsOn 'controlLayout' }
 
+// The keyboard driving page (keyboard/KeyboardBridge.java) labels its keys with the same wording as the diagrams,
+// so ship a copy of tools/control-labels.json next to it in the APK's assets.
+def keyboardAssets = layout.buildDirectory.dir('generated/keyboardAssets')
+tasks.register('copyControlLabels', Copy) {
+    from rootProject.file('tools/control-labels.json')
+    into keyboardAssets.map { it.dir('keyboard') }
+}
+android.sourceSets.main.assets.srcDir(keyboardAssets)
+tasks.named('preBuild') { dependsOn 'copyControlLabels' }
+
 dependencies {
     implementation project(':FtcRobotController')
 

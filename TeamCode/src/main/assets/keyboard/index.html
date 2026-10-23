@@ -1,0 +1,1130 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>BIOBUZZ Keyboard Drive</title>
+<style>
+/*
+  Served by the robot (TeamCode keyboard/KeyboardBridge.java) at http://192.168.43.1:8080/keyboard.
+  The robot's Wi-Fi has no internet, so everything is inline: no fonts or scripts from elsewhere.
+  Talks to the Robot Controller's WebSocket (port 8081, namespace "keyboard"):
+    page -> robot  input "<pad 1>;<pad 2>" every 20 ms, each "lx,ly,rx,ry,lt,rt,buttons" (see PadState.java),
+                   takeOver, init <OpMode name>, start, stop, stopRobot
+    robot -> page  status, opModes, telemetry (JSON payloads)
+*/
+:root {
+  --bg: #111417;
+  --panel: #1a1e23;
+  --panel-2: #22272d;
+  --line: #2e353d;
+  --ink: #e8ecf0;
+  --muted: #8b96a3;
+  --faint: #5b6570;
+  --pad1: #f0b24a;        /* honey: gamepad 1, the driver */
+  --pad1-soft: #3a2c12;
+  --pad2: #4fc9c9;        /* teal: gamepad 2, the operator */
+  --pad2-soft: #123333;
+  --ok: #57d16c;
+  --warn: #f0b24a;
+  --bad: #ff5d5d;
+  --bad-soft: #3a1515;
+  --key: #262c33;
+  --key-edge: #14181c;
+  --tele-bg: #000000;
+  --mono: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+  --sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  --u: min(42px, calc((100vw - 64px) / 15));
+}
+* { box-sizing: border-box; }
+html, body { margin: 0; background: var(--bg); color: var(--ink); font: 14px/1.4 var(--sans); }
+body { padding: 16px; max-width: 1400px; margin: 0 auto; }
+button, select { font: inherit; color: inherit; }
+
+header { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 16px; margin-bottom: 12px; }
+h1 { font-size: 18px; margin: 0; letter-spacing: 0.02em; }
+h1 span { color: var(--pad1); }
+.pill { display: inline-flex; align-items: center; gap: 7px; padding: 4px 11px; border-radius: 999px;
+        background: var(--panel-2); border: 1px solid var(--line); white-space: nowrap; }
+.pill::before { content: ""; width: 8px; height: 8px; border-radius: 50%; background: var(--dot, var(--faint)); }
+.pill.ok { --dot: var(--ok); }
+.pill.warn { --dot: var(--warn); }
+.pill.bad { --dot: var(--bad); }
+.spacer { flex: 1; }
+.who { color: var(--muted); }
+.who b { color: var(--ink); font-weight: 600; }
+
+.bar { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; padding: 10px; margin-bottom: 12px;
+       background: var(--panel); border: 1px solid var(--line); border-radius: 10px; }
+select { background: var(--panel-2); border: 1px solid var(--line); border-radius: 7px; padding: 7px 10px; min-width: 220px; }
+.btn { background: var(--panel-2); border: 1px solid var(--line); border-radius: 7px; padding: 7px 14px; cursor: pointer; }
+.btn:hover:not(:disabled) { border-color: var(--muted); }
+.btn:disabled { opacity: 0.4; cursor: default; }
+.btn.primary { background: var(--pad1-soft); border-color: var(--pad1); color: var(--pad1); }
+.btn.stop { background: var(--bad); border-color: var(--bad); color: #fff; font-weight: 700; padding: 7px 18px; }
+.btn.stop kbd { background: rgba(0,0,0,0.25); border-color: transparent; color: #fff; }
+.phase { color: var(--muted); padding: 0 6px; }
+.phase b { color: var(--ink); }
+
+.banner { display: none; padding: 10px 14px; margin-bottom: 12px; border-radius: 10px; border: 1px solid var(--bad);
+          background: var(--bad-soft); }
+.banner.show { display: block; }
+
+main { display: grid; grid-template-columns: minmax(0, 1.15fr) minmax(0, 1fr); gap: 12px; align-items: start; }
+@media (max-width: 980px) { main { grid-template-columns: minmax(0, 1fr); } }
+section { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 14px; min-width: 0; }
+section h2 { font-size: 12px; text-transform: uppercase; letter-spacing: 0.08em; color: var(--muted); margin: 0 0 10px;
+             display: flex; gap: 8px; align-items: center; }
+section h2 .right { margin-left: auto; text-transform: none; letter-spacing: 0; }
+
+/* ---- Keyboard drawing ---- */
+.kb-wrap { position: relative; overflow-x: auto; padding-bottom: 4px; }
+.kb { display: flex; flex-direction: column; gap: calc(var(--u) * 0.1); width: max-content; margin: 0 auto; }
+.row { display: flex; gap: calc(var(--u) * 0.1); }
+.cap { width: calc(var(--u) * var(--w, 1)); height: var(--u); border-radius: 6px; background: var(--key);
+       border: 1px solid var(--key-edge); box-shadow: inset 0 -2px 0 rgba(0,0,0,0.35);
+       display: flex; flex-direction: column; justify-content: space-between; padding: 3px 5px;
+       font-size: calc(var(--u) * 0.3); color: var(--faint); user-select: none; transition: background 60ms, transform 60ms; }
+.cap .sub { font-size: calc(var(--u) * 0.24); text-align: right; white-space: nowrap; overflow: hidden; }
+.cap.p1 { background: var(--pad1-soft); border-color: #5a4318; color: var(--pad1); }
+.cap.p2 { background: var(--pad2-soft); border-color: #1d4f4f; color: var(--pad2); }
+.cap.esc { background: var(--bad-soft); border-color: #5c2222; color: var(--bad); }
+.cap.down { transform: translateY(1px); box-shadow: none; }
+.cap.p1.down { background: var(--pad1); color: #1b1407; }
+.cap.p2.down { background: var(--pad2); color: #071b1b; }
+.cap.esc.down { background: var(--bad); color: #fff; }
+.cap.gap { visibility: hidden; }
+.arrows { display: grid; grid-template-columns: repeat(3, var(--u)); grid-template-rows: repeat(2, calc(var(--u) * 0.45));
+          gap: calc(var(--u) * 0.1); }
+.arrows .cap { width: var(--u); height: auto; padding: 0 4px; justify-content: center; align-items: center;
+               font-size: calc(var(--u) * 0.26); }
+.arrows .left { grid-row: 2; grid-column: 1; }
+.arrows .up { grid-row: 1; grid-column: 2; }
+.arrows .down-key { grid-row: 2; grid-column: 2; }
+.arrows .right { grid-row: 2; grid-column: 3; }
+.focus-veil { position: absolute; inset: 0; display: none; align-items: center; justify-content: center;
+              background: rgba(17,20,23,0.82); border-radius: 8px; font-weight: 600; cursor: pointer; }
+.focus-veil.show { display: flex; }
+.focus-veil span { padding: 8px 14px; border: 1px solid var(--pad1); border-radius: 8px; color: var(--pad1); }
+
+/* ---- Legend ---- */
+.legend { display: grid; grid-template-columns: max-content max-content minmax(0, 1fr); gap: 4px 10px; margin-top: 14px;
+          align-items: baseline; }
+.legend .group { grid-column: 1 / -1; color: var(--muted); font-size: 12px; text-transform: uppercase;
+                 letter-spacing: 0.08em; margin-top: 8px; }
+kbd { font: 12px var(--mono); padding: 1px 6px; border-radius: 4px; background: var(--key); border: 1px solid var(--line);
+      color: var(--ink); white-space: nowrap; }
+.legend .ctl { font-size: 12px; white-space: nowrap; }
+.legend .ctl.p1 { color: var(--pad1); }
+.legend .ctl.p2 { color: var(--pad2); }
+.legend .what.none { color: var(--faint); }
+.note { color: var(--muted); font-size: 12px; margin-top: 12px; }
+
+/* ---- Telemetry, as the Driver Station draws it ---- */
+.telemetry { background: var(--tele-bg); color: #ffffff; border-radius: 8px; padding: 10px 12px; min-height: 240px;
+             font: 14px/1.35 Roboto, var(--sans); overflow-x: auto; }
+.telemetry .tl { white-space: nowrap; }
+.telemetry.plain .tl { white-space: pre; }
+.telemetry.mono .tl { font-family: var(--mono); }
+.telemetry tt { font-family: var(--mono); font-size: 1em; }
+.telemetry big { font-size: 1.25em; }
+.telemetry .empty { color: #666; }
+
+.pads { margin-top: 12px; color: var(--muted); font-size: 12px; }
+.pads b { color: var(--ink); font-weight: 600; }
+
+/* ---- Key editor ---- */
+.edit-btn { margin-left: auto; text-transform: none; letter-spacing: 0; font-size: 13px; padding: 4px 12px; }
+.editor { margin-top: 14px; }
+.editor .paused { padding: 8px 12px; border: 1px solid var(--warn); border-radius: 8px; color: var(--warn);
+                  background: var(--pad1-soft); margin-bottom: 12px; }
+.profile-bar { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-bottom: 10px; }
+.profile-bar select { min-width: 160px; }
+.profile-bar input[type=text] { background: var(--panel-2); border: 1px solid var(--line); border-radius: 7px;
+                                padding: 7px 10px; color: var(--ink); font: inherit; width: 180px; }
+.btn.small { padding: 4px 10px; font-size: 13px; }
+.btn.danger { color: var(--bad); }
+.analog { display: flex; flex-wrap: wrap; gap: 6px 18px; align-items: center; color: var(--muted); font-size: 12px;
+          margin: 4px 0 12px; }
+.analog input[type=range] { width: 120px; vertical-align: middle; accent-color: var(--pad1); }
+.analog output { color: var(--ink); font-family: var(--mono); }
+.edit-msg { min-height: 1.4em; color: var(--muted); font-size: 12px; margin: 0 0 8px; }
+.edit-msg.warn { color: var(--warn); }
+.edit-rows { display: grid; grid-template-columns: max-content minmax(0, 1.1fr) minmax(0, 1fr); gap: 4px 10px;
+             align-items: center; }
+.edit-rows .group { grid-column: 1 / -1; color: var(--muted); font-size: 12px; text-transform: uppercase;
+                    letter-spacing: 0.08em; margin-top: 10px; }
+.edit-rows .what { color: var(--muted); font-size: 12px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.chips { display: flex; flex-wrap: wrap; gap: 4px; align-items: center; }
+.chip { display: inline-flex; align-items: center; gap: 4px; font: 12px var(--mono); padding: 2px 4px 2px 7px;
+        border-radius: 5px; background: var(--key); border: 1px solid var(--line); position: relative; overflow: hidden; }
+.chip .x { cursor: pointer; color: var(--muted); padding: 0 4px; border: 0; background: none; font: inherit; }
+.chip .x:hover { color: var(--bad); }
+.chip .depth { position: absolute; left: 0; bottom: 0; height: 2px; background: var(--pad1); width: 0; }
+.add { font: 12px var(--sans); padding: 2px 9px; border-radius: 5px; border: 1px dashed var(--line);
+       background: none; color: var(--muted); cursor: pointer; }
+.add:hover { color: var(--ink); border-color: var(--muted); }
+.add.listening { border-style: solid; border-color: var(--pad1); color: var(--pad1); }
+.legend .src + .src { margin-left: 3px; }
+</style>
+</head>
+<body>
+<header>
+  <h1><span>BIOBUZZ</span> keyboard drive</h1>
+  <span id="link" class="pill bad">Connecting…</span>
+  <span class="spacer"></span>
+  <span id="who" class="who"></span>
+  <button id="takeOver" class="btn" hidden>Take over</button>
+</header>
+
+<div id="banner" class="banner"></div>
+
+<div class="bar">
+  <select id="opModes" aria-label="OpMode"></select>
+  <button id="init" class="btn primary" disabled>Init</button>
+  <button id="start" class="btn" disabled>Start</button>
+  <button id="stop" class="btn" disabled>Stop</button>
+  <span id="phase" class="phase"></span>
+  <span class="spacer"></span>
+  <button id="stopRobot" class="btn stop">Stop robot <kbd>Esc</kbd></button>
+</div>
+
+<main>
+  <section>
+    <h2>Keys <span id="labelsFor"></span><button id="editKeys" class="btn edit-btn">Edit keys</button></h2>
+    <div class="kb-wrap">
+      <div id="kb" class="kb"></div>
+      <div id="veil" class="focus-veil"><span>Click here to drive</span></div>
+    </div>
+
+    <div id="view">
+      <div id="legend" class="legend"></div>
+      <p id="turnNote" class="note" hidden>TeleOp sees the keyboard at Start and turns at a rate with the right stick
+        x keys instead of pointing the intake.</p>
+      <p class="note">Keys are let go when this window loses focus. If the robot hears nothing for 250 ms it puts both
+        gamepads at rest.</p>
+    </div>
+
+    <div id="editor" class="editor" hidden>
+      <div class="paused">Driving is paused while you edit keys. Esc still stops the robot.</div>
+      <div class="profile-bar">
+        <select id="profile" aria-label="Key profile"></select>
+        <span id="profileName" hidden>
+          <input id="nameInput" type="text" maxlength="40" aria-label="Profile name">
+          <button id="nameSave" class="btn small primary">Save</button>
+          <button id="nameCancel" class="btn small">Cancel</button>
+        </span>
+        <span id="profileActions">
+          <button id="newProfile" class="btn small">New</button>
+          <button id="renameProfile" class="btn small">Rename</button>
+          <button id="resetProfile" class="btn small">Reset to default</button>
+          <button id="deleteProfile" class="btn small danger">Delete</button>
+          <button id="exportProfile" class="btn small">Export</button>
+          <button id="importProfile" class="btn small">Import</button>
+          <input id="importFile" type="file" accept=".json,application/json" hidden>
+        </span>
+        <span class="spacer"></span>
+        <button id="doneEditing" class="btn primary">Done</button>
+      </div>
+      <div class="analog">
+        <span>Analog inputs (HE keyboards in gamepad mode):</span>
+        <label>deadzone <input id="deadzone" type="range" min="0" max="0.3" step="0.01"> <output id="deadzoneOut"></output></label>
+        <label>button actuation <input id="actuation" type="range" min="0.1" max="0.9" step="0.05"> <output id="actuationOut"></output></label>
+      </div>
+      <p id="editMsg" class="edit-msg"></p>
+      <div id="editRows" class="edit-rows"></div>
+    </div>
+
+    <div id="pads" class="pads"></div>
+  </section>
+  <section>
+    <h2>Telemetry <span id="teleFor" class="right"></span></h2>
+    <div id="telemetry" class="telemetry"><span class="empty">No telemetry yet.</span></div>
+  </section>
+</main>
+
+<script>
+"use strict";
+const $ = id => document.getElementById(id);
+
+// ---- Gamepad controls. Button bits match PadState.Button. ----
+const BIT = ["A", "B", "X", "Y", "GUIDE", "START", "BACK", "LEFT_BUMPER", "RIGHT_BUMPER",
+             "DPAD_UP", "DPAD_DOWN", "DPAD_LEFT", "DPAD_RIGHT", "LEFT_STICK_BUTTON", "RIGHT_STICK_BUTTON"]
+  .reduce((m, name, i) => (m[name] = 1 << i, m), {});
+
+// Every control a key can drive, on either gamepad. ctl: the name in tools/control-labels.json.
+// axis: [field, direction] the input pushes; btn: button bit. short: text on the keycap.
+const CONTROLS = [
+  { id: "left_stick_up", ctl: "left_stick", name: "left stick ↑", short: "▲", axis: ["ly", -1] },
+  { id: "left_stick_left", ctl: "left_stick", name: "left stick ←", short: "◀", axis: ["lx", -1] },
+  { id: "left_stick_down", ctl: "left_stick", name: "left stick ↓", short: "▼", axis: ["ly", 1] },
+  { id: "left_stick_right", ctl: "left_stick", name: "left stick →", short: "▶", axis: ["lx", 1] },
+  { id: "right_stick_up", ctl: "right_stick", name: "right stick ↑", short: "R▲", axis: ["ry", -1] },
+  { id: "right_stick_left", ctl: "right_stick", name: "right stick ←", short: "R◀", axis: ["rx", -1] },
+  { id: "right_stick_down", ctl: "right_stick", name: "right stick ↓", short: "R▼", axis: ["ry", 1] },
+  { id: "right_stick_right", ctl: "right_stick", name: "right stick →", short: "R▶", axis: ["rx", 1] },
+  { id: "left_trigger", ctl: "left_trigger", name: "LT", short: "LT", axis: ["lt", 1] },
+  { id: "right_trigger", ctl: "right_trigger", name: "RT", short: "RT", axis: ["rt", 1] },
+  { id: "left_bumper", ctl: "left_bumper", name: "LB", short: "LB", btn: "LEFT_BUMPER" },
+  { id: "right_bumper", ctl: "right_bumper", name: "RB", short: "RB", btn: "RIGHT_BUMPER" },
+  { id: "triangle", ctl: "triangle", name: "△", short: "△", btn: "Y" },
+  { id: "cross", ctl: "cross", name: "✕", short: "✕", btn: "A" },
+  { id: "square", ctl: "square", name: "□", short: "□", btn: "X" },
+  { id: "circle", ctl: "circle", name: "○", short: "○", btn: "B" },
+  { id: "dpad_up", ctl: "dpad_up", name: "dpad ↑", short: "d ↑", btn: "DPAD_UP" },
+  { id: "dpad_down", ctl: "dpad_down", name: "dpad ↓", short: "d ↓", btn: "DPAD_DOWN" },
+  { id: "dpad_left", ctl: "dpad_left", name: "dpad ←", short: "d ←", btn: "DPAD_LEFT" },
+  { id: "dpad_right", ctl: "dpad_right", name: "dpad →", short: "d →", btn: "DPAD_RIGHT" },
+  { id: "share", ctl: "share", name: "share", short: "share", btn: "BACK" },
+  { id: "options", ctl: "options", name: "options", short: "opts", btn: "START" },
+  { id: "ps", ctl: "ps", name: "PS / guide", short: "ps", btn: "GUIDE" },
+  { id: "left_stick_button", ctl: "left_stick_button", name: "left stick press", short: "LS", btn: "LEFT_STICK_BUTTON" },
+  { id: "right_stick_button", ctl: "right_stick_button", name: "right stick press", short: "RS", btn: "RIGHT_STICK_BUTTON" },
+];
+const CONTROL = Object.fromEntries(CONTROLS.map(c => [c.id, c]));
+
+// Bindings: "gamepad<N>.<control id>" -> list of sources. A source is a key (KeyboardEvent.code, e.g. "KeyW") or
+// an analog input on a gamepad-like device: { dev: Gamepad.id, axis | button: index, rest, full }.
+// The default keeps setup-only controls in the top row, away from the driving keys.
+const DEFAULT_BINDS = {
+  "gamepad1.left_stick_up": ["KeyW"], "gamepad1.left_stick_left": ["KeyA"],
+  "gamepad1.left_stick_down": ["KeyS"], "gamepad1.left_stick_right": ["KeyD"],
+  "gamepad1.right_stick_left": ["KeyQ"], "gamepad1.right_stick_right": ["KeyE"],
+  "gamepad1.left_trigger": ["ShiftLeft", "ShiftRight"], "gamepad1.right_trigger": ["Space"],
+  "gamepad1.triangle": ["KeyI"], "gamepad1.cross": ["KeyK"],
+  "gamepad1.left_bumper": ["KeyU"], "gamepad1.right_bumper": ["KeyO"],
+  "gamepad1.square": ["Digit7"], "gamepad1.circle": ["Digit8"],
+  "gamepad1.dpad_up": ["Minus"], "gamepad1.dpad_down": ["Equal"],
+  "gamepad2.square": ["KeyJ"], "gamepad2.circle": ["KeyL"],
+  "gamepad2.dpad_up": ["ArrowUp"], "gamepad2.dpad_down": ["ArrowDown"],
+  "gamepad2.dpad_left": ["ArrowLeft"], "gamepad2.dpad_right": ["ArrowRight"],
+  "gamepad2.share": ["Digit9"], "gamepad2.options": ["Digit0"],
+};
+// Esc is the e-stop. Cmd (Win) / Ctrl / Opt (Alt): macOS swallows key-ups while Cmd is down, and the browser and
+// OS keep their shortcuts. Caps Lock toggles.
+const RESERVED = new Set(["Escape", "MetaLeft", "MetaRight", "ControlLeft", "ControlRight", "AltLeft", "AltRight",
+                          "CapsLock", "Fn"]);
+const KEY_NAMES = { Space: "Space", ShiftLeft: "L Shift", ShiftRight: "R Shift", ArrowUp: "↑", ArrowDown: "↓",
+                    ArrowLeft: "←", ArrowRight: "→", Minus: "−", Equal: "=", Enter: "Return", Backspace: "Delete",
+                    BracketLeft: "[", BracketRight: "]", Backslash: "\\", Semicolon: ";", Quote: "'", Comma: ",",
+                    Period: ".", Slash: "/", Backquote: "`", Tab: "Tab" };
+const keyName = code => KEY_NAMES[code] || code.replace(/^(Key|Digit|Numpad)/, "");
+
+// Wording the keyboard needs on top of tools/control-labels.json
+const KEYBOARD_LABELS = {
+  "TeleOp": {
+    "gamepad1.right_stick": "Turn left / right (from the keyboard TeleOp turns at a rate)",
+    "gamepad1.left_trigger": "Hold: slow mode (driving and turning)",
+    // The editor lists stick directions separately; these override the whole-stick wording above
+    "gamepad1.right_stick_up": "Not used: from the keyboard TeleOp turns at a rate with right stick x",
+    "gamepad1.right_stick_down": "Not used: from the keyboard TeleOp turns at a rate with right stick x",
+  },
+};
+
+// ---- Profiles, kept in this browser ----
+const STORE_KEY = "biobuzz.keyboardDrive.v1";
+const DEFAULT_PROFILE = "Default";
+let store = { active: DEFAULT_PROFILE, profiles: {}, deadzone: 0.05, actuation: 0.5 };
+
+function loadStore() {
+  try {
+    const s = JSON.parse(localStorage.getItem(STORE_KEY));
+    if (!s || typeof s !== "object") return;
+    for (const [name, binds] of Object.entries(s.profiles || {})) {
+      const clean = cleanBinds(binds);
+      if (clean && name !== DEFAULT_PROFILE) store.profiles[name] = clean;
+    }
+    if (store.profiles[s.active]) store.active = s.active;
+    if (s.deadzone >= 0 && s.deadzone <= 0.3) store.deadzone = s.deadzone;
+    if (s.actuation >= 0.1 && s.actuation <= 0.9) store.actuation = s.actuation;
+  } catch (e) { /* private window or blocked storage: defaults */ }
+}
+
+function saveStore() {
+  try { localStorage.setItem(STORE_KEY, JSON.stringify(store)); } catch (e) { /* not saved, still works */ }
+}
+
+const activeBinds = () => store.profiles[store.active] || DEFAULT_BINDS;
+const clone = o => JSON.parse(JSON.stringify(o));
+
+function isAnalog(src) { return typeof src === "object"; }
+
+/** A binds object from storage or an imported file, keeping only what makes sense. Null if it isn't one. */
+function cleanBinds(binds) {
+  if (!binds || typeof binds !== "object" || Array.isArray(binds)) return null;
+  const out = {};
+  for (const [slot, sources] of Object.entries(binds)) {
+    const m = /^gamepad([12])\.(\w+)$/.exec(slot);
+    if (!m || !CONTROL[m[2]] || !Array.isArray(sources)) continue;
+    const ok = sources.filter(s =>
+      (typeof s === "string" && /^[A-Za-z0-9]{1,24}$/.test(s) && !RESERVED.has(s)) ||
+      (isAnalog(s) && s && typeof s.dev === "string" && (Number.isInteger(s.axis) || Number.isInteger(s.button))
+        && Number.isFinite(s.rest) && Number.isFinite(s.full) && s.full !== s.rest));
+    if (ok.length) out[slot] = ok;
+  }
+  return out;
+}
+
+// code -> slot, rebuilt when the binds change
+let keySlot = {};
+function indexBinds() {
+  keySlot = {};
+  for (const [slot, sources] of Object.entries(activeBinds())) {
+    for (const s of sources) if (!isAnalog(s)) keySlot[s] = slot;
+  }
+}
+const padOf = slot => +slot.charAt(7);
+const controlOf = slot => CONTROL[slot.slice(9)];
+
+// ---- Keyboard drawing (laptop layout; Windows names for the modifier keys there) ----
+const WINDOWS = /Win/i.test((navigator.userAgentData && navigator.userAgentData.platform) || navigator.platform || "");
+const CMD = WINDOWS ? "win" : "cmd";
+const OPT = WINDOWS ? "alt" : "opt";
+const ROWS = [
+  [["Escape", "esc", 1.5]],
+  [["Backquote", "`"], ["Digit1", "1"], ["Digit2", "2"], ["Digit3", "3"], ["Digit4", "4"], ["Digit5", "5"],
+   ["Digit6", "6"], ["Digit7", "7"], ["Digit8", "8"], ["Digit9", "9"], ["Digit0", "0"], ["Minus", "−"],
+   ["Equal", "="], ["Backspace", "delete", 1.5]],
+  [["Tab", "tab", 1.5], ["KeyQ", "Q"], ["KeyW", "W"], ["KeyE", "E"], ["KeyR", "R"], ["KeyT", "T"], ["KeyY", "Y"],
+   ["KeyU", "U"], ["KeyI", "I"], ["KeyO", "O"], ["KeyP", "P"], ["BracketLeft", "["], ["BracketRight", "]"],
+   ["Backslash", "\\"]],
+  [["CapsLock", "caps", 1.8], ["KeyA", "A"], ["KeyS", "S"], ["KeyD", "D"], ["KeyF", "F"], ["KeyG", "G"],
+   ["KeyH", "H"], ["KeyJ", "J"], ["KeyK", "K"], ["KeyL", "L"], ["Semicolon", ";"], ["Quote", "'"],
+   ["Enter", "return", 1.8]],
+  [["ShiftLeft", "shift", 2.35], ["KeyZ", "Z"], ["KeyX", "X"], ["KeyC", "C"], ["KeyV", "V"], ["KeyB", "B"],
+   ["KeyN", "N"], ["KeyM", "M"], ["Comma", ","], ["Period", "."], ["Slash", "/"], ["ShiftRight", "shift", 2.35]],
+  [["fn", "fn"], ["ControlLeft", "ctrl"], ["AltLeft", OPT], ["MetaLeft", CMD, 1.25], ["Space", "", 5.2],
+   ["MetaRight", CMD, 1.25], ["AltRight", OPT], ["arrows"]],
+];
+const capEls = {};
+
+function makeCap(code, text, width) {
+  const el = document.createElement("div");
+  if (width) el.style.setProperty("--w", width);
+  el.innerHTML = `<span></span><span class="sub"></span>`;
+  el.firstChild.textContent = text;
+  capEls[code] = el;
+  return el;
+}
+
+function drawKeyboard() {
+  for (const row of ROWS) {
+    const r = document.createElement("div");
+    r.className = "row";
+    for (const [code, text, width] of row) {
+      if (code === "arrows") {
+        const a = document.createElement("div");
+        a.className = "arrows";
+        for (const [c, t, cls] of [["ArrowLeft", "←", "left"], ["ArrowUp", "↑", "up"],
+                                   ["ArrowDown", "↓", "down-key"], ["ArrowRight", "→", "right"]]) {
+          const cap = makeCap(c, t);
+          cap.dataset.pos = cls;
+          cap.lastChild.remove();
+          a.appendChild(cap);
+        }
+        r.appendChild(a);
+      } else {
+        r.appendChild(makeCap(code, text, width));
+      }
+    }
+    $("kb").appendChild(r);
+  }
+}
+
+/** Colors and keycap labels for the active binds. */
+function paintKeyboard() {
+  for (const [code, el] of Object.entries(capEls)) {
+    const slot = keySlot[code];
+    el.className = "cap " + (code === "Escape" ? "esc" : slot ? "p" + padOf(slot) : "")
+      + (el.dataset.pos ? " " + el.dataset.pos : "") + (held.has(code) ? " down" : "");
+    const sub = el.querySelector(".sub");
+    if (sub) sub.textContent = code === "Escape" ? "stop" : slot ? controlOf(slot).short : "";
+  }
+}
+
+// ---- Held keys ----
+const held = new Set();
+
+function releaseAll() {
+  held.clear();
+  paintKeyboard();
+}
+
+window.addEventListener("keydown", e => {
+  // Cmd: macOS stops sending key-ups while it is down (Cmd+Tab would leave keys stuck), so let go of everything
+  if (e.key === "Meta") { releaseAll(); return; }
+  if (e.metaKey || e.ctrlKey || e.altKey) return; // browser shortcuts
+  if (e.code === "Escape") {
+    e.preventDefault();
+    send("stopRobot");
+    if (listening) stopListening("Cancelled.");
+    return;
+  }
+  if (editing) {
+    if (listening && !e.repeat) { e.preventDefault(); bindSource(e.code); }
+    return;
+  }
+  if (!keySlot[e.code]) return;
+  e.preventDefault(); // no scrolling, no clicking a focused button with Space, no changing the OpMode list
+  if (!held.has(e.code)) {
+    held.add(e.code);
+    paintKeyboard();
+    sendInput();
+  }
+}, true);
+
+window.addEventListener("keyup", e => {
+  if (!held.delete(e.code)) return;
+  e.preventDefault();
+  paintKeyboard();
+  sendInput();
+}, true);
+
+function showFocus() {
+  $("veil").classList.toggle("show", !document.hasFocus());
+}
+window.addEventListener("blur", () => { releaseAll(); sendInput(); showFocus(); });
+window.addEventListener("focus", showFocus);
+document.addEventListener("visibilitychange", () => { if (document.hidden) { releaseAll(); sendInput(); } });
+$("veil").addEventListener("click", () => { window.focus(); showFocus(); });
+
+// ---- Gamepad-like devices: real gamepads, and HE keyboards in gamepad mode ----
+// Standard Gamepad API layout -> SDK buttons
+const PHYSICAL = { 0: "A", 1: "B", 2: "X", 3: "Y", 4: "LEFT_BUMPER", 5: "RIGHT_BUMPER", 8: "BACK", 9: "START",
+                   10: "LEFT_STICK_BUTTON", 11: "RIGHT_STICK_BUTTON", 12: "DPAD_UP", 13: "DPAD_DOWN",
+                   14: "DPAD_LEFT", 15: "DPAD_RIGHT", 16: "GUIDE" };
+const STICK_DEADZONE = 0.08;
+
+function connectedGamepads() {
+  try {
+    return navigator.getGamepads ? Array.from(navigator.getGamepads()).filter(g => g && g.connected) : [];
+  } catch (e) {
+    return []; // blocked here (Firefox on a plain-http page)
+  }
+}
+
+/** Devices with analog inputs bound in the active profile; they don't also count as a whole gamepad. */
+function boundDevices() {
+  const devs = new Set();
+  for (const sources of Object.values(activeBinds())) for (const s of sources) if (isAnalog(s)) devs.add(s.dev);
+  return devs;
+}
+
+/** Standard-layout gamepads that join gamepad 1 and 2 as a whole. */
+function wholeGamepads(gamepads) {
+  const bound = boundDevices();
+  return gamepads.filter(g => g.mapping === "standard" && !bound.has(g.id));
+}
+
+function physicalPad(g) {
+  const axis = i => { const v = g.axes[i] || 0; return Math.abs(v) < STICK_DEADZONE ? 0 : v; };
+  const pad = { lx: axis(0), ly: axis(1), rx: axis(2), ry: axis(3),
+                lt: g.buttons[6] ? g.buttons[6].value : 0, rt: g.buttons[7] ? g.buttons[7].value : 0, buttons: 0 };
+  for (const [i, name] of Object.entries(PHYSICAL)) if (g.buttons[i] && g.buttons[i].pressed) pad.buttons |= BIT[name];
+  return pad;
+}
+
+function rawValue(g, src) {
+  if (Number.isInteger(src.axis)) return g.axes[src.axis] ?? src.rest;
+  const b = g.buttons[src.button];
+  return b ? b.value : src.rest;
+}
+
+/** 0..1: how far an analog input is from rest toward fully pressed, after the deadzone. */
+function analogValue(src, gamepads) {
+  const g = gamepads.find(p => p.id === src.dev);
+  if (!g) return 0;
+  const v = Math.max(0, Math.min(1, (rawValue(g, src) - src.rest) / (src.full - src.rest)));
+  return v <= store.deadzone ? 0 : (v - store.deadzone) / (1 - store.deadzone);
+}
+
+function sourceValue(src, gamepads) {
+  return isAnalog(src) ? analogValue(src, gamepads) : held.has(src) ? 1 : 0;
+}
+
+function emptyPad() { return { lx: 0, ly: 0, rx: 0, ry: 0, lt: 0, rt: 0, buttons: 0 }; }
+
+function boundPads(gamepads) {
+  const pads = [emptyPad(), emptyPad()];
+  for (const [slot, sources] of Object.entries(activeBinds())) {
+    let v = 0;
+    for (const s of sources) v = Math.max(v, sourceValue(s, gamepads));
+    if (!v) continue;
+    const pad = pads[padOf(slot) - 1];
+    const c = controlOf(slot);
+    if (c.btn) { if (v >= store.actuation) pad.buttons |= BIT[c.btn]; }
+    else pad[c.axis[0]] += c.axis[1] * v;
+  }
+  for (const pad of pads) {
+    for (const f of ["lx", "ly", "rx", "ry"]) pad[f] = Math.max(-1, Math.min(1, pad[f]));
+    // Diagonals reach the edge of the stick's circle, as a real stick does
+    const len = Math.hypot(pad.lx, pad.ly);
+    if (len > 1) { pad.lx /= len; pad.ly /= len; }
+    const rlen = Math.hypot(pad.rx, pad.ry);
+    if (rlen > 1) { pad.rx /= rlen; pad.ry /= rlen; }
+  }
+  return pads;
+}
+
+/** Keyboard and a laptop gamepad together: a button counts if either has it, the bigger stick value wins. */
+function merge(a, b) {
+  const bigger = (x, y) => Math.abs(y) > Math.abs(x) ? y : x;
+  return { lx: bigger(a.lx, b.lx), ly: bigger(a.ly, b.ly), rx: bigger(a.rx, b.rx), ry: bigger(a.ry, b.ry),
+           lt: Math.max(a.lt, b.lt), rt: Math.max(a.rt, b.rt), buttons: a.buttons | b.buttons };
+}
+
+function currentPads() {
+  // Inputs only count while this window has focus, and not while keys are being edited
+  if (editing || !document.hasFocus()) return [emptyPad(), emptyPad()];
+  const gamepads = connectedGamepads();
+  const pads = boundPads(gamepads);
+  wholeGamepads(gamepads).slice(0, 2).forEach((g, i) => { pads[i] = merge(pads[i], physicalPad(g)); });
+  return pads;
+}
+
+function encode(pad) {
+  return [pad.lx, pad.ly, pad.rx, pad.ry, pad.lt, pad.rt].map(v => (+v.toFixed(3)).toString()).join(",")
+    + "," + pad.buttons;
+}
+
+function showGamepads() {
+  const gamepads = connectedGamepads();
+  const whole = wholeGamepads(gamepads);
+  const bound = boundDevices();
+  const parts = [];
+  whole.slice(0, 2).forEach((g, i) => parts.push([`Laptop gamepad → gamepad ${i + 1}: `, g.id]));
+  for (const g of gamepads) if (bound.has(g.id)) parts.push(["Analog inputs bound from: ", g.id]);
+  const el = $("pads");
+  el.textContent = "";
+  if (!parts.length) {
+    el.textContent = navigator.getGamepads
+      ? "No laptop gamepad. Plug one in and press a button to add it to gamepad 1, or bind an HE keyboard's analog inputs in Edit keys."
+      : "This browser doesn't allow gamepads on this page; use Chrome, Edge or Safari for a gamepad or an HE keyboard.";
+    return;
+  }
+  parts.forEach(([text, id], i) => {
+    if (i) el.append(" · ");
+    const b = document.createElement("b");
+    b.textContent = id;
+    el.append(text, b);
+  });
+}
+window.addEventListener("gamepadconnected", showGamepads);
+window.addEventListener("gamepaddisconnected", showGamepads);
+
+// ---- Robot connection ----
+let socket = null;
+let status = null;
+let opModes = [];
+let labels = {};
+
+function connect() {
+  const port = parseInt(location.port || "8080", 10) + 1;
+  socket = new WebSocket(`ws://${location.hostname}:${port}`);
+  socket.onopen = () => {
+    socket.send(JSON.stringify({ namespace: "system", type: "subscribeToNamespace", payload: "keyboard" }));
+    showLink();
+  };
+  socket.onmessage = e => {
+    const m = JSON.parse(e.data);
+    if (m.namespace !== "keyboard") return;
+    const data = m.payload ? JSON.parse(m.payload) : null;
+    if (m.type === "status") { status = data; showStatus(); }
+    else if (m.type === "opModes") { opModes = data; showOpModes(); }
+    else if (m.type === "telemetry") showTelemetry(data);
+  };
+  socket.onclose = () => {
+    socket = null;
+    status = null;
+    showStatus();
+    setTimeout(connect, 1000);
+  };
+}
+
+function send(type, payload) {
+  if (socket && socket.readyState === WebSocket.OPEN) {
+    socket.send(JSON.stringify({ namespace: "keyboard", type, payload: payload || "" }));
+  }
+}
+
+function sendInput() {
+  if (!status || !status.enabled) return;
+  const pads = currentPads();
+  send("input", encode(pads[0]) + ";" + encode(pads[1]));
+}
+setInterval(() => {
+  sendInput();
+  if (listening) pollAnalogBind();
+  if (editing) showDepth();
+}, 20);
+
+function showLink() {
+  const link = $("link");
+  if (!socket || socket.readyState !== WebSocket.OPEN) { link.className = "pill bad"; link.textContent = "No connection to the robot, retrying…"; }
+  else if (!status) { link.className = "pill warn"; link.textContent = "Connected"; }
+  else if (!status.enabled) { link.className = "pill bad"; link.textContent = "Keyboard off"; }
+  else if (!status.connectedToSdk) { link.className = "pill bad"; link.textContent = "Can't reach the SDK"; }
+  else { link.className = "pill ok"; link.textContent = "Connected"; }
+}
+
+function showStatus() {
+  showLink();
+  const s = status;
+  const you = !!(s && s.you);
+  const who = $("who");
+  if (!s) who.textContent = "";
+  else if (you) who.innerHTML = `<b>You drive</b> (${s.yourAddress})`;
+  else if (s.controller) who.innerHTML = `Watching: <b></b> drives`;
+  else who.textContent = "Nobody drives";
+  if (s && !you && s.controller) who.querySelector("b").textContent = s.controller;
+  $("takeOver").hidden = !s || !s.enabled || you || !s.controller;
+
+  const banner = $("banner");
+  let text = "";
+  if (s && s.driverStation) text = "A Driver Station connected, so keyboard driving is off until the robot app restarts.";
+  else if (s && !s.connectedToSdk) text = "The bridge can't reach the SDK's gamepad input (see the robot log, tag KeyboardBridge).";
+  banner.textContent = text;
+  banner.classList.toggle("show", !!text);
+
+  const active = s && s.opMode;
+  const phase = s ? s.phase : "idle";
+  // As on the Driver Station: stop the OpMode before picking another
+  $("init").disabled = !you || !s.enabled || !$("opModes").value || (active && (phase === "init" || phase === "running"));
+  $("start").disabled = !you || !s.enabled || !active || phase !== "init";
+  $("stop").disabled = !you || !s.enabled || !active || (phase !== "init" && phase !== "running");
+  $("stopRobot").disabled = !s || !s.enabled;
+  $("phase").innerHTML = active ? `<b></b> · ${phase}` : "No OpMode running";
+  if (active) $("phase").querySelector("b").textContent = active;
+  $("teleFor").textContent = active || "";
+  showLegend();
+}
+
+function showOpModes() {
+  const select = $("opModes");
+  const previous = select.value;
+  select.innerHTML = "";
+  const order = { TELEOP: 0, AUTONOMOUS: 1, UTILITY: 2 };
+  const sorted = opModes.slice().sort((a, b) =>
+    (order[a.flavor] ?? 3) - (order[b.flavor] ?? 3) || a.group.localeCompare(b.group) || a.name.localeCompare(b.name));
+  let group = null;
+  for (const o of sorted) {
+    const name = { TELEOP: "TeleOp", AUTONOMOUS: "Autonomous" }[o.flavor] || "Other";
+    if (!group || group.label !== name) {
+      group = document.createElement("optgroup");
+      group.label = name;
+      select.appendChild(group);
+    }
+    const opt = document.createElement("option");
+    opt.value = opt.textContent = o.name;
+    group.appendChild(opt);
+  }
+  if (opModes.some(o => o.name === previous)) select.value = previous;
+  else if (opModes.some(o => o.name === "TeleOp")) select.value = "TeleOp";
+  showStatus();
+}
+$("opModes").addEventListener("change", () => { $("opModes").blur(); showStatus(); });
+
+for (const id of ["init", "start", "stop", "takeOver"]) {
+  $(id).addEventListener("click", () => {
+    $(id).blur(); // keys go back to driving
+    if (id === "init") send("init", $("opModes").value);
+    else send(id);
+  });
+}
+$("stopRobot").addEventListener("click", () => { $("stopRobot").blur(); send("stopRobot"); });
+
+// ---- Labels, from tools/control-labels.json for the OpMode in use ----
+/** The OpMode whose labels to show, and its phase: "init", "running", or null before one is picked (both). */
+function labelContext() {
+  if (status && status.opMode) return { opMode: status.opMode, phase: status.phase === "init" ? "init" : "running" };
+  return { opMode: $("opModes").value, phase: null };
+}
+
+function labelFor(opMode, phase, pad, ctl, id) {
+  const exact = id && KEYBOARD_LABELS[opMode] && KEYBOARD_LABELS[opMode][`gamepad${pad}.${id}`];
+  if (exact) return exact;
+  const find = key => {
+    for (const section of [KEYBOARD_LABELS[opMode], labels[opMode], labels["*"]]) {
+      if (section && section[key]) return section[key];
+    }
+    return null;
+  };
+  const running = find(`gamepad${pad}.${ctl}`);
+  const init = find(`init.gamepad${pad}.${ctl}`);
+  if (phase === "init") return init;
+  if (phase === "running") return running;
+  return [running, init && "During init: " + init].filter(Boolean).join(". ") || null;
+}
+
+function sourceText(src) {
+  if (!isAnalog(src)) return keyName(src);
+  const what = Number.isInteger(src.axis) ? `axis ${src.axis}${src.full > src.rest ? "+" : "−"}` : `button ${src.button}`;
+  return `🎮 ${what}`;
+}
+
+function sourceChip(src, onRemove) {
+  const chip = document.createElement("span");
+  chip.className = "chip";
+  chip.textContent = sourceText(src);
+  if (isAnalog(src)) {
+    chip.title = src.dev;
+    const depth = document.createElement("span");
+    depth.className = "depth";
+    chip.appendChild(depth);
+    chip.depthSource = src;
+  }
+  if (onRemove) {
+    const x = document.createElement("button");
+    x.className = "x";
+    x.textContent = "×";
+    x.title = "Remove";
+    x.addEventListener("click", onRemove);
+    chip.appendChild(x);
+  }
+  return chip;
+}
+
+/** Live depth bars on analog chips, so an HE key's travel shows while editing. */
+function showDepth() {
+  const gamepads = connectedGamepads();
+  for (const chip of document.querySelectorAll(".chip")) {
+    if (chip.depthSource) chip.querySelector(".depth").style.width = (analogValue(chip.depthSource, gamepads) * 100) + "%";
+  }
+}
+
+function showLegend() {
+  const { opMode, phase } = labelContext();
+  $("labelsFor").textContent = opMode ? `· ${opMode}${phase ? ", " + (phase === "init" ? "during init" : "after start") : ""}` : "";
+  $("turnNote").hidden = opMode !== "TeleOp";
+  const legend = $("legend");
+  legend.innerHTML = "";
+  const add = (tag, cls, text) => {
+    const el = document.createElement(tag);
+    if (cls) el.className = cls;
+    if (text) el.textContent = text;
+    legend.appendChild(el);
+    return el;
+  };
+  const binds = activeBinds();
+  for (const pad of [1, 2]) {
+    const role = labels[opMode] && labels[opMode][`gamepad${pad}`];
+    add("div", "group", `Gamepad ${pad}${role ? " · " + role : ""}`);
+    // One row per control name; the four stick directions share a row
+    const rows = new Map();
+    for (const c of CONTROLS) {
+      const sources = binds[`gamepad${pad}.${c.id}`];
+      if (!sources) continue;
+      if (!rows.has(c.ctl)) rows.set(c.ctl, { names: [], sources: [] });
+      const row = rows.get(c.ctl);
+      row.names.push(c.name);
+      row.sources.push(...sources);
+    }
+    for (const [ctl, row] of rows) {
+      const keys = add("span");
+      for (const s of row.sources) { const k = document.createElement("kbd"); k.className = "src"; k.textContent = sourceText(s); keys.appendChild(k); }
+      add("span", "ctl p" + pad, ctl.endsWith("_stick") ? ctl.replace("_", " ") : row.names[0]);
+      const label = labelFor(opMode, phase, pad, ctl);
+      add("span", "what" + (label ? "" : " none"), label || "not used here");
+    }
+  }
+  add("div", "group", "Safety");
+  add("span").innerHTML = "<kbd>Esc</kbd>";
+  add("span", "ctl", "any page");
+  add("span", "what", "Stop the OpMode now");
+}
+
+// ---- Key editor ----
+let editing = false;
+let listening = null; // { slot, rest: snapshot of every gamepad input when listening started }
+
+function setEditing(on) {
+  editing = on;
+  if (listening) stopListening("");
+  releaseAll();
+  sendInput(); // pads at rest right away
+  $("editor").hidden = !on;
+  $("view").hidden = on;
+  $("editKeys").hidden = on;
+  if (on) { showEditor(); editMessage("Click + next to a control, then press a key or an HE key in gamepad mode."); }
+  else { showLegend(); showGamepads(); }
+}
+$("editKeys").addEventListener("click", () => { $("editKeys").blur(); setEditing(true); });
+$("doneEditing").addEventListener("click", () => setEditing(false));
+
+function editMessage(text, warn) {
+  $("editMsg").textContent = text;
+  $("editMsg").classList.toggle("warn", !!warn);
+}
+
+/** The Default profile can't change: editing it starts a copy. */
+function editableBinds() {
+  if (store.active === DEFAULT_PROFILE) {
+    const name = uniqueName("My keys");
+    store.profiles[name] = clone(DEFAULT_BINDS);
+    store.active = name;
+    editMessage(`Default can't change, so your edits go into a new profile, "${name}".`);
+  }
+  return store.profiles[store.active];
+}
+
+function uniqueName(base) {
+  let name = base;
+  for (let i = 2; name === DEFAULT_PROFILE || store.profiles[name]; i++) name = `${base} ${i}`;
+  return name;
+}
+
+function changed() {
+  saveStore();
+  indexBinds();
+  paintKeyboard();
+  showEditor();
+}
+
+function showEditor() {
+  const select = $("profile");
+  select.innerHTML = "";
+  for (const name of [DEFAULT_PROFILE, ...Object.keys(store.profiles).sort()]) {
+    const opt = document.createElement("option");
+    opt.value = opt.textContent = name;
+    select.appendChild(opt);
+  }
+  select.value = store.active;
+  const custom = store.active !== DEFAULT_PROFILE;
+  for (const id of ["renameProfile", "resetProfile", "deleteProfile"]) $(id).disabled = !custom;
+  $("deadzone").value = store.deadzone;
+  $("deadzoneOut").textContent = store.deadzone.toFixed(2);
+  $("actuation").value = store.actuation;
+  $("actuationOut").textContent = store.actuation.toFixed(2);
+
+  const { opMode, phase } = labelContext();
+  const rows = $("editRows");
+  rows.innerHTML = "";
+  const binds = activeBinds();
+  for (const pad of [1, 2]) {
+    const head = document.createElement("div");
+    head.className = "group";
+    head.textContent = `Gamepad ${pad}`;
+    rows.appendChild(head);
+    for (const c of CONTROLS) {
+      const slot = `gamepad${pad}.${c.id}`;
+      const name = document.createElement("span");
+      name.className = "ctl p" + pad;
+      name.textContent = c.name;
+      const what = document.createElement("span");
+      const label = labelFor(opMode, phase, pad, c.ctl, c.id);
+      what.className = "what";
+      what.textContent = label || "";
+      what.title = label || "";
+      const chips = document.createElement("span");
+      chips.className = "chips";
+      (binds[slot] || []).forEach((src, i) => chips.appendChild(sourceChip(src, () => removeSource(slot, i))));
+      const addBtn = document.createElement("button");
+      addBtn.className = "add" + (listening && listening.slot === slot ? " listening" : "");
+      addBtn.textContent = listening && listening.slot === slot ? "press a key…" : "+";
+      addBtn.addEventListener("click", () => { addBtn.blur(); startListening(slot); });
+      chips.appendChild(addBtn);
+      rows.append(name, chips, what);
+    }
+  }
+}
+
+function removeSource(slot, index) {
+  const binds = editableBinds();
+  const list = (binds[slot] || []).slice();
+  list.splice(index, 1);
+  if (list.length) binds[slot] = list; else delete binds[slot];
+  changed();
+}
+
+function snapshot() {
+  return connectedGamepads().map(g => ({ id: g.id, axes: g.axes.slice(), buttons: g.buttons.map(b => b.value) }));
+}
+
+function startListening(slot) {
+  listening = { slot, rest: snapshot() };
+  editMessage(`Press a key for gamepad ${padOf(slot)} ${controlOf(slot).name}, or press an HE key in gamepad mode all the way down. Esc cancels.`);
+  showEditor();
+}
+
+function stopListening(text) {
+  listening = null;
+  editMessage(text);
+  showEditor();
+}
+
+/** An analog input that moved well away from where it rested when listening started. */
+function pollAnalogBind() {
+  for (const g of connectedGamepads()) {
+    const rest = listening.rest.find(r => r.id === g.id);
+    if (!rest) { listening.rest.push({ id: g.id, axes: g.axes.slice(), buttons: g.buttons.map(b => b.value) }); continue; }
+    for (let i = 0; i < g.axes.length; i++) {
+      const r = rest.axes[i] ?? 0;
+      if (Math.abs(g.axes[i] - r) > 0.5) return bindSource({ dev: g.id, axis: i, rest: r, full: g.axes[i] > r ? 1 : -1 });
+    }
+    for (let i = 0; i < g.buttons.length; i++) {
+      const r = rest.buttons[i] ?? 0;
+      if (g.buttons[i].value - r > 0.5) return bindSource({ dev: g.id, button: i, rest: r, full: 1 });
+    }
+  }
+}
+
+function sameSource(a, b) {
+  if (isAnalog(a) !== isAnalog(b)) return false;
+  if (!isAnalog(a)) return a === b;
+  return a.dev === b.dev && a.axis === b.axis && a.button === b.button
+    && Math.sign(a.full - a.rest) === Math.sign(b.full - b.rest);
+}
+
+function bindSource(src) {
+  const slot = listening.slot;
+  if (!isAnalog(src) && RESERVED.has(src)) {
+    editMessage(`${keyName(src)} can't be bound (Esc is the e-stop; Cmd/Win, Ctrl, Opt/Alt and Caps Lock misbehave).`, true);
+    return;
+  }
+  const binds = editableBinds();
+  let moved = null;
+  for (const [other, sources] of Object.entries(binds)) {
+    const kept = sources.filter(s => !sameSource(s, src));
+    if (kept.length === sources.length) continue;
+    if (other !== slot) moved = other;
+    if (kept.length) binds[other] = kept; else delete binds[other];
+  }
+  binds[slot] = [...(binds[slot] || []), src];
+  listening = null;
+  const what = `${sourceText(src)} → gamepad ${padOf(slot)} ${controlOf(slot).name}`;
+  editMessage(moved ? `${what} (moved from gamepad ${padOf(moved)} ${controlOf(moved).name})` : what, !!moved);
+  changed();
+}
+
+// Profile buttons
+$("profile").addEventListener("change", () => {
+  store.active = $("profile").value;
+  $("profile").blur();
+  editMessage("");
+  changed();
+});
+
+let naming = null; // "new" or "rename"
+function askName(kind) {
+  if (listening) stopListening("");
+  naming = kind;
+  $("profileName").hidden = false;
+  $("profileActions").hidden = true;
+  $("nameInput").value = kind === "rename" ? store.active : uniqueName("My keys");
+  $("nameInput").focus();
+  $("nameInput").select();
+}
+function endNaming() {
+  naming = null;
+  $("profileName").hidden = true;
+  $("profileActions").hidden = false;
+}
+$("newProfile").addEventListener("click", () => askName("new"));
+$("renameProfile").addEventListener("click", () => askName("rename"));
+$("nameCancel").addEventListener("click", endNaming);
+$("nameInput").addEventListener("keydown", e => {
+  e.stopPropagation(); // typing a name isn't driving or binding
+  if (e.key === "Enter") $("nameSave").click();
+  if (e.key === "Escape") endNaming();
+});
+$("nameSave").addEventListener("click", () => {
+  const name = $("nameInput").value.trim();
+  if (!name || name === DEFAULT_PROFILE || (store.profiles[name] && !(naming === "rename" && name === store.active))) {
+    editMessage("Pick a name that isn't Default or another profile's.", true);
+    return;
+  }
+  if (naming === "new") {
+    store.profiles[name] = clone(activeBinds());
+  } else if (name !== store.active) {
+    store.profiles[name] = store.profiles[store.active];
+    delete store.profiles[store.active];
+  }
+  store.active = name;
+  endNaming();
+  editMessage(`Profile "${name}".`);
+  changed();
+});
+$("resetProfile").addEventListener("click", () => {
+  store.profiles[store.active] = clone(DEFAULT_BINDS);
+  editMessage(`"${store.active}" is back to the default keys.`);
+  changed();
+});
+let deleteArmed = false;
+$("deleteProfile").addEventListener("click", () => {
+  if (!deleteArmed) {
+    deleteArmed = true;
+    $("deleteProfile").textContent = "Click again to delete";
+    setTimeout(() => { deleteArmed = false; $("deleteProfile").textContent = "Delete"; }, 3000);
+    return;
+  }
+  deleteArmed = false;
+  $("deleteProfile").textContent = "Delete";
+  const name = store.active;
+  delete store.profiles[name];
+  store.active = DEFAULT_PROFILE;
+  editMessage(`Deleted "${name}".`);
+  changed();
+});
+$("exportProfile").addEventListener("click", () => {
+  const data = { format: "biobuzz-keyboard-keys", version: 1, name: store.active, binds: activeBinds() };
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(new Blob([JSON.stringify(data, null, 2)], { type: "application/json" }));
+  a.download = `${store.active.replace(/[^\w -]/g, "_")}.keys.json`;
+  a.click();
+  setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+});
+$("importProfile").addEventListener("click", () => $("importFile").click());
+$("importFile").addEventListener("change", async () => {
+  const file = $("importFile").files[0];
+  $("importFile").value = "";
+  if (!file) return;
+  try {
+    const data = JSON.parse(await file.text());
+    const binds = cleanBinds(data && data.binds);
+    if (!binds || data.format !== "biobuzz-keyboard-keys") throw new Error("not a keys file");
+    const name = uniqueName(typeof data.name === "string" && data.name.trim() ? data.name.trim().slice(0, 40) : "Imported");
+    store.profiles[name] = binds;
+    store.active = name;
+    editMessage(`Imported "${name}".`);
+    changed();
+  } catch (e) {
+    editMessage(`Couldn't import ${file.name}: it isn't a keys file exported from this page.`, true);
+  }
+});
+for (const [id, field] of [["deadzone", "deadzone"], ["actuation", "actuation"]]) {
+  $(id).addEventListener("input", () => {
+    store[field] = parseFloat($(id).value);
+    $(id + "Out").textContent = store[field].toFixed(2);
+    saveStore();
+  });
+}
+
+// ---- Telemetry ----
+function escapeHtml(s) {
+  return s.replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+}
+
+function showTelemetry(t) {
+  const pane = $("telemetry");
+  pane.className = "telemetry" + (t.format === "HTML" ? "" : " plain") + (t.format === "MONOSPACE" ? " mono" : "");
+  if (!t.lines.length) { pane.innerHTML = `<span class="empty">No telemetry yet.</span>`; return; }
+  // HTML lines come from our own OpModes (Driver Station HTML: b, i, big, small, tt, font color)
+  pane.innerHTML = t.lines.map(l => `<div class="tl">${t.format === "HTML" ? l : escapeHtml(l)}</div>`).join("");
+}
+
+// ---- Start ----
+loadStore();
+indexBinds();
+drawKeyboard();
+paintKeyboard();
+showFocus();
+showGamepads();
+showStatus();
+fetch("/keyboard/labels.json", { cache: "no-store" })
+  .then(r => r.json())
+  .then(j => { labels = j; showLegend(); if (editing) showEditor(); })
+  .catch(() => {});
+connect();
+</script>
+</body>
+</html>
