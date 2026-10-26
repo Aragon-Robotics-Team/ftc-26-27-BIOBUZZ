@@ -74,5 +74,11 @@
     "gamepad1.left_bumper": "Hold: intake + flywheel reverse",
     "gamepad1.dpad_up": "More power (both)",
     "gamepad1.dpad_down": "Less power (both)"
+  },
+
+  "Ball Chase Test": {
+    "init.gamepad1.dpad_left": "Start in our LEFT corner, back to alliance wall",
+    "init.gamepad1.dpad_right": "Start in our RIGHT corner, back to alliance wall",
+    "gamepad1.cross": "Chase again from here"
   }
 }

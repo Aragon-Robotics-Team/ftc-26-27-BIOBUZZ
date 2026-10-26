@@ -14,6 +14,7 @@ import com.qualcomm.hardware.lynx.LynxModule;
 import com.qualcomm.robotcore.hardware.HardwareMap;
 
 import org.firstinspires.ftc.robotcore.external.Telemetry;
+import org.firstinspires.ftc.teamcode.subsystems.BallVision;
 import org.firstinspires.ftc.teamcode.subsystems.Drivetrain;
 import org.firstinspires.ftc.teamcode.subsystems.Gate;
 import org.firstinspires.ftc.teamcode.subsystems.HiveVision;
@@ -35,6 +36,7 @@ public class Robot {
     public final Launcher launcher;
     public final Led led;
     public final HiveVision hiveVision;
+    public final BallVision ballVision;
 
     private final List<LynxModule> hubs;
     private final Subsystem[] subsystems;
@@ -50,10 +52,11 @@ public class Robot {
         launcher = new Launcher(hardwareMap);
         led = new Led(hardwareMap, launcher);
         hiveVision = new HiveVision(hardwareMap); // off until an OpMode enables it
+        ballVision = new BallVision(hardwareMap, drivebase::getPose); // off until an OpMode enables it
 
-        // Hive vision first, so this loop aims at the cell it just read; launcher before Led, so the light shows
-        // this loop's launcher state
-        subsystems = new Subsystem[]{hiveVision, drivebase, intake, gate, launcher, led};
+        // Hive vision first, so this loop aims at the cell it just read; ball vision after the drivetrain, so it has
+        // this loop's pose; launcher before Led, so the light shows this loop's launcher state
+        subsystems = new Subsystem[]{hiveVision, drivebase, ballVision, intake, gate, launcher, led};
     }
 
     // ---- Hive ----
@@ -113,6 +116,16 @@ public class Robot {
                         sequential(startShooting(), waitMs(AUTO_SHOOT_MS), stopShooting()),
                         instant(() -> {}))
         );
+    }
+
+    // ---- Pollen ----
+
+    /**
+     * Intake pollen the ball camera sees until there are maxBalls more in the robot, nothing is in view, or timeoutS
+     * runs out (see {@link PollenChase}). Needs ballVision enabled during init.
+     */
+    public Command chasePollen(int maxBalls, double timeoutS) {
+        return new PollenChase(this, maxBalls, timeoutS).command();
     }
 
     // ---- Localization ----

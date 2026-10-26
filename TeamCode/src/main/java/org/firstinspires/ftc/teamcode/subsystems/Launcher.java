@@ -42,7 +42,8 @@ public class Launcher implements Subsystem {
 
     private final DcMotorEx flywheel;
     private final DcMotorEx turret;
-    private final double turretTicksPerRadian = TURRET_MOTOR_TICKS_PER_REV * TURRET_GEAR_RATIO / (2 * Math.PI);
+    private final double turretTicksPerRadian =
+            (TURRET_ENCODER_REVERSED ? -1 : 1) * TURRET_MOTOR_TICKS_PER_REV * TURRET_GEAR_RATIO / (2 * Math.PI);
 
     private double targetVelocity = 0;
     private double flywheelVelocity = 0;

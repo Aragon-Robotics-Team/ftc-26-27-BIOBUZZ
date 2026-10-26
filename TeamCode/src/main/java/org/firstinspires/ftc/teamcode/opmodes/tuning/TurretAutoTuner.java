@@ -1,6 +1,7 @@
 package org.firstinspires.ftc.teamcode.opmodes.tuning;
 
 import static org.firstinspires.ftc.teamcode.core.RobotConstants.Launcher.TURRET_DIRECTION;
+import static org.firstinspires.ftc.teamcode.core.RobotConstants.Launcher.TURRET_ENCODER_REVERSED;
 import static org.firstinspires.ftc.teamcode.core.RobotConstants.Launcher.TURRET_GEAR_RATIO;
 import static org.firstinspires.ftc.teamcode.core.RobotConstants.Launcher.TURRET_MAX_ANGLE;
 import static org.firstinspires.ftc.teamcode.core.RobotConstants.Launcher.TURRET_MIN_ANGLE;
@@ -51,7 +52,8 @@ public class TurretAutoTuner extends LinearOpMode {
         turret.setZeroPowerBehavior(DcMotor.ZeroPowerBehavior.BRAKE);
         turret.setMode(DcMotor.RunMode.STOP_AND_RESET_ENCODER);
         turret.setMode(DcMotor.RunMode.RUN_WITHOUT_ENCODER);
-        double ticksPerRadian = TURRET_MOTOR_TICKS_PER_REV * TURRET_GEAR_RATIO / (2 * Math.PI);
+        double ticksPerRadian =
+                (TURRET_ENCODER_REVERSED ? -1 : 1) * TURRET_MOTOR_TICKS_PER_REV * TURRET_GEAR_RATIO / (2 * Math.PI);
         double safeAngle = Math.min(Math.toRadians(SAFE_ANGLE_DEG), Math.min(-TURRET_MIN_ANGLE, TURRET_MAX_ANGLE));
         double hysteresis = Math.toRadians(HYSTERESIS_DEG);
         panels = PanelsTelemetry.INSTANCE.getTelemetry();
