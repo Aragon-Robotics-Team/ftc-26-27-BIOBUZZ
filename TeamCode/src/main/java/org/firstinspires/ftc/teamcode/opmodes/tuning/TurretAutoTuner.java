@@ -1,11 +1,11 @@
 package org.firstinspires.ftc.teamcode.opmodes.tuning;
 
-import static org.firstinspires.ftc.teamcode.RobotConstants.Launcher.TURRET_DIRECTION;
-import static org.firstinspires.ftc.teamcode.RobotConstants.Launcher.TURRET_GEAR_RATIO;
-import static org.firstinspires.ftc.teamcode.RobotConstants.Launcher.TURRET_MAX_ANGLE;
-import static org.firstinspires.ftc.teamcode.RobotConstants.Launcher.TURRET_MIN_ANGLE;
-import static org.firstinspires.ftc.teamcode.RobotConstants.Launcher.TURRET_MOTOR_NAME;
-import static org.firstinspires.ftc.teamcode.RobotConstants.Launcher.TURRET_MOTOR_TICKS_PER_REV;
+import static org.firstinspires.ftc.teamcode.core.RobotConstants.Launcher.TURRET_DIRECTION;
+import static org.firstinspires.ftc.teamcode.core.RobotConstants.Launcher.TURRET_GEAR_RATIO;
+import static org.firstinspires.ftc.teamcode.core.RobotConstants.Launcher.TURRET_MAX_ANGLE;
+import static org.firstinspires.ftc.teamcode.core.RobotConstants.Launcher.TURRET_MIN_ANGLE;
+import static org.firstinspires.ftc.teamcode.core.RobotConstants.Launcher.TURRET_MOTOR_NAME;
+import static org.firstinspires.ftc.teamcode.core.RobotConstants.Launcher.TURRET_MOTOR_TICKS_PER_REV;
 
 import com.bylazar.configurables.annotations.Configurable;
 import com.bylazar.telemetry.PanelsTelemetry;

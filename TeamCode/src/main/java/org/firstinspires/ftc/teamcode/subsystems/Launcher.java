@@ -3,7 +3,7 @@ package org.firstinspires.ftc.teamcode.subsystems;
 import static com.pedropathing.ivy.commands.Commands.conditional;
 import static com.pedropathing.ivy.commands.Commands.infinite;
 import static com.pedropathing.ivy.commands.Commands.instant;
-import static org.firstinspires.ftc.teamcode.RobotConstants.Launcher.*;
+import static org.firstinspires.ftc.teamcode.core.RobotConstants.Launcher.*;
 
 import com.pedropathing.ivy.Command;
 import com.pedropathing.math.Pose;
@@ -17,8 +17,8 @@ import com.qualcomm.robotcore.util.ElapsedTime;
 import com.qualcomm.robotcore.util.Range;
 
 import org.firstinspires.ftc.robotcore.external.Telemetry;
-import org.firstinspires.ftc.teamcode.ShotSolver;
-import org.firstinspires.ftc.teamcode.ShotSolver.Shot;
+import org.firstinspires.ftc.teamcode.core.ShotSolver;
+import org.firstinspires.ftc.teamcode.core.ShotSolver.Shot;
 
 import java.util.function.Supplier;
 

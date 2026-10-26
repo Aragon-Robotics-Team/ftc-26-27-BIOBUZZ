@@ -2,8 +2,8 @@ package org.firstinspires.ftc.teamcode.routines;
 
 import com.qualcomm.robotcore.eventloop.opmode.Disabled;
 
-import org.firstinspires.ftc.teamcode.Alliance;
-import org.firstinspires.ftc.teamcode.Robot;
+import org.firstinspires.ftc.teamcode.core.Alliance;
+import org.firstinspires.ftc.teamcode.core.Robot;
 
 import java.lang.reflect.InvocationTargetException;
 import java.util.ArrayList;

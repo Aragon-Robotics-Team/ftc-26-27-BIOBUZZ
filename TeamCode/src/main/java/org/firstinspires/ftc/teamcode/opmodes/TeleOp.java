@@ -1,13 +1,13 @@
 package org.firstinspires.ftc.teamcode.opmodes;
 
 import static com.pedropathing.ivy.Scheduler.schedule;
-import static org.firstinspires.ftc.teamcode.RobotConstants.Drive.SLOW_MODE_SCALE;
-import static org.firstinspires.ftc.teamcode.RobotConstants.Drive.TURN_MODE;
-import static org.firstinspires.ftc.teamcode.RobotConstants.Field.RED_LEFT_CORNER;
-import static org.firstinspires.ftc.teamcode.RobotConstants.Field.RED_RIGHT_CORNER;
-import static org.firstinspires.ftc.teamcode.RobotConstants.Launcher.SHOOT_ON_THE_MOVE;
-import static org.firstinspires.ftc.teamcode.RobotConstants.Vision.HOLD_TO_LOCK_S;
-import static org.firstinspires.ftc.teamcode.RobotConstants.Vision.LOCK_RUMBLE_MS;
+import static org.firstinspires.ftc.teamcode.core.RobotConstants.Drive.SLOW_MODE_SCALE;
+import static org.firstinspires.ftc.teamcode.core.RobotConstants.Drive.TURN_MODE;
+import static org.firstinspires.ftc.teamcode.core.RobotConstants.Field.RED_LEFT_CORNER;
+import static org.firstinspires.ftc.teamcode.core.RobotConstants.Field.RED_RIGHT_CORNER;
+import static org.firstinspires.ftc.teamcode.core.RobotConstants.Launcher.SHOOT_ON_THE_MOVE;
+import static org.firstinspires.ftc.teamcode.core.RobotConstants.Vision.HOLD_TO_LOCK_S;
+import static org.firstinspires.ftc.teamcode.core.RobotConstants.Vision.LOCK_RUMBLE_MS;
 import static org.firstinspires.ftc.teamcode.util.Html.*;
 
 import com.pedropathing.ivy.Scheduler;
@@ -17,12 +17,12 @@ import com.qualcomm.robotcore.eventloop.opmode.OpMode;
 import com.qualcomm.robotcore.util.ElapsedTime;
 
 import org.firstinspires.ftc.robotcore.external.Telemetry;
-import org.firstinspires.ftc.teamcode.Alliance;
-import org.firstinspires.ftc.teamcode.Hive;
-import org.firstinspires.ftc.teamcode.MatchState;
-import org.firstinspires.ftc.teamcode.Robot;
-import org.firstinspires.ftc.teamcode.RobotConstants.Drive.TurnMode;
-import org.firstinspires.ftc.teamcode.ShotSolver.Shot;
+import org.firstinspires.ftc.teamcode.core.Alliance;
+import org.firstinspires.ftc.teamcode.core.Hive;
+import org.firstinspires.ftc.teamcode.core.MatchState;
+import org.firstinspires.ftc.teamcode.core.Robot;
+import org.firstinspires.ftc.teamcode.core.RobotConstants.Drive.TurnMode;
+import org.firstinspires.ftc.teamcode.core.ShotSolver.Shot;
 import org.firstinspires.ftc.teamcode.subsystems.Intake;
 import org.firstinspires.ftc.teamcode.subsystems.Launcher;
 import org.firstinspires.ftc.teamcode.util.FieldDiagram;

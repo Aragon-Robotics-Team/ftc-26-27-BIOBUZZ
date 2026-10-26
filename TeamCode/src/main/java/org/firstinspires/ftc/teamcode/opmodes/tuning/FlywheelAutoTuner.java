@@ -1,9 +1,9 @@
 package org.firstinspires.ftc.teamcode.opmodes.tuning;
 
-import static org.firstinspires.ftc.teamcode.RobotConstants.Launcher.FLYWHEEL_DIRECTION;
-import static org.firstinspires.ftc.teamcode.RobotConstants.Launcher.FLYWHEEL_MOTOR_NAME;
-import static org.firstinspires.ftc.teamcode.RobotConstants.Launcher.TARGET_VELOCITY;
-import static org.firstinspires.ftc.teamcode.RobotConstants.Launcher.VELOCITY_TOLERANCE;
+import static org.firstinspires.ftc.teamcode.core.RobotConstants.Launcher.FLYWHEEL_DIRECTION;
+import static org.firstinspires.ftc.teamcode.core.RobotConstants.Launcher.FLYWHEEL_MOTOR_NAME;
+import static org.firstinspires.ftc.teamcode.core.RobotConstants.Launcher.TARGET_VELOCITY;
+import static org.firstinspires.ftc.teamcode.core.RobotConstants.Launcher.VELOCITY_TOLERANCE;
 
 import com.bylazar.configurables.annotations.Configurable;
 import com.bylazar.telemetry.PanelsTelemetry;

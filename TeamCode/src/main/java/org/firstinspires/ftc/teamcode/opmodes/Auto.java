@@ -11,9 +11,9 @@ import com.qualcomm.robotcore.eventloop.opmode.OpMode;
 import com.qualcomm.robotcore.util.ElapsedTime;
 
 import org.firstinspires.ftc.robotcore.external.Telemetry;
-import org.firstinspires.ftc.teamcode.Hive;
-import org.firstinspires.ftc.teamcode.MatchState;
-import org.firstinspires.ftc.teamcode.Robot;
+import org.firstinspires.ftc.teamcode.core.Hive;
+import org.firstinspires.ftc.teamcode.core.MatchState;
+import org.firstinspires.ftc.teamcode.core.Robot;
 import org.firstinspires.ftc.teamcode.routines.AutoRoutine;
 import org.firstinspires.ftc.teamcode.routines.Routines;
 import org.firstinspires.ftc.teamcode.util.Html;
