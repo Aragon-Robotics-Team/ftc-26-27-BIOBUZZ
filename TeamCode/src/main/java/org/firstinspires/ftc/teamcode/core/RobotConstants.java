@@ -6,39 +6,8 @@ import com.qualcomm.robotcore.hardware.PIDFCoefficients;
 
 /** Every robot tunable and hardware name in one place. Drivetrain / localizer config lives in pedro.Constants. */
 public class RobotConstants {
-    /** Red-side poses in Pedro coordinates (inches). Blue is rotated 180° with Alliance.apply; never write blue poses. */
-    public static class Field {
-        // Center of each cell's opening, from the red driver station's point of view, with the heading pointing out of
-        // the opening. From BiobuzzSim: the hive is 12.75 in from field center toward our wall, and the up cell's
-        // opening is centered 15.7 in out from the hive center. TODO: check against the real field
-        public static Pose RED_HIVE_LEFT_CELL = new Pose(59.25, 87.7, Math.toRadians(90));   // rear cell
-        public static Pose RED_HIVE_RIGHT_CELL = new Pose(59.25, 56.3, Math.toRadians(-90)); // audience cell
-        // The up cell's opening (Competition Manual 9.6, via BiobuzzSim): 20 in wide, 14 in tall, centered 59.6 in
-        // above the tiles, and leaning back 30° with the arm, so its face points outward and 30° up
-        public static double HIVE_OPENING_CENTER_Z = 59.6;
-        public static double HIVE_OPENING_WIDTH = 20;
-        public static double HIVE_OPENING_HEIGHT = 14;
-        public static double HIVE_OPENING_TILT = Math.toRadians(30);
-
-        // Flower column centers, one on each perimeter wall 48 in from a corner, about 3.5 in off the wall (Event Field
-        // Setup Guide V1.0, via BiobuzzSim). The set looks the same from both alliances, so it's used as is for blue.
-        // TODO: check against the real field
-        public static Pose[] FLOWERS = {
-                new Pose(48, 140.5),  // rear wall
-                new Pose(96, 3.5),    // audience wall
-                new Pose(3.5, 48),    // red alliance wall
-                new Pose(140.5, 96),  // blue alliance wall
-        };
-
-        // Pose resets: robot pushed into the corner, back against the alliance wall.
-        // 9 in = half of an 18 in robot. TODO: use the real robot size from CAD
-        public static Pose RED_LEFT_CORNER = new Pose(9, 135, 0); // tile A6, alliance wall x rear wall
-        // TODO: check against the real field (the GARDEN is in this corner; clear any balls first)
-        public static Pose RED_RIGHT_CORNER = new Pose(9, 9, 0);  // tile A1, alliance wall x audience wall
-    }
-
     public static class Drive {
-        public static double SLOW_MODE_SCALE = 0.4; // TODO: tune
+        public static double SLOW_MODE_SCALE = 0.4;
 
         /** How the TeleOp right stick turns the robot. */
         public enum TurnMode {
@@ -172,5 +141,40 @@ public class RobotConstants {
         public static double SCORING_MARGIN = 0.5; // inches the ball's edge must clear each side of the opening by
         // Ready to shoot once flywheel and turret errors are within this fraction of what the shot can take
         public static double READY_WINDOW_FRACTION = 0.5;
+    }
+
+    /** Red-side poses in Pedro coordinates (inches). Blue is rotated 180° with Alliance.apply; never write blue poses. */
+    public static class Field {
+        // Center of each cell's opening, from the red driver station's point of view, with the heading pointing out of
+        // the opening. The hive is 12.75 in from field center toward our wall, and the up cell's
+        // opening is centered 15.7 in out from the hive center. TODO: double check
+        public static Pose RED_HIVE_LEFT_CELL = new Pose(59.25, 87.7, Math.toRadians(90));   // rear cell
+        public static Pose RED_HIVE_RIGHT_CELL = new Pose(59.25, 56.3, Math.toRadians(-90)); // audience cell
+        // The up cell's opening (Competition Manual 9.6): 20 in wide, 14 in tall, centered 59.6 in
+        // above the tiles, and leaning back 30° with the arm, so its face points outward and 30° up
+        public static double HIVE_OPENING_CENTER_Z = 59.6;
+        public static double HIVE_OPENING_WIDTH = 20;
+        public static double HIVE_OPENING_HEIGHT = 14;
+        public static double HIVE_OPENING_TILT = Math.toRadians(30);
+
+        // Flower column centers, one on each perimeter wall 48 in from a corner, about 3.5 in off the wall. The set looks the same from both alliances, so it's used as is for blue.
+        // TODO: check against the real field
+        public static Pose[] FLOWERS = {
+                new Pose(48, 140.5),  // rear wall
+                new Pose(96, 3.5),    // audience wall
+                new Pose(3.5, 48),    // red alliance wall
+                new Pose(140.5, 96),  // blue alliance wall
+        };
+
+        // Robot frame, inches: width side to side, length front to back.
+        public static double ROBOT_WIDTH = 15.30315; //see below
+        public static double ROBOT_LENGTH = 12.2441; //measured from cad OCT 26- michael
+
+        // Pose resets: robot pushed into the corner, back against the alliance wall, so the center is half the
+        // length off the alliance wall and half the width off the side wall.
+        public static Pose RED_LEFT_CORNER =  // tile A6, alliance wall x rear wall
+                new Pose(ROBOT_LENGTH / 2, 144 - ROBOT_WIDTH / 2, 0);
+        public static Pose RED_RIGHT_CORNER = // tile A1, alliance wall x audience wall
+                new Pose(ROBOT_LENGTH / 2, ROBOT_WIDTH / 2, 0);
     }
 }

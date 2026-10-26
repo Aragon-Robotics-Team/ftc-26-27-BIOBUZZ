@@ -1,6 +1,6 @@
 // Camera coverage model shared by tools/camera-coverage-3d.html (browser) and tools/limelight-mount-table.js (node).
 // Units: inches and degrees. World frame: x from red to blue, y toward the audience, h up, origin at field center.
-// Hive geometry from the Competition Manual (Figs 9-9 to 9-17) as built in BiobuzzSim; tag cluster position from
+// Hive geometry from the Competition Manual (Figs 9-9 to 9-17); tag cluster position from
 // Fig 9-15 (cluster center 7.19 in behind the opening, i.e. 14.27 in from the pivot along the arm).
 (function (root) {
   const HIVE = {

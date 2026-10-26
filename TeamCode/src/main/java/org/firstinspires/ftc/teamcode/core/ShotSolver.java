@@ -17,7 +17,6 @@ import com.pedropathing.utils.Angle;
  * 1. Newton's method adjusts both until the simulated ball crosses the middle of the opening.
  * 2. The speed is then moved to the middle of the range of speeds that still score. With a fixed hood that is the most
  *    reliable arc: it leaves the most room for flywheel error either way.
- * The flight model and numbers come from BiobuzzSim (.trials/launcher_real.py, docs/launcher-design-numbers.md).
  *
  * Solved every loop from the last answer, so it usually takes one Newton step. Not thread-safe; one per Launcher.
  */
