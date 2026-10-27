@@ -31,13 +31,11 @@ public class RobotConstants {
 
     public static class Intake {
         public static String MOTOR_NAME = "intake";
-        // TODO: set direction (+ power = intake)
-        public static DcMotorSimple.Direction DIRECTION = DcMotorSimple.Direction.FORWARD;
+        public static DcMotorSimple.Direction DIRECTION = DcMotorSimple.Direction.REVERSE; // Oct 26
 
-        // TODO: tune
         public static double INTAKE_POWER = 1.0;
         public static double OUTTAKE_POWER = -1.0;
-        public static double FLOWER_INTAKE_MS = 300; // how long Auto waits at a flower with the intake on
+        public static double FLOWER_INTAKE_MS = 300; // how long Auto waits at a flower with the intake on TODO tune
     }
 
     public static class Gate {
@@ -144,21 +142,21 @@ public class RobotConstants {
 
         // ---- Flywheel ----
         // goBILDA 6000 RPM: 28 ticks/rev, about 2800 ticks/sec flat out. The counter-rollers are geared off this motor.
-        public static double FLYWHEEL_MAX_VELOCITY = 2800; // ticks/sec
+        public static double FLYWHEEL_MAX_VELOCITY = 1709; // ticks/sec (Oct 26)
         // Fixed speed for spinUp() and the Flywheel Tuner
-        public static double TARGET_VELOCITY = 2000;  // ticks/sec. TODO: tune
+        public static double TARGET_VELOCITY = 1609;  // ticks/sec (Oct 26)
         public static double VELOCITY_TOLERANCE = 50; // ticks/sec, when not aiming with ShotSolver. TODO: tune
         public static double VELOCITY_NUDGE = 25;     // ticks/sec per operator press. TODO: tune
         // Velocity PIDF on the hub: F ≈ 32767 / 2800 max ticks/sec, P ≈ F / 10
-        public static PIDFCoefficients FLYWHEEL_PIDF = new PIDFCoefficients(1.2, 0, 0, 11.7); // TODO: tune
+        public static PIDFCoefficients FLYWHEEL_PIDF = new PIDFCoefficients(1.2, 0, 0, 17.26); // Oct 26. TODO: retune wednesday
 
         // ---- Turret ----
         // Angles are robot-relative radians: 0 = facing the front of the robot, positive = counter-clockwise.
-        public static double TURRET_MOTOR_TICKS_PER_REV = 8192; // REV Through Bore on the motor shaft (1:1), in the turret motor's encoder port
+        public static double TURRET_MOTOR_TICKS_PER_REV = 8192; // REV Through Bore on the motor shaft (1:1), in the turret motor's encoder port (Oct 26)
         public static double TURRET_GEAR_RATIO = 100.0 / 30.0;   // motor revs per turret rev (30T:100T)
         // The Through Bore counts down when the turret turns CCW. setDirection(TURRET_DIRECTION) flips the count too,
         // so changing TURRET_DIRECTION means checking this again.
-        public static boolean TURRET_ENCODER_REVERSED = true;
+        public static boolean TURRET_ENCODER_REVERSED = false; // Oct 26
         // TODO: set turret soft limits from CAD
         public static double TURRET_MIN_ANGLE = -Math.PI / 2;
         public static double TURRET_MAX_ANGLE = Math.PI / 2;
@@ -166,9 +164,12 @@ public class RobotConstants {
         public static double TURRET_OFFSET_X = 1.02;
         public static double TURRET_OFFSET_Y = 0;
         // TODO: tune from turret tuner opmode
-        public static double TURRET_KP = 1.0;         // power per radian of error
-        public static double TURRET_KI = 0;           // power per radian-second
-        public static double TURRET_KD = 0;           // power per radian/sec of speed error
+        public static double TURRET_KP = 1.9;         // power per radian of error (Oct 26)
+        public static double TURRET_KI = 0;           // power per radian-second (Oct 26)
+        public static double TURRET_KD = 0.0759;           // power per radian/sec of speed error (Oct 26)
+        // Static friction: added toward the target, so small errors still move the turret. TODO: add ?
+        public static double TURRET_KS = 0;
+        public static double TURRET_KS_DEADBAND = Math.toRadians(0.5); // no kS this close, so it doesn't buzz on target
         public static double TURRET_MAX_POWER = 0.8;
         public static double TURRET_ANGLE_TOLERANCE = Math.toRadians(1); // when not aiming with ShotSolver
         public static double TURRET_NUDGE = Math.toRadians(1); // per operator press
@@ -184,7 +185,7 @@ public class RobotConstants {
         // Every shot is simulated (gravity, drag, backspin lift) to find the exit speed and turret angle that put the
         // ball through the middle of the opening, allowing for the robot's motion.
         public static double HOOD_ANGLE = Math.toRadians(67.608); // fixed hood, above horizontal
-        public static double EXIT_HEIGHT = 10.3543;  // inches above the tiles where the ball leaves. TODO: set from CAD
+        public static double EXIT_HEIGHT = 10.3543;  // inches above the tiles where the ball leaves (Oct 26). TODO: set from CAD
         public static double EXIT_RADIUS = 0;   // inches from the turret axis to where the ball leaves. TODO: set from CAD
         // Flywheel ticks/sec per inch/sec of ball exit speed. Depends on wheel size and grip, so it has to be measured:
         // stand still, nudge the flywheel until shots go through the middle of the opening, and read "Calibration" in
@@ -239,7 +240,7 @@ public class RobotConstants {
         public static double KEEP_OUT_MARGIN = 2;  // inches added around the hive's feet
 
         // Robot frame, inches: width side to side, length front to back.
-        public static double ROBOT_WIDTH = 15.748; //see below (incldues number sign)
+        public static double ROBOT_WIDTH = 15.748; //see below (incldues number sign) Oct 26
         public static double ROBOT_LENGTH = 12.2441; //measured from cad OCT 26- michael
 
         // Pose resets: robot pushed into the corner, back against the alliance wall, so the center is half the

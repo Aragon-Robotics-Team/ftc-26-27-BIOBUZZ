@@ -16,6 +16,7 @@ import org.firstinspires.ftc.teamcode.subsystems.Launcher;
  * Tune the turret PID with Panels: edit the values under Configurables > TurretTuner and watch
  * target / actual in the Graph. Copy the final values into RobotConstants.Launcher.
  * Start with the turret facing forward (that's where it zeroes).
+ * 0. Set kS (from the Turret Auto Tuner) so small errors still move the turret past friction.
  * 1. Raise kP until the turret gets to the target quickly, then back off if it overshoots.
  * 2. Add kD to damp any overshoot. Add kI only if it stalls just short of the target.
  * X / A / B (gamepad 1) jump the target left / center / right by stepDegrees, so you can watch the response.
@@ -27,6 +28,7 @@ public class TurretTuner extends OpMode {
     public static double kP = RobotConstants.Launcher.TURRET_KP;
     public static double kI = RobotConstants.Launcher.TURRET_KI;
     public static double kD = RobotConstants.Launcher.TURRET_KD;
+    public static double kS = RobotConstants.Launcher.TURRET_KS;
     public static double maxPower = RobotConstants.Launcher.TURRET_MAX_POWER;
 
     private Launcher launcher;
@@ -51,6 +53,7 @@ public class TurretTuner extends OpMode {
         RobotConstants.Launcher.TURRET_KP = kP;
         RobotConstants.Launcher.TURRET_KI = kI;
         RobotConstants.Launcher.TURRET_KD = kD;
+        RobotConstants.Launcher.TURRET_KS = kS;
         RobotConstants.Launcher.TURRET_MAX_POWER = maxPower;
 
         // Positive angle is counter-clockwise, i.e. to the left
