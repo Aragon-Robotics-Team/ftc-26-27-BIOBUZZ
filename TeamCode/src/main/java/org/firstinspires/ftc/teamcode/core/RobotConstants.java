@@ -108,8 +108,20 @@ public class RobotConstants {
         public static double TILT = Math.toRadians(22.39);  // below horizontal
         public static double ROLL = Math.toRadians(8.63);   // + = the right side of the image is higher
 
+        // ---- TEMPORARY yellow-only detector (BallPipeline) ----
+        // Stand-in until ball_pipeline.py is ported: an HSV threshold for POLLEN only, no nectar, no lighting
+        // correction. OpenCV HSV: hue 0-180, saturation and value 0-255. TODO: tune on real photos from the C270
+        public static double POLLEN_HUE_MIN = 18;
+        public static double POLLEN_HUE_MAX = 38;
+        public static double POLLEN_SAT_MIN = 110;
+        public static double POLLEN_VAL_MIN = 90;
+        public static double MIN_FILL = 0.55;        // blob area / its enclosing circle's area; a ball is ~0.8, tape ~0.2
+        public static double SIZE_GATE_MIN = 0.5;    // blob diameter / the diameter a pollen there should have
+        public static double SIZE_GATE_MAX = 1.6;
+        public static double MAX_DEPTH = 96;         // inches along the view; rows that can only hold farther balls are skipped
+
         // ---- Intake ---- (CAD)
-        public static double INTAKE_REACH = 7;      // inches from the robot center forward to the intake's mouth
+        public static double INTAKE_REACH = 7;     // inches from the robot center forward to the intake's mouth
         public static double INTAKE_WIDTH = 10.1;   // inches between the intake's side plates, centered on the robot
 
         // ---- Target ----
