@@ -1,6 +1,6 @@
 package org.firstinspires.ftc.teamcode.util;
 
-import org.firstinspires.ftc.teamcode.Alliance;
+import org.firstinspires.ftc.teamcode.core.Alliance;
 
 /**
  * Formatting for telemetry in HTML mode: telemetry.setDisplayFormat(Telemetry.DisplayFormat.HTML).

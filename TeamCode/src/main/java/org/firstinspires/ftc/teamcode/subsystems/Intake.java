@@ -1,10 +1,10 @@
 package org.firstinspires.ftc.teamcode.subsystems;
 
 import static com.pedropathing.ivy.commands.Commands.instant;
-import static org.firstinspires.ftc.teamcode.RobotConstants.Intake.DIRECTION;
-import static org.firstinspires.ftc.teamcode.RobotConstants.Intake.INTAKE_POWER;
-import static org.firstinspires.ftc.teamcode.RobotConstants.Intake.MOTOR_NAME;
-import static org.firstinspires.ftc.teamcode.RobotConstants.Intake.OUTTAKE_POWER;
+import static org.firstinspires.ftc.teamcode.core.RobotConstants.Intake.DIRECTION;
+import static org.firstinspires.ftc.teamcode.core.RobotConstants.Intake.INTAKE_POWER;
+import static org.firstinspires.ftc.teamcode.core.RobotConstants.Intake.MOTOR_NAME;
+import static org.firstinspires.ftc.teamcode.core.RobotConstants.Intake.OUTTAKE_POWER;
 
 import com.pedropathing.ivy.Command;
 import com.qualcomm.robotcore.hardware.DcMotor;

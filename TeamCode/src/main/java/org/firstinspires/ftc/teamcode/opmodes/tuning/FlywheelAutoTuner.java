@@ -1,9 +1,9 @@
 package org.firstinspires.ftc.teamcode.opmodes.tuning;
 
-import static org.firstinspires.ftc.teamcode.RobotConstants.Launcher.FLYWHEEL_DIRECTION;
-import static org.firstinspires.ftc.teamcode.RobotConstants.Launcher.FLYWHEEL_MOTOR_NAME;
-import static org.firstinspires.ftc.teamcode.RobotConstants.Launcher.TARGET_VELOCITY;
-import static org.firstinspires.ftc.teamcode.RobotConstants.Launcher.VELOCITY_TOLERANCE;
+import static org.firstinspires.ftc.teamcode.core.RobotConstants.Launcher.FLYWHEEL_DIRECTION;
+import static org.firstinspires.ftc.teamcode.core.RobotConstants.Launcher.FLYWHEEL_MOTOR_NAME;
+import static org.firstinspires.ftc.teamcode.core.RobotConstants.Launcher.TARGET_VELOCITY;
+import static org.firstinspires.ftc.teamcode.core.RobotConstants.Launcher.VELOCITY_TOLERANCE;
 
 import com.bylazar.configurables.annotations.Configurable;
 import com.bylazar.telemetry.PanelsTelemetry;
@@ -38,7 +38,7 @@ public class FlywheelAutoTuner extends LinearOpMode {
     public static double STEP_WINDOW_S = 2.0;             // how long to watch each step
     public static double MAX_OVERSHOOT = 0.05;            // fraction of the step size
     // P values to try, as multiples of F (the FTC rule of thumb is 0.1)
-    public static double[] P_MULTIPLIERS = {0.05, 0.1, 0.2, 0.4, 0.8, 1.6, 3.2};
+    public static double[] P_MULTIPLIERS = {0.05, 0.1, 0.15, 0.2, 0.25, 0.3, 0.35};
 
     private DcMotorEx flywheel;
     private TelemetryManager panels;

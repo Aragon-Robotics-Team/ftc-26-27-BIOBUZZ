@@ -1,6 +1,6 @@
 package org.firstinspires.ftc.teamcode.vision;
 
-import org.firstinspires.ftc.teamcode.Hive;
+import org.firstinspires.ftc.teamcode.core.Hive;
 
 /**
  * Decides when the camera has seen enough to change MatchState.hive. No hardware, so it's unit tested.

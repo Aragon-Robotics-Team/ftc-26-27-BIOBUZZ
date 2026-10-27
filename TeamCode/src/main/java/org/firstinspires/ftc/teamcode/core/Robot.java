@@ -1,4 +1,4 @@
-package org.firstinspires.ftc.teamcode;
+package org.firstinspires.ftc.teamcode.core;
 
 import static com.pedropathing.ivy.commands.Commands.conditional;
 import static com.pedropathing.ivy.commands.Commands.instant;
@@ -6,7 +6,7 @@ import static com.pedropathing.ivy.commands.Commands.waitMs;
 import static com.pedropathing.ivy.commands.Commands.waitUntil;
 import static com.pedropathing.ivy.groups.Groups.parallel;
 import static com.pedropathing.ivy.groups.Groups.sequential;
-import static org.firstinspires.ftc.teamcode.RobotConstants.Gate.AUTO_SHOOT_MS;
+import static org.firstinspires.ftc.teamcode.core.RobotConstants.Gate.AUTO_SHOOT_MS;
 
 import com.pedropathing.ivy.Command;
 import com.pedropathing.math.Pose;
@@ -20,7 +20,7 @@ import org.firstinspires.ftc.teamcode.subsystems.Gate;
 import org.firstinspires.ftc.teamcode.subsystems.HiveVision;
 import org.firstinspires.ftc.teamcode.subsystems.Intake;
 import org.firstinspires.ftc.teamcode.subsystems.Launcher;
-import org.firstinspires.ftc.teamcode.subsystems.Led;
+// import org.firstinspires.ftc.teamcode.subsystems.Led; // LED: commented out until it's on the robot
 import org.firstinspires.ftc.teamcode.subsystems.Subsystem;
 
 import java.util.List;
@@ -34,7 +34,7 @@ public class Robot {
     public final Intake intake;
     public final Gate gate;
     public final Launcher launcher;
-    public final Led led;
+    // public final Led led; // LED: commented out until it's on the robot
     public final HiveVision hiveVision;
     public final BallVision ballVision;
 
@@ -50,13 +50,13 @@ public class Robot {
         intake = new Intake(hardwareMap);
         gate = new Gate(hardwareMap);
         launcher = new Launcher(hardwareMap);
-        led = new Led(hardwareMap, launcher);
+        // led = new Led(hardwareMap, launcher); // LED: commented out until it's on the robot
         hiveVision = new HiveVision(hardwareMap); // off until an OpMode enables it
         ballVision = new BallVision(hardwareMap, drivebase::getPose); // off until an OpMode enables it
 
         // Hive vision first, so this loop aims at the cell it just read; ball vision after the drivetrain, so it has
         // this loop's pose; launcher before Led, so the light shows this loop's launcher state
-        subsystems = new Subsystem[]{hiveVision, drivebase, ballVision, intake, gate, launcher, led};
+        subsystems = new Subsystem[]{hiveVision, drivebase, ballVision, intake, gate, launcher /*, led */};
     }
 
     // ---- Hive ----
@@ -75,12 +75,12 @@ public class Robot {
         return parallel(instant(() -> {
             MatchState.hive = side;
             hiveVision.manualSet();
-        }), led.flash());
+        }) /*, led.flash() */);
     }
 
     /** After a tip, the other cell is up. */
     public Command flipHive() {
-        return parallel(instant(() -> MatchState.hive = MatchState.hive.flipped()), led.flash());
+        return parallel(instant(() -> MatchState.hive = MatchState.hive.flipped()) /*, led.flash() */);
     }
 
     /** Keep the turret on the hive's up cell, leading it while the robot moves. Runs until interrupted. */
@@ -132,7 +132,7 @@ public class Robot {
 
     /** Snap the pose to a known spot, e.g. with the robot pushed into a corner. Takes a red-side pose. */
     public Command resetPose(Pose redPose) {
-        return parallel(instant(() -> drivebase.setPose(MatchState.alliance.apply(redPose))), led.flash());
+        return parallel(instant(() -> drivebase.setPose(MatchState.alliance.apply(redPose))) /*, led.flash() */);
     }
 
     public void start() {

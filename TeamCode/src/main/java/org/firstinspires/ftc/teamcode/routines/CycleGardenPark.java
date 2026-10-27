@@ -9,8 +9,8 @@ import com.pedropathing.ivy.Command;
 import com.pedropathing.math.Pose;
 import com.pedropathing.paths.Path;
 
-import org.firstinspires.ftc.teamcode.Alliance;
-import org.firstinspires.ftc.teamcode.Robot;
+import org.firstinspires.ftc.teamcode.core.Alliance;
+import org.firstinspires.ftc.teamcode.core.Robot;
 
 /** Shoot the preloads, intake the garden balls and shoot them, then park in the loading zone. */
 public class CycleGardenPark extends AutoRoutine {

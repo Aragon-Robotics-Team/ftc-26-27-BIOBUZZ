@@ -15,13 +15,15 @@ public class BallGeometry {
         public final double forward, left, height; // lens position, robot frame, inches
         public final double yaw;                   // radians, + = turned left (CCW seen from above)
         public final double tilt;                  // radians below horizontal
+        public final double roll;                  // radians about the optical axis, + = the image's right side looks higher
 
-        public Mount(double forward, double left, double height, double yaw, double tilt) {
+        public Mount(double forward, double left, double height, double yaw, double tilt, double roll) {
             this.forward = forward;
             this.left = left;
             this.height = height;
             this.yaw = yaw;
             this.tilt = tilt;
+            this.roll = roll;
         }
     }
 
@@ -30,7 +32,7 @@ public class BallGeometry {
     public final Mount mount;
 
     // Camera axes in the robot frame: optical axis (forward), image right, image down
-    private final double fwdX, fwdY, fwdZ, rightX, rightY, downX, downY, downZ;
+    private final double fwdX, fwdY, fwdZ, rightX, rightY, rightZ, downX, downY, downZ;
 
     public BallGeometry(int width, int height, double fx, double fy, double cx, double cy, Mount mount) {
         this.width = width;
@@ -45,11 +47,15 @@ public class BallGeometry {
         fwdX = cosT * cosY;
         fwdY = cosT * sinY;
         fwdZ = -sinT;
-        rightX = sinY;
-        rightY = -cosY;
-        downX = -sinT * cosY;
-        downY = -sinT * sinY;
-        downZ = -cosT;
+        // Level camera first (image right horizontal), then rolled about the optical axis
+        double levelDownX = -sinT * cosY, levelDownY = -sinT * sinY, levelDownZ = -cosT;
+        double cosR = Math.cos(mount.roll), sinR = Math.sin(mount.roll);
+        rightX = cosR * sinY - sinR * levelDownX;
+        rightY = -cosR * cosY - sinR * levelDownY;
+        rightZ = -sinR * levelDownZ;
+        downX = sinR * sinY + cosR * levelDownX;
+        downY = -sinR * cosY + cosR * levelDownY;
+        downZ = cosR * levelDownZ;
     }
 
     /** Uncalibrated: square pixels, principal point in the middle, focal length from the horizontal field of view. */
@@ -78,7 +84,7 @@ public class BallGeometry {
      */
     public double depth(double u, double v, double diameter) {
         double a = (u - cx) / fx, b = (v - cy) / fy;
-        double rayZ = b * downZ + fwdZ; // the ray's vertical component (its optical-axis component is 1)
+        double rayZ = a * rightZ + b * downZ + fwdZ; // the ray's vertical component (its optical-axis component is 1)
         double drop = diameter / 2 - mount.height;
         if (rayZ >= -1e-6 || drop >= 0) return Double.NaN;
         return drop / rayZ;
@@ -108,14 +114,17 @@ public class BallGeometry {
         double dx = x - mount.forward, dy = y - mount.left, dz = z - mount.height;
         double depth = dx * fwdX + dy * fwdY + dz * fwdZ;
         if (depth <= 1e-6) return null;
-        double right = dx * rightX + dy * rightY;
+        double right = dx * rightX + dy * rightY + dz * rightZ;
         double down = dx * downX + dy * downY + dz * downZ;
         return new double[]{cx + fx * right / depth, cy + fy * down / depth};
     }
 
-    /** Image row of the horizon: a ball on the tiles always appears below it. */
+    /**
+     * Image row of the horizon, at its highest across the frame (it slopes when the camera is rolled): a ball on the
+     * tiles always appears below it.
+     */
     public double horizonRow() {
-        return cy - fy * Math.tan(mount.tilt);
+        return rowWhereRayDrops(0);
     }
 
     /**
@@ -123,8 +132,15 @@ public class BallGeometry {
      * inches (along the optical axis). Rows above it can be cleared before looking for balls.
      */
     public double firstFloorRow(double diameter, double maxDepth) {
-        // depth = (height - d/2) / (b cos(tilt) + sin(tilt)) <= maxDepth, solved for b = (v - cy) / fy
-        double b = ((mount.height - diameter / 2) / maxDepth - Math.sin(mount.tilt)) / Math.cos(mount.tilt);
+        // depth = (height - d/2) / -rayZ <= maxDepth
+        return rowWhereRayDrops((mount.height - diameter / 2) / maxDepth);
+    }
+
+    /** Topmost row, over the frame's width, where the ray drops at least k per unit along the optical axis. */
+    private double rowWhereRayDrops(double k) {
+        // a * rightZ + b * downZ + fwdZ <= -k, solved for b = (v - cy) / fy; downZ < 0. Linear in a: an edge is highest
+        double a = rightZ > 0 ? -cx / fx : (width - cx) / fx;
+        double b = (k + fwdZ + a * rightZ) / -downZ;
         return cy + fy * b;
     }
 }

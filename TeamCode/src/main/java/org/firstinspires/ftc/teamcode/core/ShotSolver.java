@@ -1,10 +1,10 @@
-package org.firstinspires.ftc.teamcode;
+package org.firstinspires.ftc.teamcode.core;
 
-import static org.firstinspires.ftc.teamcode.RobotConstants.Field.HIVE_OPENING_CENTER_Z;
-import static org.firstinspires.ftc.teamcode.RobotConstants.Field.HIVE_OPENING_HEIGHT;
-import static org.firstinspires.ftc.teamcode.RobotConstants.Field.HIVE_OPENING_TILT;
-import static org.firstinspires.ftc.teamcode.RobotConstants.Field.HIVE_OPENING_WIDTH;
-import static org.firstinspires.ftc.teamcode.RobotConstants.Launcher.*;
+import static org.firstinspires.ftc.teamcode.core.RobotConstants.Field.HIVE_OPENING_CENTER_Z;
+import static org.firstinspires.ftc.teamcode.core.RobotConstants.Field.HIVE_OPENING_HEIGHT;
+import static org.firstinspires.ftc.teamcode.core.RobotConstants.Field.HIVE_OPENING_TILT;
+import static org.firstinspires.ftc.teamcode.core.RobotConstants.Field.HIVE_OPENING_WIDTH;
+import static org.firstinspires.ftc.teamcode.core.RobotConstants.Launcher.*;
 
 import com.pedropathing.math.Pose;
 import com.pedropathing.math.Velocity;
@@ -17,7 +17,6 @@ import com.pedropathing.utils.Angle;
  * 1. Newton's method adjusts both until the simulated ball crosses the middle of the opening.
  * 2. The speed is then moved to the middle of the range of speeds that still score. With a fixed hood that is the most
  *    reliable arc: it leaves the most room for flywheel error either way.
- * The flight model and numbers come from BiobuzzSim (.trials/launcher_real.py, docs/launcher-design-numbers.md).
  *
  * Solved every loop from the last answer, so it usually takes one Newton step. Not thread-safe; one per Launcher.
  */

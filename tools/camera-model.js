@@ -1,6 +1,6 @@
 // Camera coverage model shared by tools/camera-coverage-3d.html (browser) and tools/limelight-mount-table.js (node).
 // Units: inches and degrees. World frame: x from red to blue, y toward the audience, h up, origin at field center.
-// Hive geometry from the Competition Manual (Figs 9-9 to 9-17) as built in BiobuzzSim; tag cluster position from
+// Hive geometry from the Competition Manual (Figs 9-9 to 9-17); tag cluster position from
 // Fig 9-15 (cluster center 7.19 in behind the opening, i.e. 14.27 in from the pivot along the arm).
 (function (root) {
   const HIVE = {
@@ -15,7 +15,7 @@
   };
   const FIELD = 144;
   const IDS = { Red: { North: [30, 31, 32, 33], South: [34, 35, 36, 37] }, Blue: { South: [38, 39, 40, 41], North: [42, 43, 44, 45] } };
-  const FOV = { limelight: { landscape: [54.5, 42], portrait: [42, 54.5] }, c270: [45, 34] }; // C270 at 640x480: estimate
+  const FOV = { limelight: { landscape: [54.5, 42], portrait: [42, 54.5] }, gobilda: [70, 47.3] }; // goBILDA global shutter at 1280x800: 70° H from the spec, V from the 16:10 frame
   const rad = (d) => (d * Math.PI) / 180, deg = (r) => (r * 180) / Math.PI;
   const sub = (a, b) => ({ x: a.x - b.x, y: a.y - b.y, h: a.h - b.h });
   const dot = (a, b) => a.x * b.x + a.y * b.y + a.h * b.h;
@@ -58,13 +58,16 @@
   }
 
   // ---- cameras
-  function camera(C, yaw, pitchDeg, fovDeg) {
-    const p = rad(pitchDeg);
+  // rollDeg turns the image about the view axis: + = the image's right side looks higher
+  function camera(C, yaw, pitchDeg, fovDeg, rollDeg) {
+    const p = rad(pitchDeg), q = rad(rollDeg || 0), cq = Math.cos(q), sq = Math.sin(q);
+    const r0 = { x: -Math.sin(yaw), y: Math.cos(yaw), h: 0 };
+    const u0 = { x: -Math.sin(p) * Math.cos(yaw), y: -Math.sin(p) * Math.sin(yaw), h: Math.cos(p) };
     return {
       C, yaw, pitch: p,
       f: { x: Math.cos(p) * Math.cos(yaw), y: Math.cos(p) * Math.sin(yaw), h: Math.sin(p) },
-      r: { x: -Math.sin(yaw), y: Math.cos(yaw), h: 0 },
-      u: { x: -Math.sin(p) * Math.cos(yaw), y: -Math.sin(p) * Math.sin(yaw), h: Math.cos(p) },
+      r: { x: cq * r0.x + sq * u0.x, y: cq * r0.y + sq * u0.y, h: cq * r0.h + sq * u0.h },
+      u: { x: cq * u0.x - sq * r0.x, y: cq * u0.y - sq * r0.y, h: cq * u0.h - sq * r0.h },
       hf: rad(fovDeg[0]) / 2, vf: rad(fovDeg[1]) / 2,
     };
   }
@@ -119,7 +122,7 @@
     return pts;
   }
 
-  // ---- robot. cfg: { alliance, up, limelight: {h, tilt, orient, range, off}, webcam: {h, tilt, toe, side, fwd, lat} }
+  // ---- robot. cfg: { alliance, up, limelight: {h, tilt, orient, range, off}, webcam: {h, tilt, toe, roll, side, fwd, lat} }
   // heading = chassis yaw (radians, 0 = +x). Turret keeps the Limelight on our up cell's tags within +-90 deg of the chassis
   // (clamp = false aims freely, for the coverage maps).
   function limelight(cfg, rx, ry, heading, clamp) {
@@ -144,7 +147,7 @@
     const c = Math.cos(heading), s = Math.sin(heading);
     const lx = W.fwd, ly = lat * W.lat;
     const C = { x: rx + lx * c - ly * s, y: ry + lx * s + ly * c, h: W.h };
-    return camera(C, heading - lat * rad(W.toe), -W.tilt, FOV.c270);
+    return camera(C, heading - lat * rad(W.toe), -W.tilt, FOV.gobilda, -lat * (W.roll || 0)); // mirrored on the right
   }
   // floor in front of the intake (robot frame: fwd from the intake lip, lat across a 14 in mouth) seen by the webcam
   function webcamMouth(cfg, lip) {

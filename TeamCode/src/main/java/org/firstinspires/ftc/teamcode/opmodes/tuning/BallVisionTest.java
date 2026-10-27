@@ -1,8 +1,8 @@
 package org.firstinspires.ftc.teamcode.opmodes.tuning;
 
 import static com.pedropathing.ivy.Scheduler.schedule;
-import static org.firstinspires.ftc.teamcode.RobotConstants.BallVision.*;
-import static org.firstinspires.ftc.teamcode.RobotConstants.Drive.SLOW_MODE_SCALE;
+import static org.firstinspires.ftc.teamcode.core.RobotConstants.BallVision.*;
+import static org.firstinspires.ftc.teamcode.core.RobotConstants.Drive.SLOW_MODE_SCALE;
 
 import com.bylazar.configurables.annotations.Configurable;
 import com.bylazar.telemetry.PanelsTelemetry;

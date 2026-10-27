@@ -31,13 +31,15 @@
   canvas { display: block; width: 100%; height: 100%; }
   .legend { position: absolute; left: 12px; bottom: 12px; background: rgba(20,22,26,.85); border: 1px solid var(--line); border-radius: 8px; padding: 8px 10px; color: var(--muted); display: grid; gap: 3px; }
   .legend span::before { content: ""; display: inline-block; width: 11px; height: 11px; border-radius: 2px; margin-right: 6px; vertical-align: -1px; background: var(--c); }
+  .pip { position: absolute; right: 12px; bottom: 12px; border: 1px solid #ffd60a; border-radius: 4px; pointer-events: none; }
+  .pip span { position: absolute; left: 6px; top: 4px; color: #ffd60a; font-size: 12px; text-shadow: 0 0 3px #000; }
   .tip { position: absolute; right: 12px; top: 12px; color: var(--muted); background: rgba(20,22,26,.85); border: 1px solid var(--line); border-radius: 8px; padding: 6px 10px; }
 </style>
 </head>
 <body>
 <aside>
   <h1>Camera coverage</h1>
-  <p class="hint">Limelight 3A on the turret reading hive tags, C270 webcam on an intake side plate looking for balls. Tags are opaque stickers: they only read from the face side.</p>
+  <p class="hint">Limelight 3A on the turret reading hive tags, goBILDA global shutter webcam on an intake side plate looking for balls. Tags are opaque stickers: they only read from the face side.</p>
 
   <h2>Hive</h2>
   <label>Our alliance<div class="seg" data-key="alliance"><button data-v="Red" class="on">Red</button><button data-v="Blue">Blue</button></div></label>
@@ -50,37 +52,45 @@
 
   <h2>Limelight 3A (turret)</h2>
   <label>Orientation<div class="seg" data-key="llOrient"><button data-v="landscape" class="on">Landscape</button><button data-v="portrait">Portrait</button></div></label>
-  <label><div class="row">Lens height <b id="llHV"></b></div><input id="llH" type="range" min="6" max="20" step="0.5" value="11"></label>
-  <label><div class="row">Tilt up <b id="llTiltV"></b></div><input id="llTilt" type="range" min="0" max="50" step="1" value="30"></label>
+  <label><div class="row">Lens height <b id="llHV"></b></div><input id="llH" type="range" min="6" max="20" step="0.5" value="12"></label>
+  <label><div class="row">Tilt up <b id="llTiltV"></b></div><input id="llTilt" type="range" min="0" max="50" step="1" value="45"></label>
   <label><div class="row">Max range, face on <b id="llRangeV"></b></div><input id="llRange" type="range" min="50" max="200" step="5" value="110"></label>
   <label><div class="row">Max angle off the tag's face <b id="llOffV"></b></div><input id="llOff" type="range" min="30" max="80" step="1" value="60"></label>
 
-  <h2>C270 webcam (chassis)</h2>
+  <h2>goBILDA global shutter webcam (chassis)</h2>
   <label>Side plate<div class="seg" data-key="wSide"><button data-v="left" class="on">Left</button><button data-v="right">Right</button></div></label>
-  <label><div class="row">Lens height <b id="wHV"></b></div><input id="wH" type="range" min="4" max="10" step="0.5" value="5"></label>
-  <label><div class="row">Tilt down <b id="wTiltV"></b></div><input id="wTilt" type="range" min="0" max="45" step="1" value="17"></label>
+  <label><div class="row">Lens height <b id="wHV"></b></div><input id="wH" type="range" min="4" max="10" step="0.5" value="7"></label>
+  <label><div class="row">Tilt down <b id="wTiltV"></b></div><input id="wTilt" type="range" min="0" max="45" step="1" value="22"></label>
   <label><div class="row">Toe-in toward the centre <b id="wToeV"></b></div><input id="wToe" type="range" min="0" max="40" step="1" value="22"></label>
-  <label><div class="row">Lens ahead of robot centre <b id="wFwdV"></b></div><input id="wFwd" type="range" min="4" max="14" step="0.5" value="11"></label>
-  <label><div class="row">Lens off the centre line <b id="wLatV"></b></div><input id="wLat" type="range" min="0" max="10" step="0.5" value="9"></label>
+  <label><div class="row">Roll, outer side up <b id="wRollV"></b></div><input id="wRoll" type="range" min="-20" max="20" step="0.1" value="8.6"></label>
+  <label><div class="row">Lens ahead of robot centre <b id="wFwdV"></b></div><input id="wFwd" type="range" min="4" max="14" step="0.5" value="5.5"></label>
+  <label><div class="row">Lens off the centre line <b id="wLatV"></b></div><input id="wLat" type="range" min="0" max="10" step="0.5" value="5.5"></label>
+
+  <h2>Pollen and nectar</h2>
+  <div class="seg" data-key="balls" style="margin-bottom:6px"><button data-v="staged" class="on">As staged</button><button data-v="scattered">Scattered</button></div>
+  <button class="btn" id="rescatter" style="width:100%;margin-bottom:9px;display:none">Scatter again</button>
 
   <h2>Show</h2>
   <label class="check"><input type="checkbox" id="showHeat" checked> Where the Limelight can read the hive state</label>
   <label class="check"><input type="checkbox" id="showLL" checked> Limelight view</label>
   <label class="check"><input type="checkbox" id="showW" checked> Webcam view and floor footprint</label>
+  <label class="check"><input type="checkbox" id="showPip" checked> What the webcam sees</label>
 
   <h2>Limelight readout</h2>
   <table id="llStats"></table>
   <h2>Webcam readout</h2>
   <table id="wStats"></table>
-  <p class="hint" style="margin-top:10px">Range and angle limits are estimates; measure them on the practice hive. C270 view (45° × 34° at 640 × 480) is estimated from Logitech's 55° diagonal.</p>
+  <p class="hint" style="margin-top:10px">Range and angle limits are estimates; measure them on the practice hive. Webcam view (70° × 47° at 1280 × 800) is from goBILDA's 70° horizontal spec; lower resolutions may crop it.</p>
 </aside>
 <main>
   <canvas id="view"></canvas>
+  <div class="pip" id="pip"><span>Webcam</span></div>
   <div class="legend">
     <span style="--c:#30a46c">Floor: hive state readable, up cell's tags</span>
     <span style="--c:#d6a21e">Floor: only the down cell's tags</span>
     <span style="--c:#3e8ee8">Limelight view</span>
     <span style="--c:#ffd60a">Webcam view and floor it sees</span>
+    <span style="--c:#f2c230">Pollen and nectar</span>
     <span style="--c:#30a46c">Tag read now</span>
     <span style="--c:#f5f5f5">Tag not read</span>
   </div>
@@ -93,15 +103,15 @@
 const M = window.CameraModel;
 const S = {
   alliance: 'Red', up: 'South', heading: -90, robot: { x: -12.75, y: 62 },
-  llOrient: 'landscape', llH: 11, llTilt: 30, llRange: 110, llOff: 60,
-  wSide: 'left', wH: 5, wTilt: 17, wToe: 22, wFwd: 11, wLat: 9,
-  showHeat: true, showLL: true, showW: true,
+  llOrient: 'landscape', llH: 12, llTilt: 45, // CAD mount llRange: 110, llOff: 60,
+  wSide: 'left', wH: 7, wTilt: 22, wToe: 22, wRoll: 8.6, wFwd: 5.5, wLat: 5.5, // CAD mount
+  showHeat: true, showLL: true, showW: true, showPip: true, balls: 'staged',
 };
-const LIP = 11; // intake lip, inches ahead of robot centre
+const LIP = 7; // intake lip, inches ahead of robot centre (CAD)
 const cfg = () => ({
   alliance: S.alliance, up: S.up,
   limelight: { h: S.llH, tilt: S.llTilt, orient: S.llOrient, range: S.llRange, off: S.llOff },
-  webcam: { h: S.wH, tilt: S.wTilt, toe: S.wToe, side: S.wSide, fwd: S.wFwd, lat: S.wLat },
+  webcam: { h: S.wH, tilt: S.wTilt, toe: S.wToe, roll: S.wRoll, side: S.wSide, fwd: S.wFwd, lat: S.wLat },
 });
 const V = (p) => new THREE.Vector3(p.x, p.h, p.y); // model (x, y, h) -> three (x, up, z)
 
@@ -131,8 +141,9 @@ function label(text, x, z) {
   const c = document.createElement('canvas'); c.width = 256; c.height = 48;
   const g = c.getContext('2d'); g.fillStyle = '#9aa1ab'; g.font = '28px system-ui'; g.textAlign = 'center'; g.fillText(text, 128, 34);
   const s = new THREE.Sprite(new THREE.SpriteMaterial({ map: new THREE.CanvasTexture(c), depthTest: false }));
-  s.scale.set(40, 7.5, 1); s.position.set(x, 16, z); scene.add(s);
+  s.scale.set(40, 7.5, 1); s.position.set(x, 16, z); scene.add(s); labels.push(s);
 }
+const labels = [];
 label('audience side', 0, 80); label('scoring side', 0, -80); label('red', -84, 0); label('blue', 84, 0);
 
 // hive frame (static)
@@ -150,9 +161,77 @@ for (const sx of [-1, 1]) {
 }
 bar({ x: -FX, y: 0, h: M.HIVE.pivot }, { x: FX, y: 0, h: M.HIVE.pivot }, 0.9);
 
+// flowers (Competition Manual 9.7): a column on each wall, 4 in opening 21.5 in up; centers from RobotConstants.FLOWERS
+const FLOWERS = [{ x: -24, y: -68.5 }, { x: 24, y: 68.5 }, { x: -68.5, y: 24 }, { x: 68.5, y: -24 }]; // rear, audience, red, blue walls
+for (const f of FLOWERS) {
+  const column = new THREE.Mesh(new THREE.CylinderGeometry(2.2, 2.2, 21.5, 20, 1, true), new THREE.MeshLambertMaterial({ color: 0xb8c0cc, transparent: true, opacity: 0.25, side: THREE.DoubleSide, depthWrite: false }));
+  column.position.set(f.x, 21.5 / 2, f.y); scene.add(column);
+}
+
 // ---- dynamic groups
-const hiveGroup = new THREE.Group(), robotGroup = new THREE.Group(), viewGroup = new THREE.Group();
-scene.add(hiveGroup, robotGroup, viewGroup);
+const hiveGroup = new THREE.Group(), robotGroup = new THREE.Group(), viewGroup = new THREE.Group(), ballGroup = new THREE.Group();
+scene.add(hiveGroup, robotGroup, viewGroup, ballGroup);
+
+// Scoring elements staged for a match (Competition Manual 10.3.1). POLLEN 2.8 in, NECTAR 3.6 in. Not shown: the 4
+// POLLEN pre-loaded in each robot.
+const POLLEN = 2.8, NECTAR = 3.6;
+const ballMat = { pollen: new THREE.MeshLambertMaterial({ color: 0xf2c230 }), Red: new THREE.MeshLambertMaterial({ color: 0xd8343a }), Blue: new THREE.MeshLambertMaterial({ color: 0x2f7fe0 }) };
+const ballGeo = { pollen: new THREE.SphereGeometry(POLLEN / 2, 18, 12), nectar: new THREE.SphereGeometry(NECTAR / 2, 18, 12) };
+function ball(kind, p) {
+  const m = new THREE.Mesh(kind === 'pollen' ? ballGeo.pollen : ballGeo.nectar, ballMat[kind]);
+  m.position.copy(V(p)); ballGroup.add(m);
+}
+// The same 40 balls (24 pollen, 8 of each nectar) dropped at random on the tiles: inside the walls, off the hive's
+// foot bars, the flowers and the robot, and not on top of each other. Kept until scattered again.
+let scattered = null;
+function scatter() {
+  const kinds = [...Array(24).fill('pollen'), ...Array(8).fill('Red'), ...Array(8).fill('Blue')];
+  const placed = [];
+  const free = (x, y, r) => Math.abs(x) <= 72 - r && Math.abs(y) <= 72 - r
+    && !(Math.abs(Math.abs(x) - FX) < 1 + r && Math.abs(y) < FY + 1 + r)
+    && FLOWERS.every((f) => Math.hypot(x - f.x, y - f.y) > 2.2 + r)
+    && Math.hypot(x - S.robot.x, y - S.robot.y) > 10 + r
+    && placed.every((b) => Math.hypot(x - b.p.x, y - b.p.y) > b.r + r);
+  for (const kind of kinds) {
+    const r = (kind === 'pollen' ? POLLEN : NECTAR) / 2;
+    for (let tries = 0; tries < 500; tries++) {
+      const x = (Math.random() * 2 - 1) * 72, y = (Math.random() * 2 - 1) * 72;
+      if (free(x, y, r)) { placed.push({ kind, r, p: { x, y, h: r } }); break; }
+    }
+  }
+  scattered = placed;
+}
+function buildBalls() {
+  ballGroup.clear();
+  document.getElementById('rescatter').style.display = S.balls === 'scattered' ? '' : 'none';
+  if (S.balls === 'scattered') {
+    if (!scattered) scatter();
+    for (const b of scattered) ball(b.kind, b.p);
+    return;
+  }
+  // 4 in each FLOWER, stacked in the column from the tiles
+  for (const f of FLOWERS) for (let i = 0; i < 4; i++) ball('pollen', { x: f.x, y: f.y, h: POLLEN / 2 + i * POLLEN });
+  // 4 in each GARDEN, in a line from the corner nearest the alliance area along the wall: red on the audience wall,
+  // blue on the rear wall
+  for (let i = 0; i < 4; i++) {
+    const along = -72 + POLLEN / 2 + i * POLLEN, off = 72 - POLLEN / 2;
+    ball('pollen', { x: along, y: off, h: POLLEN / 2 });
+    ball('pollen', { x: -along, y: -off, h: POLLEN / 2 });
+  }
+  for (const al of ['Red', 'Blue']) {
+    const side = al === 'Red' ? -1 : 1;
+    // 3 in the up cell, against its back wall and in a line from the side nearest the alliance's own area
+    const up = al === S.alliance ? S.up : (S.alliance === 'Red' ? 'North' : 'South'); // as buildHive draws it
+    const s = up === 'South' ? 1 : -1, floor = M.HIVE.rise - M.HIVE.cellH / 2;
+    for (let i = 0; i < 3; i++) {
+      const x = side * (M.HIVE.cellW / 2 - NECTAR / 2 - i * NECTAR);
+      const p = M.hubToWorld({ x: 0, up: floor + NECTAR / 2, along: s * (M.HIVE.gap / 2 + NECTAR / 2) }, al, up);
+      ball(al, { x: p.x + x, y: p.y, h: p.h });
+    }
+    // 5 in the alliance area, outside the alliance wall (where on the floor there is up to the drive team)
+    for (let i = 0; i < 5; i++) ball(al, { x: side * (72 + 8), y: (i - 2) * (NECTAR + 1), h: NECTAR / 2 });
+  }
+}
 function clear(g) { while (g.children.length) { const c = g.children.pop(); c.traverse?.((o) => { o.geometry?.dispose(); o.material?.map?.dispose(); o.material?.dispose?.(); }); } }
 
 // heatmap texture on the floor
@@ -227,16 +306,27 @@ function buildRobot(ll, wcam) {
   clear(robotGroup);
   const h = THREE.MathUtils.degToRad(S.heading), R = S.robot;
   const chassis = new THREE.Group(); chassis.position.set(R.x, 0, R.y); chassis.rotation.y = -h; robotGroup.add(chassis);
-  const body = new THREE.Mesh(new THREE.BoxGeometry(18, 9, 18), new THREE.MeshLambertMaterial({ color: 0x8a7a5c })); body.position.y = 4.5; chassis.add(body);
-  const intake = new THREE.Mesh(new THREE.BoxGeometry(2, 5, 14), new THREE.MeshLambertMaterial({ color: 0xd9b88a })); intake.position.set(10, 3.5, 0); chassis.add(intake);
+  // CAD: frame 12.25 in front to back, 15.75 in across; intake side plates reach LIP, 10.1 in apart
+  const body = new THREE.Mesh(new THREE.BoxGeometry(12.25, 9, 15.75), new THREE.MeshLambertMaterial({ color: 0x8a7a5c })); body.position.y = 4.5; chassis.add(body);
+  for (const side of [-1, 1]) {
+    const plate = new THREE.Mesh(new THREE.BoxGeometry(LIP - 6.1, 1.6, 0.13), new THREE.MeshLambertMaterial({ color: 0xd9b88a }));
+    plate.position.set((LIP + 6.1) / 2, 3.9, side * 5.1); chassis.add(plate);
+  }
   const turret = new THREE.Group(); turret.position.y = 9; turret.rotation.y = -ll.turretRel; chassis.add(turret);
   const disc = new THREE.Mesh(new THREE.CylinderGeometry(5, 5, 1.5, 24), new THREE.MeshLambertMaterial({ color: 0xa0522d })); disc.position.y = 0.75; turret.add(disc);
   const launcher = new THREE.Mesh(new THREE.BoxGeometry(10, 7, 7), new THREE.MeshLambertMaterial({ color: 0xc8b48c, transparent: true, opacity: 0.8 })); launcher.position.set(0, 5, 0); turret.add(launcher);
   const llBox = new THREE.Mesh(new THREE.BoxGeometry(1.5, 2.2, 3), new THREE.MeshLambertMaterial({ color: 0x111111 }));
   llBox.position.copy(V(ll.cam.C)); robotGroup.add(llBox);
   const wBox = new THREE.Mesh(new THREE.BoxGeometry(1.2, 1.2, 2.8), new THREE.MeshLambertMaterial({ color: 0x222222 }));
-  wBox.position.copy(V(wcam.C)); robotGroup.add(wBox);
+  wBox.position.copy(V(wcam.C)); robotGroup.add(wBox); webcamBox = wBox;
+  // what the webcam sees: a three camera at the lens, looking along f with the image's up along u
+  pipCam.fov = 2 * THREE.MathUtils.radToDeg(wcam.vf); pipCam.aspect = Math.tan(wcam.hf) / Math.tan(wcam.vf);
+  pipCam.position.copy(V(wcam.C)); pipCam.up.copy(V(wcam.u));
+  pipCam.lookAt(V(wcam.C).add(V(wcam.f))); pipCam.updateProjectionMatrix();
+  resize();
 }
+const pipCam = new THREE.PerspectiveCamera(47, 1.6, 0.5, 400);
+let webcamBox = null;
 
 function buildViews(ll, wcam) {
   clear(viewGroup);
@@ -284,7 +374,7 @@ function readouts(ll) {
 }
 
 function update() {
-  for (const [id, unit] of [['heading', '°'], ['llH', ' in'], ['llTilt', '°'], ['llRange', ' in'], ['llOff', '°'], ['wH', ' in'], ['wTilt', '°'], ['wToe', '°'], ['wFwd', ' in'], ['wLat', ' in']])
+  for (const [id, unit] of [['heading', '°'], ['llH', ' in'], ['llTilt', '°'], ['llRange', ' in'], ['llOff', '°'], ['wH', ' in'], ['wTilt', '°'], ['wToe', '°'], ['wRoll', '°'], ['wFwd', ' in'], ['wLat', ' in']])
     document.getElementById(id + 'V').textContent = S[id] + unit;
   const c = cfg(), h = THREE.MathUtils.degToRad(S.heading);
   const ll = M.limelight(c, S.robot.x, S.robot.y, h, true);
@@ -292,7 +382,7 @@ function update() {
   const reads = new Map();
   ll.up.forEach((t, i) => reads.set(t.id, ll.ru[i].ok)); ll.dn.forEach((t, i) => reads.set(t.id, ll.rd[i].ok));
   heat.visible = S.showHeat; if (S.showHeat) drawHeat();
-  buildHive(reads); buildRobot(ll, wcam); buildViews(ll, wcam); readouts(ll);
+  buildHive(reads); buildBalls(); buildRobot(ll, wcam); buildViews(ll, wcam); readouts(ll);
 }
 
 // ---- controls
@@ -301,12 +391,13 @@ document.querySelectorAll('.seg[data-key]').forEach((seg) => seg.addEventListene
   seg.querySelectorAll('button').forEach((x) => x.classList.toggle('on', x === b));
   S[seg.dataset.key] = b.dataset.v; update();
 }));
-for (const id of ['heading', 'llH', 'llTilt', 'llRange', 'llOff', 'wH', 'wTilt', 'wToe', 'wFwd', 'wLat'])
+for (const id of ['heading', 'llH', 'llTilt', 'llRange', 'llOff', 'wH', 'wTilt', 'wToe', 'wRoll', 'wFwd', 'wLat'])
   document.getElementById(id).addEventListener('input', (ev) => { S[id] = +ev.target.value; update(); });
-for (const id of ['showHeat', 'showLL', 'showW'])
+for (const id of ['showHeat', 'showLL', 'showW', 'showPip'])
   document.getElementById(id).addEventListener('change', (ev) => { S[id] = ev.target.checked; update(); });
 function setHeading(deg) { S.heading = Math.round(((deg + 540) % 360) - 180); document.getElementById('heading').value = S.heading; update(); }
 function hiveBearing() { const c = cfg(), a = M.clusterCenter(M.tags(c.alliance, c.up, c.up)); return Math.atan2(a.y - S.robot.y, a.x - S.robot.x) * 180 / Math.PI; }
+document.getElementById('rescatter').onclick = () => { scatter(); update(); };
 document.getElementById('faceHive').onclick = () => setHeading(hiveBearing());
 document.getElementById('faceAway').onclick = () => setHeading(hiveBearing() + 180);
 
@@ -324,9 +415,24 @@ canvas.addEventListener('pointerup', (e) => {
   }
 });
 
+const pipEl = document.getElementById('pip');
+let pip = null; // inset rectangle, CSS pixels from the canvas's bottom left
 function resize() {
   const r = canvas.parentElement.getBoundingClientRect();
   renderer.setSize(r.width, r.height, false); cam3.aspect = r.width / r.height; cam3.updateProjectionMatrix();
+  const w = Math.round(Math.min(r.width * 0.42, 480)), h = Math.round(w / pipCam.aspect);
+  pip = { x: r.width - w - 12, y: 12, w, h };
+  Object.assign(pipEl.style, { width: w + 'px', height: h + 'px', display: S.showPip ? '' : 'none' });
+}
+function render() {
+  const r = canvas.parentElement.getBoundingClientRect();
+  renderer.setScissorTest(false); renderer.setViewport(0, 0, r.width, r.height); renderer.render(scene, cam3);
+  if (!S.showPip || !pip) return;
+  const hidden = [viewGroup, heat, webcamBox, ...labels].filter((o) => o && o.visible);
+  hidden.forEach((o) => { o.visible = false; });
+  renderer.setScissorTest(true); renderer.setScissor(pip.x, pip.y, pip.w, pip.h); renderer.setViewport(pip.x, pip.y, pip.w, pip.h);
+  renderer.render(scene, pipCam);
+  hidden.forEach((o) => { o.visible = true; });
 }
 document.getElementById('views').addEventListener('click', (ev) => {
   const b = ev.target.closest('button'); if (!b) return;
@@ -337,7 +443,7 @@ const view0 = new URLSearchParams(location.search).get('view');
 if (view0) document.querySelector(`#views [data-v="${view0}"]`)?.click();
 window.addEventListener('resize', resize);
 resize(); update();
-(function loop() { controls.update(); renderer.render(scene, cam3); requestAnimationFrame(loop); })();
+(function loop() { controls.update(); render(); requestAnimationFrame(loop); })();
 </script>
 </body>
 </html>

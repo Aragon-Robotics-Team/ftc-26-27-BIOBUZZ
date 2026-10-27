@@ -11,8 +11,8 @@
     "gamepad2": "Operator",
 
     "gamepad1.left_stick": "Drive (field-centric: forward = away from our driver station)",
-    "gamepad1.right_stick": "Point the intake this way (field-centric); holds that heading when let go",
-    "gamepad1.left_trigger": "Hold: slow mode (driving, not turning)",
+    "gamepad1.right_stick": "Turn (x). With TURN_MODE = TWIN_STICK: point the intake this way, holds that heading",
+    "gamepad1.left_trigger": "Hold: slow mode (turning too, except with TWIN_STICK)",
     "gamepad1.right_trigger": "Hold: open gate and feed the shooter",
     "gamepad1.right_bumper": "Flywheel on",
     "gamepad1.left_bumper": "Flywheel off",
@@ -54,6 +54,62 @@
     "gamepad1.cross": "Jump target heading to the start heading",
     "gamepad1.circle": "Jump target heading right by stepDegrees",
     "gamepad1.triangle": "Turn the target heading around (180°)"
+  },
+
+  "XboxSeriesTeleOp": {
+    "gamepad1": "Driver (Xbox Series controller; the rest is as in TeleOp)",
+    "gamepad1.left_stick": "Drive (field-centric), left / right reversed for this controller",
+    "gamepad1.right_stick": "LT / RT: turn left / right (this controller sends its triggers here)",
+    "gamepad1.circle": "Hold: open gate and feed the shooter"
+  },
+
+  "Controller Test": {
+    "gamepad1.left_stick": "Shown on screen",
+    "gamepad1.right_stick": "Shown on screen",
+    "gamepad1.left_trigger": "Shown on screen",
+    "gamepad1.right_trigger": "Shown on screen",
+    "gamepad1.cross": "Shown on screen",
+    "gamepad1.circle": "Shown on screen",
+    "gamepad1.square": "Shown on screen",
+    "gamepad1.triangle": "Shown on screen",
+    "gamepad1.dpad_up": "Shown on screen",
+    "gamepad1.dpad_down": "Shown on screen",
+    "gamepad1.dpad_left": "Shown on screen",
+    "gamepad1.dpad_right": "Shown on screen",
+    "gamepad1.left_bumper": "Shown on screen",
+    "gamepad1.right_bumper": "Shown on screen",
+    "gamepad1.left_stick_button": "Shown on screen",
+    "gamepad1.right_stick_button": "Shown on screen",
+    "gamepad1.share": "Shown on screen",
+    "gamepad1.options": "Shown on screen",
+    "gamepad1.ps": "Shown on screen",
+    "gamepad1.touchpad": "Shown on screen",
+    "gamepad2.left_stick": "Shown on screen",
+    "gamepad2.right_stick": "Shown on screen",
+    "gamepad2.left_trigger": "Shown on screen",
+    "gamepad2.right_trigger": "Shown on screen",
+    "gamepad2.cross": "Shown on screen",
+    "gamepad2.circle": "Shown on screen",
+    "gamepad2.square": "Shown on screen",
+    "gamepad2.triangle": "Shown on screen",
+    "gamepad2.dpad_up": "Shown on screen",
+    "gamepad2.dpad_down": "Shown on screen",
+    "gamepad2.dpad_left": "Shown on screen",
+    "gamepad2.dpad_right": "Shown on screen",
+    "gamepad2.left_bumper": "Shown on screen",
+    "gamepad2.right_bumper": "Shown on screen",
+    "gamepad2.left_stick_button": "Shown on screen",
+    "gamepad2.right_stick_button": "Shown on screen",
+    "gamepad2.share": "Shown on screen",
+    "gamepad2.options": "Shown on screen",
+    "gamepad2.ps": "Shown on screen",
+    "gamepad2.touchpad": "Shown on screen"
+  },
+
+  "Localization Test": {
+    "gamepad1.left_stick": "Drive (robot-centric)",
+    "gamepad1.right_stick": "Turn: spin in place to check the pod offsets",
+    "gamepad1.cross": "Clear the trail and reset the pose to 0, 0"
   },
 
   "Flywheel Tuner": {

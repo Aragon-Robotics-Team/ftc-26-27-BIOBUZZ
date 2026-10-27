@@ -1,9 +1,11 @@
-package org.firstinspires.ftc.teamcode;
+package org.firstinspires.ftc.teamcode.core;
 
 import static com.pedropathing.api.Paths.line;
 import static com.pedropathing.ivy.groups.Groups.sequential;
-import static org.firstinspires.ftc.teamcode.RobotConstants.BallVision.*;
-import static org.firstinspires.ftc.teamcode.RobotConstants.Drive.INTAKE_HEADING_OFFSET;
+import static org.firstinspires.ftc.teamcode.core.RobotConstants.BallVision.*;
+import static org.firstinspires.ftc.teamcode.core.RobotConstants.Drive.INTAKE_HEADING_OFFSET;
+import static org.firstinspires.ftc.teamcode.core.RobotConstants.Field.ROBOT_LENGTH;
+import static org.firstinspires.ftc.teamcode.core.RobotConstants.Field.ROBOT_WIDTH;
 
 import com.pedropathing.follower.Follower;
 import com.pedropathing.ivy.Command;
@@ -27,7 +29,6 @@ import org.firstinspires.ftc.teamcode.vision.PollenTracker;
  */
 public class PollenChase {
     private static final int MAX_TRIES = 3;
-    private static final double HALF_ROBOT = 9; // inches; keeps path ends inside the walls. TODO: real robot size
 
     private enum State {
         APPROACH, // driving at a target in view
@@ -166,7 +167,9 @@ public class PollenChase {
                 .with(Constants.foresightConfig.maxPathSpeed.at(CHASE_MAX_SPEED)));
     }
 
+    /** Keeps path ends inside the walls, by half the robot's longer side. */
     private static double clamp(double v) {
-        return Math.max(HALF_ROBOT, Math.min(144 - HALF_ROBOT, v));
+        double half = Math.max(ROBOT_WIDTH, ROBOT_LENGTH) / 2;
+        return Math.max(half, Math.min(144 - half, v));
     }
 }

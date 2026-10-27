@@ -3,7 +3,7 @@ package org.firstinspires.ftc.teamcode.subsystems;
 import static com.pedropathing.ivy.commands.Commands.conditional;
 import static com.pedropathing.ivy.commands.Commands.infinite;
 import static com.pedropathing.ivy.commands.Commands.instant;
-import static org.firstinspires.ftc.teamcode.RobotConstants.Launcher.*;
+import static org.firstinspires.ftc.teamcode.core.RobotConstants.Launcher.*;
 
 import com.pedropathing.ivy.Command;
 import com.pedropathing.math.Pose;
@@ -17,8 +17,8 @@ import com.qualcomm.robotcore.util.ElapsedTime;
 import com.qualcomm.robotcore.util.Range;
 
 import org.firstinspires.ftc.robotcore.external.Telemetry;
-import org.firstinspires.ftc.teamcode.ShotSolver;
-import org.firstinspires.ftc.teamcode.ShotSolver.Shot;
+import org.firstinspires.ftc.teamcode.core.ShotSolver;
+import org.firstinspires.ftc.teamcode.core.ShotSolver.Shot;
 
 import java.util.function.Supplier;
 
@@ -42,7 +42,8 @@ public class Launcher implements Subsystem {
 
     private final DcMotorEx flywheel;
     private final DcMotorEx turret;
-    private final double turretTicksPerRadian = TURRET_MOTOR_TICKS_PER_REV * TURRET_GEAR_RATIO / (2 * Math.PI);
+    private final double turretTicksPerRadian =
+            (TURRET_ENCODER_REVERSED ? -1 : 1) * TURRET_MOTOR_TICKS_PER_REV * TURRET_GEAR_RATIO / (2 * Math.PI);
 
     private double targetVelocity = 0;
     private double flywheelVelocity = 0;
@@ -293,6 +294,7 @@ public class Launcher implements Subsystem {
 
         double power = TURRET_KP * error + TURRET_KI * turretIntegral + TURRET_KD * (turretTargetRate - turretVelocity)
                 + TURRET_KV * turretTargetRate;
+        if (Math.abs(error) > TURRET_KS_DEADBAND) power += TURRET_KS * Math.signum(error);
         turret.setPower(Range.clip(power, -TURRET_MAX_POWER, TURRET_MAX_POWER));
     }
 

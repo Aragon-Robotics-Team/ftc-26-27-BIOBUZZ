@@ -9,8 +9,8 @@ import com.pedropathing.ivy.Command;
 import com.pedropathing.math.Pose;
 import com.pedropathing.paths.Path;
 
-import org.firstinspires.ftc.teamcode.Alliance;
-import org.firstinspires.ftc.teamcode.Robot;
+import org.firstinspires.ftc.teamcode.core.Alliance;
+import org.firstinspires.ftc.teamcode.core.Robot;
 
 /**
  * 2 Cycles (Garden) + Park (doc/auto-pathing.md, doc/autoPP/red_2cycle_park.pp): shoot the preloads, collect the
