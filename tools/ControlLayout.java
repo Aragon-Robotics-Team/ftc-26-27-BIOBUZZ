@@ -960,7 +960,8 @@ public class ControlLayout {
     static String fingerprint(Path root, String subtitle, OpModeInfo op, List<Card> cards) throws Exception {
         MessageDigest sha = MessageDigest.getInstance("SHA-256");
         Path self = root.resolve(THIS_FILE);
-        if (Files.exists(self)) sha.update(Files.readAllBytes(self));
+        // Without the \r, so a Windows checkout (CRLF) gets the same fingerprint as a Mac or Linux one
+        if (Files.exists(self)) sha.update(Files.readString(self).replace("\r", "").getBytes(StandardCharsets.UTF_8));
         StringBuilder b = new StringBuilder(op.name).append('\n').append(subtitle).append('\n');
         for (Card c : cards) {
             b.append(c.title).append('\n');

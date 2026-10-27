@@ -14,7 +14,7 @@ public class RobotConstants {
             TWIN_STICK, // the intake turns to face where the right stick points, and holds that heading when let go
             RATE        // right stick x sets the turn speed
         }
-        public static TurnMode TURN_MODE = TurnMode.TWIN_STICK;
+        public static TurnMode TURN_MODE = TurnMode.RATE; // Oct 26: normal turning for now, TWIN_STICK once the heading PID is tuned
 
         // ---- Twin stick heading hold ----
         // The right stick sets a new heading only when pushed further than this, so its spring-back to center
@@ -42,8 +42,8 @@ public class RobotConstants {
         public static String SERVO_NAME = "gate";
 
         // TODO: tune
-        public static double CLOSED_POSITION = 0.0;
-        public static double OPEN_POSITION = 0.5;
+        public static double CLOSED_POSITION = 1;
+        public static double OPEN_POSITION = 1;
         public static double AUTO_SHOOT_MS = 1000; // how long Auto holds the gate open to empty the robot
     }
 
