@@ -42,9 +42,9 @@ public class RobotConstants {
         public static String SERVO_NAME = "gate";
 
         // TODO: tune
-        public static double CLOSED_POSITION = 1;
-        public static double OPEN_POSITION = 1;
-        public static double AUTO_SHOOT_MS = 1000; // how long Auto holds the gate open to empty the robot
+        public static double CLOSED_POSITION = 0.25;
+        public static double OPEN_POSITION = 0.4;
+        public static double AUTO_SHOOT_MS = 2000; // how long Auto holds the gate open to empty the robot
     }
 
     public static class Led {
