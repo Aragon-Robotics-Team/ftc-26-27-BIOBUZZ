@@ -12,7 +12,7 @@
             <goBILDA5202SeriesMotor name="rightRear" port="1" />
             <goBILDA5202SeriesMotor name="leftFront" port="2" />
             <goBILDA5202SeriesMotor name="leftRear" port="3" />
-            <goBILDAPinpoint name="pinpoint" port="0" bus="0" />
+            <goBILDAPinpoint name="pinpoint" port="0" bus="1" />
         </LynxModule>
     </LynxUsbDevice>
 </Robot>
