@@ -38,6 +38,7 @@ public class BallVision implements Subsystem {
     private final WebcamName webcam; // null if it isn't configured
     private final Supplier<Pose> pose;
     private final BallGeometry geometry;
+    private final BallPipeline pipeline;
     private final BallVisionProcessor processor;
     private final PollenTracker tracker;
     private VisionPortal portal;
@@ -62,7 +63,8 @@ public class BallVision implements Subsystem {
         }
         webcam = found;
         geometry = geometry();
-        processor = new BallVisionProcessor(geometry, new BallPipeline(geometry), DISTORTION);
+        pipeline = new BallPipeline(geometry, pipelineSettings());
+        processor = new BallVisionProcessor(geometry, pipeline, DISTORTION);
 
         PollenTracker.Settings settings = new PollenTracker.Settings();
         settings.lockGate = LOCK_GATE;
@@ -75,6 +77,25 @@ public class BallVision implements Subsystem {
         settings.nearMouth = NEAR_MOUTH;
         settings.edgeMarginPx = EDGE_MARGIN_PX;
         tracker = new PollenTracker(settings, BallVision::chaseable);
+    }
+
+    /** The ball pipeline's settings from RobotConstants.BallVision; the rest keep BallPipeline's defaults. */
+    public static BallPipeline.Settings pipelineSettings() {
+        BallPipeline.Settings s = new BallPipeline.Settings();
+        s.pollenHue = POLLEN_HUE;
+        s.redNectarHue = RED_NECTAR_HUE;
+        s.blueNectarHue = BLUE_NECTAR_HUE;
+        s.fieldContrastK = FIELD_CONTRAST_K;
+        s.fieldContrastMin = FIELD_CONTRAST_MIN;
+        s.fieldContrastMax = FIELD_CONTRAST_MAX;
+        s.sizeMarginLo = SIZE_MARGIN_LO;
+        s.sizeMarginHi = SIZE_MARGIN_HI;
+        s.minCircularity = MIN_CIRCULARITY;
+        s.minCircleFill = MIN_CIRCLE_FILL;
+        s.minRoundFrac = MIN_ROUND_FRAC;
+        s.roundTol = ROUND_TOL;
+        s.lineFilter = LINE_FILTER;
+        return s;
     }
 
     /** The camera model from RobotConstants.BallVision: calibrated if there's a calibration. */
@@ -126,6 +147,15 @@ public class BallVision implements Subsystem {
 
     public BallGeometry getGeometry() {
         return geometry;
+    }
+
+    public BallPipeline getPipeline() {
+        return pipeline;
+    }
+
+    /** New frames picked up so far. */
+    public int getFrameCount() {
+        return frames;
     }
 
     /** Balls in the newest frame. */

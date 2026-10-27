@@ -85,43 +85,54 @@ public class RobotConstants {
         public static int GAIN = 100;          // clamped to what the camera allows
 
         // ---- Lens ----
-        // Nominal horizontal field of view, used until there's a calibration
+        // Nominal horizontal field of view, used when CAMERA_MATRIX is null
         public static double HORIZONTAL_FOV = Math.toRadians(70);
-        // From biobuzz_detection's calibrate_camera.py (camera_calib.json), solved at CALIBRATION_WIDTH x HEIGHT.
-        // TODO: calibrate. null = uncalibrated: HORIZONTAL_FOV, and frames aren't undistorted
+        // goBILDA's factory calibration for this camera (3122-0004-0001, USB 0C45:0366, teamwebcamcalibrations.xml,
+        // 1280x800 entry), scaled to FRAME_WIDTH x HEIGHT. A camera_calib.json from biobuzz_detection's
+        // calibrate_camera.py goes here the same way. null = uncalibrated: HORIZONTAL_FOV, and frames aren't undistorted
         public static int CALIBRATION_WIDTH = 1280;
         public static int CALIBRATION_HEIGHT = 800;
-        public static double[] CAMERA_MATRIX = null; // fx, fy, cx, cy
-        public static double[] DISTORTION = null;    // k1, k2, p1, p2, k3
+        public static double[] CAMERA_MATRIX = {908.758, 908.758, 696.345, 376.979}; // fx, fy, cx, cy
+        public static double[] DISTORTION = {0.0374901, -0.0506747, 0, 0, -0.00229137}; // k1, k2, p1, p2, k3
 
         // ---- Mount ----
         // On the printed arducam mount at the front of the intake's left side plate (CAD, Oct 26). The plate is turned
         // 20° in toward the center line, then tipped 23.92° down about the robot's left-right axis, which leaves the
         // camera looking 21.71° right of straight ahead, 22.39° down, and rolled 8.63°. Lens position from the robot
-        // center (between the wheels, on the tiles), inches: the middle of the plate's camera face. The lens itself
-        // sits a little further out along the view, by the camera's depth.
+        // center (between the wheels, on the tiles), inches: the lens's optical center, 24.1 mm out from the plate's
+        // camera face along the view (goBILDA's camera CAD); the face's middle is 5.54 forward, 5.27 left, 7.12 up.
         // Rows are assumed to run along the plate's long side (landscape).
-        public static double LENS_FORWARD = 5.54;
-        public static double LENS_LEFT = 5.27;
-        public static double LENS_HEIGHT = 7.12;
+        public static double LENS_FORWARD = 6.34;
+        public static double LENS_LEFT = 4.96;
+        public static double LENS_HEIGHT = 6.76;
         public static double YAW = Math.toRadians(-21.71);  // + = turned left
         public static double TILT = Math.toRadians(22.39);  // below horizontal
         public static double ROLL = Math.toRadians(8.63);   // + = the right side of the image is higher
 
-        // ---- TEMPORARY yellow-only detector (BallPipeline) ----
-        // Stand-in until ball_pipeline.py is ported: an HSV threshold for POLLEN only, no nectar, no lighting
-        // correction. OpenCV HSV: hue 0-180, saturation and value 0-255. TODO: tune on real photos from the C270
-        public static double POLLEN_HUE_MIN = 18;
-        public static double POLLEN_HUE_MAX = 38;
-        public static double POLLEN_SAT_MIN = 110;
-        public static double POLLEN_VAL_MIN = 90;
-        public static double MIN_FILL = 0.55;        // blob area / its enclosing circle's area; a ball is ~0.8, tape ~0.2
-        public static double SIZE_GATE_MIN = 0.5;    // blob diameter / the diameter a pollen there should have
-        public static double SIZE_GATE_MAX = 1.6;
-        public static double MAX_DEPTH = 96;         // inches along the view; rows that can only hold farther balls are skipped
+        // ---- Pipeline ---- (BallPipeline; the rest of its settings are in BallPipeline.Settings)
+        // Same values as biobuzz_detection's ball_pipeline.py: change them there first and check with its evaluate.py.
+        // Hue windows, OpenCV H (0-179). Deliberately broad; the field-contrast check is what rejects the field.
+        public static int[][] POLLEN_HUE = {{12, 45}};
+        public static int[][] RED_NECTAR_HUE = {{0, 10}, {165, 179}}; // red wraps around 0
+        public static int[][] BLUE_NECTAR_HUE = {{88, 132}};
+        // A ball pixel's saturation has to be this many times the frame's median (the field's), clamped
+        public static double FIELD_CONTRAST_K = 4.5;
+        public static double FIELD_CONTRAST_MIN = 75;
+        public static double FIELD_CONTRAST_MAX = 130;
+        // Size gate: x the pixel diameter a ball should have where it is (from the mount above)
+        public static double SIZE_MARGIN_LO = 0.55;
+        public static double SIZE_MARGIN_HI = 1.60;
+        // Circle test, on the convex hull
+        public static double MIN_CIRCULARITY = 0.65;
+        public static double MIN_CIRCLE_FILL = 0.60;
+        // Recovering a ball merged with tape: share of directions its edge has to be round in, and how round
+        public static double MIN_ROUND_FRAC = 0.75;
+        public static double ROUND_TOL = 0.05;
+        // Straight-line rejection is among the slowest stages; off still rejects most straight clutter
+        public static boolean LINE_FILTER = true;
 
         // ---- Intake ---- (CAD)
-        public static double INTAKE_REACH = 7;     // inches from the robot center forward to the intake's mouth
+        public static double INTAKE_REACH = 7;      // inches from the robot center forward to the intake's mouth
         public static double INTAKE_WIDTH = 10.1;   // inches between the intake's side plates, centered on the robot
 
         // ---- Target ----

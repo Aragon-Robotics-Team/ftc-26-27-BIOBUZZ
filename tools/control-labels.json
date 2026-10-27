@@ -136,5 +136,12 @@
     "init.gamepad1.dpad_left": "Start in our LEFT corner, back to alliance wall",
     "init.gamepad1.dpad_right": "Start in our RIGHT corner, back to alliance wall",
     "gamepad1.cross": "Chase again from here"
+  },
+
+  "Ball Vision Test": {
+    "gamepad1.left_stick": "Drive (field-centric: forward = the way the robot faced at start)",
+    "gamepad1.right_stick": "Turn",
+    "gamepad1.left_trigger": "Hold: slow mode",
+    "gamepad1.cross": "Apply the mount values from Panels (reopens the camera)"
   }
 }
