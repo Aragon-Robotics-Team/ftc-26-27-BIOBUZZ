@@ -294,6 +294,7 @@ public class Launcher implements Subsystem {
 
         double power = TURRET_KP * error + TURRET_KI * turretIntegral + TURRET_KD * (turretTargetRate - turretVelocity)
                 + TURRET_KV * turretTargetRate;
+        if (Math.abs(error) > TURRET_KS_DEADBAND) power += TURRET_KS * Math.signum(error);
         turret.setPower(Range.clip(power, -TURRET_MAX_POWER, TURRET_MAX_POWER));
     }
 
