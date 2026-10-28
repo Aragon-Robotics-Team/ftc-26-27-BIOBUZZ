@@ -70,7 +70,7 @@ import javax.imageio.ImageIO;
  * dpad_right left_stick right_stick left_stick_button right_stick_button. The tool prints any binding
  * that still needs a label and any label that no longer matches a binding.
  *
- * <p>Each PNG stores a fingerprint of what it shows, so an image is only redrawn when its bindings, labels
+ * <p>Each PNG stores a fingerprint of what it shows, so an image is only redrawn when the text it shows
  * or this file change. That keeps git quiet when teammates with different fonts build.
  */
 public class ControlLayout {
@@ -965,7 +965,8 @@ public class ControlLayout {
         StringBuilder b = new StringBuilder(op.name).append('\n').append(subtitle).append('\n');
         for (Card c : cards) {
             b.append(c.title).append('\n');
-            for (Row r : c.rows) b.append(r.key).append('|').append(r.tags).append('|').append(r.label).append('|').append(r.auto).append('\n');
+            // Only what's drawn: a labeled row's auto text isn't, and changes whenever the code around a read does
+            for (Row r : c.rows) b.append(r.key).append('|').append(r.tags).append('|').append(r.label != null).append('|').append(r.text()).append('\n');
         }
         sha.update(b.toString().getBytes(StandardCharsets.UTF_8));
         return HexFormat.of().formatHex(sha.digest());

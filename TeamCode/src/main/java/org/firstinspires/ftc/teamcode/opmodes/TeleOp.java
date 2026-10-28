@@ -99,17 +99,17 @@ public class TeleOp extends OpMode {
         double headingOffset = MatchState.alliance == Alliance.BLUE ? Math.PI : 0;
         // Always-on commands, running for the whole match
         schedule(
-                twinStick()
+                TURN_MODE == TurnMode.TWIN_STICK
                         ? robot.drivebase.driveTwinStick(
                                 () -> -gamepad1.left_stick_y * driveScale(),
-                                () -> strafeInput() * driveScale(),
+                                () -> -gamepad1.left_stick_x * driveScale(),
                                 () -> -gamepad1.right_stick_y,
                                 () -> -gamepad1.right_stick_x,
                                 headingOffset)
                         : robot.drivebase.driveFieldCentric(
                                 () -> -gamepad1.left_stick_y * driveScale(),
-                                () -> strafeInput() * driveScale(),
-                                () -> turnInput() * driveScale(),
+                                () -> -gamepad1.left_stick_x * driveScale(),
+                                () -> -gamepad1.right_stick_x * driveScale(),
                                 headingOffset),
                 robot.aimAtHive()
         );
@@ -139,35 +139,7 @@ public class TeleOp extends OpMode {
     }
 
     private double driveScale() {
-        return slowModeHeld() ? SLOW_MODE_SCALE : 1.0;
-    }
-
-    // ---- Driver inputs a controller-specific TeleOp can remap (see XboxSeriesTeleOp) ----
-
-    protected boolean twinStick() {
-        return TURN_MODE == TurnMode.TWIN_STICK;
-    }
-
-    /** Strafe for the left stick, +left. */
-    protected double strafeInput() {
-        return -gamepad1.left_stick_x;
-    }
-
-    /** Turn speed for RATE turning, +CCW. */
-    protected double turnInput() {
-        return -gamepad1.right_stick_x;
-    }
-
-    protected boolean slowModeHeld() {
-        return gamepad1.left_trigger > 0.5;
-    }
-
-    protected boolean shootPressed() {
-        return gamepad1.rightTriggerWasPressed();
-    }
-
-    protected boolean shootReleased() {
-        return gamepad1.rightTriggerWasReleased();
+        return gamepad1.left_trigger > 0.5 ? SLOW_MODE_SCALE : 1.0;
     }
 
     /** Button presses schedule commands. */
@@ -179,8 +151,8 @@ public class TeleOp extends OpMode {
         if (gamepad1.rightBumperWasPressed()) schedule(robot.enableFlywheel());
         if (gamepad1.leftBumperWasPressed()) schedule(robot.launcher.idle());
 
-        if (shootPressed()) schedule(robot.startShooting());
-        if (shootReleased()) schedule(robot.stopShooting());
+        if (gamepad1.rightTriggerWasPressed()) schedule(robot.startShooting());
+        if (gamepad1.rightTriggerWasReleased()) schedule(robot.stopShooting());
 
         // ---- Gamepad 2: operator (manual corrections) ----
         if (gamepad2.dpadLeftWasPressed()) schedule(robot.launcher.nudgeTurret(+1));
