@@ -50,8 +50,9 @@ public class BallVisionProcessor implements VisionProcessor, CameraStreamSource 
     private final BallPipeline pipeline;
     private final double[] distortion; // null: frames are used as they come
 
-    private final Mat bgr = new Mat(), undistorted = new Mat(), annotated = new Mat();
+    private final Mat small = new Mat(), bgr = new Mat(), undistorted = new Mat(), annotated = new Mat();
     private Mat mapX, mapY;
+    private double scale = 1; // camera frame pixels per pipeline pixel
     private volatile Result latest;
     private volatile String problem;
     private volatile double[] highlight;  // u, v, r of the ball being chased
@@ -66,8 +67,11 @@ public class BallVisionProcessor implements VisionProcessor, CameraStreamSource 
 
     @Override
     public void init(int width, int height, CameraCalibration calibration) {
-        if (width != geometry.width || height != geometry.height) {
-            problem = String.format("camera sends %dx%d, expected %dx%d", width, height, geometry.width, geometry.height);
+        // A bigger frame of the same aspect is shrunk to the pipeline's size
+        scale = width / (double) geometry.width;
+        if (Math.abs(height / (double) geometry.height - scale) > 0.01 * scale) {
+            problem = String.format("camera sends %dx%d, not a resize of %dx%d", width, height, geometry.width,
+                    geometry.height);
             return;
         }
         if (distortion != null) {
@@ -77,7 +81,8 @@ public class BallVisionProcessor implements VisionProcessor, CameraStreamSource 
             d.put(0, 0, distortion);
             mapX = new Mat();
             mapY = new Mat();
-            Calib3d.initUndistortRectifyMap(k, d, new Mat(), k, new Size(width, height), CvType.CV_16SC2, mapX, mapY);
+            Calib3d.initUndistortRectifyMap(k, d, new Mat(), k, new Size(geometry.width, geometry.height),
+                    CvType.CV_16SC2, mapX, mapY);
         }
     }
 
@@ -85,7 +90,12 @@ public class BallVisionProcessor implements VisionProcessor, CameraStreamSource 
     public Object processFrame(Mat frame, long captureTimeNanos) {
         if (problem != null) return null;
         long start = System.nanoTime();
-        Imgproc.cvtColor(frame, bgr, frame.channels() == 4 ? Imgproc.COLOR_RGBA2BGR : Imgproc.COLOR_RGB2BGR);
+        Mat src = frame;
+        if (frame.cols() != geometry.width) {
+            Imgproc.resize(frame, small, new Size(geometry.width, geometry.height), 0, 0, Imgproc.INTER_AREA);
+            src = small;
+        }
+        Imgproc.cvtColor(src, bgr, src.channels() == 4 ? Imgproc.COLOR_RGBA2BGR : Imgproc.COLOR_RGB2BGR);
         Mat input = bgr;
         if (mapX != null) {
             Imgproc.remap(bgr, undistorted, mapX, mapY, Imgproc.INTER_LINEAR);
@@ -132,6 +142,8 @@ public class BallVisionProcessor implements VisionProcessor, CameraStreamSource 
     public void onDrawFrame(Canvas canvas, int onscreenWidth, int onscreenHeight, float scaleBmpPxToCanvasPx,
                             float scaleCanvasDensity, Object userContext) {
         if (!(userContext instanceof Result)) return;
+        // Balls are in pipeline pixels; the canvas scale is for camera frame pixels
+        scaleBmpPxToCanvasPx *= (float) scale;
         Paint paint = new Paint();
         paint.setStyle(Paint.Style.STROKE);
         paint.setAntiAlias(true);

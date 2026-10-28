@@ -77,7 +77,11 @@ public class RobotConstants {
     /** Balls on the tiles from the goBILDA global shutter webcam by the intake (BallVision), and chasing pollen with it. */
     public static class BallVision {
         public static String WEBCAM_NAME = "webcam";
-        public static int FRAME_WIDTH = 640;  // the sensor's 1280x800 binned, so the field of view is the same
+        // The camera's MJPEG modes are 1280x800, 1280x720, 800x600 and 320x240; only 1280x800 is the whole sensor.
+        // Frames come in at CAPTURE size and are shrunk to FRAME size (same aspect) before the pipeline.
+        public static int CAPTURE_WIDTH = 1280;
+        public static int CAPTURE_HEIGHT = 800;
+        public static int FRAME_WIDTH = 640;
         public static int FRAME_HEIGHT = 400;
         // Manual exposure keeps motion blur down while driving; gain makes up the brightness.
         // TODO: tune on the robot. 0 leaves the camera on auto exposure

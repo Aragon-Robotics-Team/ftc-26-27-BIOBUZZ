@@ -127,7 +127,7 @@ public class BallVision implements Subsystem {
         if (webcam == null || portal != null) return;
         portal = new VisionPortal.Builder()
                 .setCamera(webcam)
-                .setCameraResolution(new android.util.Size(FRAME_WIDTH, FRAME_HEIGHT))
+                .setCameraResolution(new android.util.Size(CAPTURE_WIDTH, CAPTURE_HEIGHT))
                 .setStreamFormat(VisionPortal.StreamFormat.MJPEG)
                 .addProcessor(processor)
                 .enableLiveView(preview)
