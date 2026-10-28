@@ -8,10 +8,10 @@
             <Servo name="gate" port="5" />
         </LynxModule>
         <LynxModule name="Control Hub" port="173">
-            <goBILDA5202SeriesMotor name="rightFront" port="0" />
-            <goBILDA5202SeriesMotor name="rightRear" port="1" />
-            <goBILDA5202SeriesMotor name="leftFront" port="2" />
-            <goBILDA5202SeriesMotor name="leftRear" port="3" />
+            <goBILDA5202SeriesMotor name="leftFront" port="0" />
+            <goBILDA5202SeriesMotor name="leftRear" port="1" />
+            <goBILDA5202SeriesMotor name="rightFront" port="2" />
+            <goBILDA5202SeriesMotor name="rightRear" port="3" />
             <goBILDAPinpoint name="pinpoint" port="0" bus="1" />
         </LynxModule>
     </LynxUsbDevice>
