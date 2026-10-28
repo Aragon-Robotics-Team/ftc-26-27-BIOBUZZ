@@ -17,6 +17,7 @@ import org.firstinspires.ftc.teamcode.core.Robot;
 import org.firstinspires.ftc.teamcode.routines.AutoRoutine;
 import org.firstinspires.ftc.teamcode.routines.Routines;
 import org.firstinspires.ftc.teamcode.util.Html;
+import org.firstinspires.ftc.teamcode.util.PanelsDisplay;
 import org.firstinspires.ftc.teamcode.util.PathLog;
 
 import java.util.List;
@@ -31,6 +32,7 @@ public class Auto extends OpMode {
     private Follower follower;
     private List<Routines> routines;
     private PathLog pathLog;
+    private PanelsDisplay panelsDisplay;
     private final ElapsedTime loopTimer = new ElapsedTime();
 
     @Override
@@ -40,6 +42,7 @@ public class Auto extends OpMode {
 
         robot = new Robot(hardwareMap);
         follower = robot.drivebase.getFollower();
+        panelsDisplay = new PanelsDisplay();
 
         // New match: both alliances start with the RIGHT cell up
         MatchState.hive = Hive.RIGHT;
@@ -98,6 +101,8 @@ public class Auto extends OpMode {
         telemetry.addLine(Html.color("──── details ────", Html.GRAY));
         robot.telemetry(telemetry);
         telemetry.update();
+
+        panelsDisplay.update(robot, loopMs);
     }
 
     @Override

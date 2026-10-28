@@ -28,6 +28,7 @@ import org.firstinspires.ftc.teamcode.subsystems.Launcher;
 import org.firstinspires.ftc.teamcode.util.FieldDiagram;
 import org.firstinspires.ftc.teamcode.util.HoldButton;
 import org.firstinspires.ftc.teamcode.util.Html;
+import org.firstinspires.ftc.teamcode.util.PanelsDisplay;
 
 /**
  * Gamepad 1 (driver):
@@ -57,6 +58,7 @@ public class TeleOp extends OpMode {
     /** Red-side corner the operator picked during init, or null. */
     private Pose initCorner = null;
     private boolean started = false;
+    private PanelsDisplay panelsDisplay;
 
     @Override
     public void init() {
@@ -65,6 +67,7 @@ public class TeleOp extends OpMode {
 
         robot = new Robot(hardwareMap);
         robot.hiveVision.setEnabled(true);
+        panelsDisplay = new PanelsDisplay();
         // Pick up where Auto left off. Without an Auto run the robot starts at the origin with the turret
         // forward; push it into a corner and use share / options (during init or after start) to localize.
         if (MatchState.pose != null) {
@@ -231,6 +234,8 @@ public class TeleOp extends OpMode {
         telemetry.addLine(color("──── details ────", GRAY));
         robot.telemetry(telemetry);
         telemetry.update();
+
+        panelsDisplay.update(robot, loopMs);
     }
 
     /** Two plain-text columns on one line, lined up by setting the whole line in monospace. */
