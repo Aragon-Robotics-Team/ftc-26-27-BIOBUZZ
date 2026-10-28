@@ -56,13 +56,6 @@
     "gamepad1.triangle": "Turn the target heading around (180°)"
   },
 
-  "XboxSeriesTeleOp": {
-    "gamepad1": "Driver (Xbox Series controller; the rest is as in TeleOp)",
-    "gamepad1.left_stick": "Drive (field-centric), left / right reversed for this controller",
-    "gamepad1.right_stick": "LT / RT: turn left / right (this controller sends its triggers here)",
-    "gamepad1.circle": "Hold: open gate and feed the shooter"
-  },
-
   "Controller Test": {
     "gamepad1.left_stick": "Shown on screen",
     "gamepad1.right_stick": "Shown on screen",
