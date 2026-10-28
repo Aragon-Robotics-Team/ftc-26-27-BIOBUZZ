@@ -79,3 +79,6 @@ dependencies {
     // Unit tests for the hardware-free logic (src/test): ./gradlew :TeamCode:testDebugUnitTest
     testImplementation 'junit:junit:4.13.2'
 }
+
+// SimLoop: simulated tests on the laptop (simloop-starter/README.md)
+apply from: "$rootDir/simloop-starter/simloop.gradle"
