@@ -75,6 +75,7 @@ public class TeleOp extends OpMode {
 
     @Override
     public void init_loop() {
+        telemetry.addLine(color(bold("Did you remember to zero the turret? :-)"), YELLOW));
         MatchState.selectAlliance(gamepad1, telemetry);
         // Only remembered here: the alliance can still change, so the corner is turned into a pose at start
         if (gamepad2.shareWasPressed()) initCorner = RED_LEFT_CORNER;
