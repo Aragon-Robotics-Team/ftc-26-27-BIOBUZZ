@@ -39,8 +39,8 @@ public class PollenTracker {
         public double lastSeen;    // capture time of the last frame it was in, seconds
         /**
          * In its last sighting it was leaving the frame just ahead of the mouth: once it's out of view it's in the
-         * camera's blind spot in front of the intake, not lost. (Which edge depends on the mount: the side-plate
-         * camera loses a ball straight ahead off its left edge.)
+         * camera's blind spot in front of the intake, not lost. (Which edge depends on the mount: the right-side
+         * camera loses a ball straight ahead off its bottom edge.)
          */
         public boolean atIntake;
         public Ball lastBall;      // pixels, in its last sighting

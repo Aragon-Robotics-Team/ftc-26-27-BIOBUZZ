@@ -96,18 +96,17 @@ public class RobotConstants {
         public static double[] DISTORTION = {0.0374901, -0.0506747, 0, 0, -0.00229137}; // k1, k2, p1, p2, k3
 
         // ---- Mount ----
-        // On the printed arducam mount at the front of the intake's left side plate (CAD, Oct 26). The plate is turned
-        // 20° in toward the center line, then tipped 23.92° down about the robot's left-right axis, which leaves the
-        // camera looking 21.71° right of straight ahead, 22.39° down, and rolled 8.63°. Lens position from the robot
-        // center (between the wheels, on the tiles), inches: the lens's optical center, 24.1 mm out from the plate's
-        // camera face along the view (goBILDA's camera CAD); the face's middle is 5.54 forward, 5.27 left, 7.12 up.
-        // Rows are assumed to run along the plate's long side (landscape).
-        public static double LENS_FORWARD = 6.34;
-        public static double LENS_LEFT = 4.96;
-        public static double LENS_HEIGHT = 6.76;
-        public static double YAW = Math.toRadians(-21.71);  // + = turned left
-        public static double TILT = Math.toRadians(22.39);  // below horizontal
-        public static double ROLL = Math.toRadians(8.63);   // + = the right side of the image is higher
+        // On the printed mount (Part 36) at the front of the intake's right side (CAD "02 - Intake", Oct 27). The camera
+        // is tilted 30° down, then turned 20° in toward the center line about the vertical, so it looks 20° left of
+        // straight ahead, 30° down, and isn't rolled. Lens position from the robot center (between the wheels, on the
+        // tiles), inches: the front of the lens in goBILDA's camera CAD, 1 mm behind the case's front face. Rows run
+        // along the case's long side (landscape), image up toward the top of the robot.
+        public static double LENS_FORWARD = 6.17;
+        public static double LENS_LEFT = -4.96;
+        public static double LENS_HEIGHT = 8.93;
+        public static double YAW = Math.toRadians(20);  // + = turned left
+        public static double TILT = Math.toRadians(30); // below horizontal
+        public static double ROLL = 0;                  // + = the right side of the image is higher
 
         // ---- Pipeline ---- (BallPipeline; the rest of its settings are in BallPipeline.Settings)
         // Same values as biobuzz_detection's ball_pipeline.py: change them there first and check with its evaluate.py.
@@ -140,7 +139,7 @@ public class RobotConstants {
         public static double SMOOTHING = 0.5;       // weight of each new sighting in the target's position
         public static double SWITCH_MARGIN = 0.75;  // another pollen takes over when closer than this x the target's distance
         public static int SWITCH_FRAMES = 5;        // ...for this many frames in a row
-        // The camera can't see the last few inches before the mouth (with the CAD mount, 3-4 in). A target last seen
+        // The camera can't see the last few inches before the mouth (with the CAD mount, 2-5 in). A target last seen
         // within NEAR_MOUTH of the mouth, in front of it and touching the edge of the frame (within EDGE_MARGIN_PX),
         // went into that blind spot rather than getting lost.
         public static double NEAR_MOUTH = 12;
