@@ -13,11 +13,14 @@ import com.pedropathing.math.Pose;
 import com.pedropathing.math.Vector2D;
 import com.pedropathing.paths.PathSegment;
 
+import org.firstinspires.ftc.teamcode.core.ShotSolver;
+
 import org.firstinspires.ftc.teamcode.core.Robot;
+import org.firstinspires.ftc.teamcode.subsystems.Launcher;
 
 /**
- * Panels view for the competition OpModes: numbers for the Graph tab and the robot (and the path it's following)
- * on the Field tab. Only Panels gets these; the Driver Station keeps the OpMode's own telemetry.
+ * Panels view for the competition OpModes: numbers for the Graph tab, and on the Field tab the robot, the path it's
+ * following, the hive cell it aims at and where the turret points. Only Panels gets these; the Driver Station keeps the OpMode's own telemetry.
  */
 public class PanelsDisplay {
     private static final int PATH_SAMPLES = 20; // points per path segment
@@ -42,10 +45,10 @@ public class PanelsDisplay {
         panels.addData("Heading (deg)", Math.toDegrees(pose.heading()));
         panels.update();
 
-        if (field.getShouldUpdateCanvas()) draw(robot.drivebase.getFollower(), pose);
+        if (field.getShouldUpdateCanvas()) draw(robot.drivebase.getFollower(), pose, robot.launcher, robot.hiveTarget());
     }
 
-    private void draw(Follower follower, Pose pose) {
+    private void draw(Follower follower, Pose pose, Launcher launcher, Pose target) {
         // The path being followed: Auto's routine, or an auto-align path in TeleOp
         if (follower.following()) {
             field.setStyle(PanelsField.INSTANCE.getTRANSPARENT(), "green", 0.75);
@@ -66,6 +69,22 @@ public class PanelsDisplay {
         field.moveCursor(pose.x(), pose.y());
         field.circle(radius);
         field.line(pose.x() + radius * Math.cos(pose.heading()), pose.y() + radius * Math.sin(pose.heading()));
+
+        // Aim: the hive cell, and from the turret pivot as far as the cell, where the turret should point (gray) and
+        // where it points (orange). Orange on gray through the cell = aimed; both off the cell = the pose is wrong.
+        field.setStyle(PanelsField.INSTANCE.getTRANSPARENT(), "gold", 0.75);
+        field.moveCursor(target.x(), target.y());
+        field.circle(3);
+        Pose pivot = ShotSolver.turretPivot(pose);
+        double reach = Math.hypot(target.x() - pivot.x(), target.y() - pivot.y());
+        aimLine(pivot, reach, pose.heading() + launcher.getTurretTargetAngle(), "gray");
+        aimLine(pivot, reach, pose.heading() + launcher.getTurretAngle(), "orange");
         field.update();
+    }
+
+    private void aimLine(Pose from, double length, double fieldAngle, String color) {
+        field.setStyle(PanelsField.INSTANCE.getTRANSPARENT(), color, 0.75);
+        field.moveCursor(from.x(), from.y());
+        field.line(from.x() + length * Math.cos(fieldAngle), from.y() + length * Math.sin(fieldAngle));
     }
 }
