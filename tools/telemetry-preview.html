@@ -154,7 +154,7 @@ header code { font-family: var(--mono); font-size: 0.85em; }
 }
 .telemetry.light { --tm-bg: #ffffff; --tm-ink: #000000; }
 .telemetry .tl { white-space: normal; }
-.telemetry tt { font-family: var(--mono); font-size: 1em; }
+.telemetry font[face="monospace"] { font-family: var(--mono); font-size: 1em; }
 .telemetry big { font-size: 1.25em; }
 .telemetry b { font-weight: 700; }
 
@@ -355,8 +355,8 @@ pre .fold { color: var(--muted); }
   </section>
 
   <ul class="notes">
-    <li>The Driver Station draws HTML telemetry with Android's <code>Html.fromHtml</code>: <code>&lt;b&gt;</code>, <code>&lt;tt&gt;</code> and <code>&lt;font color&gt;</code> work, and runs of spaces collapse to one, so padding uses <code>&amp;nbsp;</code>.</li>
-    <li>The Driver Station has no tables or columns, so each field row and the readout beside it are one telemetry line, and the side-by-side numbers are one monospace line. If a line is too long for the screen it wraps and the field breaks up; shrink <code>FieldDiagram.COLS</code> or the side text if that happens on the real Driver Hub.</li>
+    <li>The Driver Station draws HTML telemetry with Android's <code>Html.fromHtml</code>: <code>&lt;b&gt;</code>, <code>&lt;font color&gt;</code> and <code>&lt;font face='monospace'&gt;</code> work (<code>&lt;tt&gt;</code> doesn't), and runs of spaces collapse to one.</li>
+    <li>The Driver Hub is narrower than it looks here: anything beside the field, or two columns of numbers, wraps. So the field rows stand alone and every readout gets its own line. If a field row wraps on the real Driver Hub, shrink <code>FieldDiagram.COLS</code>.</li>
     <li>Field: seen from our driver station, our wall at the bottom. Each row is 12 in and each column 6 in. The arrow is the robot, pointing the way it faces (8 directions). Each hive is a <code>======</code> bar in its alliance's color; ours has a bold <code>O</code> on the up cell, the one to shoot at. Orange <code>@</code> marks the four flowers on the walls.</li>
     <li>If the robot's row looks shifted on the Driver Hub, its monospace font has no arrow characters. Switch <code>FieldDiagram.ARROWS</code> to <code>^ &lt; v &gt;</code>.</li>
   </ul>
@@ -373,7 +373,7 @@ const LED = { OFF: "#1b1f23", GREEN: "#35e05a", YELLOW: "#ffd23a", RED: "#ff4040
 
 // ---- util/Html.java ----
 const bold = t => `<b>${t}</b>`;
-const mono = t => `<tt>${t}</tt>`;
+const mono = t => `<font face='monospace'>${t}</font>`;
 const color = (t, c) => `<font color='${c}'>${t}</font>`;
 const allianceTag = a => bold(color(a, a === "RED" ? HTML.RED : HTML.BLUE));
 
@@ -448,7 +448,6 @@ function hiveDistance(s) {
 }
 
 // ---- TeleOp.showTelemetry() ----
-const LEFT_COLUMN = 22;
 
 function reachLine(s) {
   const label = s.sotm ? "SOTM " : "Shot (standing) ";
@@ -473,8 +472,6 @@ function turretLine(s, L) {
   return `Turret ${fs(s.turret, 0)}°/${fs(s.turretTarget, 0)}° ` + word + nudgeText(s.turNudge, "°");
 }
 
-const columns = (left, right) => mono(left + NBSP.repeat(Math.max(0, LEFT_COLUMN - left.length)) + NBSP + right);
-
 function lines(s) {
   const L = launcher(s);
   const out = [];
@@ -486,29 +483,29 @@ function lines(s) {
   const flight = 0.35 + distance / 280;
 
   // 1. Field + what the drivers need mid-match
-  const field = drawField(s.pose, s.alliance, s.hive);
-  const side = [
-    reachLine(s),
-    flywheelLine(s, L),
-    turretLine(s, L),
-    "",
-    "Alliance " + allianceTag(s.alliance),
-    "Hive " + bold(color(s.hive, s.hive === "LEFT" ? HTML.PINK : HTML.CYAN)),
-    "Intake " + { INTAKE: bold(color("in", HTML.GREEN)), OUTTAKE: bold(color("out", HTML.YELLOW)), OFF: bold(color("off", HTML.GRAY)) }[s.intake]
-      + (s.feeding ? " (feeding)" : ""),
-    "Gate " + (s.gate ? bold(color("open", HTML.GREEN)) : bold(color("closed", HTML.GRAY))),
-  ];
-  for (let r = 0; r < FD.ROWS; r++) add(mono(field[r]) + NBSP + NBSP + (r < side.length ? side[r] : ""));
+  for (const row of drawField(s.pose, s.alliance, s.hive)) add(mono(row));
+  add(reachLine(s));
+  add(flywheelLine(s, L));
+  add(turretLine(s, L));
+  add("Alliance " + allianceTag(s.alliance));
+  add("Hive " + bold(color(s.hive, s.hive === "LEFT" ? HTML.PINK : HTML.CYAN)));
+  add("Intake " + { INTAKE: bold(color("in", HTML.GREEN)), OUTTAKE: bold(color("out", HTML.YELLOW)), OFF: bold(color("off", HTML.GRAY)) }[s.intake]
+    + (s.feeding ? " (feeding)" : ""));
+  add("Gate " + (s.gate ? bold(color("open", HTML.GREEN)) : bold(color("closed", HTML.GRAY))));
   tiers.push(out.length);
 
-  // 2. Numbers, side by side
+  // 2. Numbers
   if (s.aiming && s.feasible) {
-    add(columns(`Ball speed ${f(exit, 0)} in/s`, `Flight time ${f(flight, 2)} s`));
-    add(columns(`Speed margin ±${f(s.flyTol / FLYWHEEL_TICKS_PER_EXIT_SPEED / exit * 100 * 2, 1)}%`, `Aim margin ±${f(s.turTol * 2, 1)}°`));
-    add(mono(`Aim ahead ${fs(s.lead, 1)}°`));
+    add(`Ball speed ${f(exit, 0)} in/s`);
+    add(`Flight time ${f(flight, 2)} s`);
+    add(`Speed margin ±${f(s.flyTol / FLYWHEEL_TICKS_PER_EXIT_SPEED / exit * 100 * 2, 1)}%`);
+    add(`Aim margin ±${f(s.turTol * 2, 1)}°`);
+    add(`Aim ahead ${fs(s.lead, 1)}°`);
   }
-  add(columns(`Pose ${f(s.pose.x, 1)}, ${f(s.pose.y, 1)}`, `Heading ${f(s.pose.h, 0)}° → ${f(s.headingTarget, 0)}°`));
-  add(columns(`Loop ${f(s.loopMs, 1)} ms ${f(1000 / s.loopMs, 0)} Hz`, "Follower MANUAL"));
+  add(`Pose ${f(s.pose.x, 1)}, ${f(s.pose.y, 1)}`);
+  add(`Heading ${f(s.pose.h, 0)}° → ${f(s.headingTarget, 0)}°`);
+  add(`Loop ${f(s.loopMs, 1)} ms ${f(1000 / s.loopMs, 0)} Hz`);
+  add("Follower MANUAL");
   tiers.push(out.length);
 
   // 3. Everything else: Robot.telemetry() -> drivebase, intake, gate, launcher, led

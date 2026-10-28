@@ -28,9 +28,9 @@ public final class Html {
         return "<b>" + text + "</b>";
     }
 
-    /** Monospace, so the field diagram and columns of numbers line up. */
+    /** Monospace, so the field diagram lines up. The Driver Station ignores {@code <tt>}; this is what the SDK samples use. */
     public static String mono(String text) {
-        return "<tt>" + text + "</tt>";
+        return "<font face='monospace'>" + text + "</font>";
     }
 
     public static String color(String text, String color) {

@@ -48,8 +48,6 @@ import org.firstinspires.ftc.teamcode.util.PanelsDisplay;
  */
 @com.qualcomm.robotcore.eventloop.opmode.TeleOp(name = "TeleOp", group = "Competition")
 public class TeleOp extends OpMode {
-    private static final int LEFT_COLUMN = 22; // characters, for the side-by-side numbers
-
     private Robot robot;
     private final ElapsedTime loopTimer = new ElapsedTime();
     private final ElapsedTime clock = new ElapsedTime();
@@ -183,8 +181,8 @@ public class TeleOp extends OpMode {
 
     /**
      * Three tiers, most important first:
-     * 1. the field diagram, with the shot readouts beside it (each diagram row and its readout share a line),
-     * 2. two monospace columns of numbers,
+     * 1. the field diagram, then what the drivers need mid-match under it,
+     * 2. numbers, one per line (side by side they wrap on the Driver Hub),
      * 3. every subsystem's own telemetry.
      * tools/telemetry-preview.html draws this layout in a browser; keep it in step.
      */
@@ -196,39 +194,34 @@ public class TeleOp extends OpMode {
         loopTimer.reset();
 
         // ---- 1. Field + what the drivers need mid-match ----
-        String[] field = FieldDiagram.draw(pose, MatchState.alliance, MatchState.hive);
-        String[] side = {
-                reachLine(shot),
-                flywheelLine(launcher),
-                turretLine(launcher),
-                "",
-                "Alliance " + Html.alliance(MatchState.alliance),
-                "Hive " + bold(color(MatchState.hive.toString(), MatchState.hive == Hive.LEFT ? PINK : CYAN)) + " " + hiveVisionWord(),
-                "Intake " + intakeWord(robot.intake.getMode()) + (robot.intake.isFeeding() ? " (feeding)" : ""),
-                "Gate " + (robot.gate.isOpen() ? bold(color("open", GREEN)) : bold(color("closed", GRAY))),
-        };
-        for (int r = 0; r < FieldDiagram.ROWS; r++) {
-            telemetry.addLine(mono(field[r]) + NBSP + NBSP + (r < side.length ? side[r] : ""));
-        }
+        for (String row : FieldDiagram.draw(pose, MatchState.alliance, MatchState.hive)) telemetry.addLine(mono(row));
+        telemetry.addLine(reachLine(shot));
+        telemetry.addLine(flywheelLine(launcher));
+        telemetry.addLine(turretLine(launcher));
+        telemetry.addLine("Alliance " + Html.alliance(MatchState.alliance));
+        telemetry.addLine("Hive " + bold(color(MatchState.hive.toString(), MatchState.hive == Hive.LEFT ? PINK : CYAN)) + " " + hiveVisionWord());
+        telemetry.addLine("Intake " + intakeWord(robot.intake.getMode()) + (robot.intake.isFeeding() ? " (feeding)" : ""));
+        telemetry.addLine("Gate " + (robot.gate.isOpen() ? bold(color("open", GREEN)) : bold(color("closed", GRAY))));
 
-        // ---- 2. Numbers, side by side ----
+        // ---- 2. Numbers ----
         if (shot != null && shot.feasible) {
-            telemetry.addLine(columns(String.format("Ball speed %.0f in/s", shot.exitSpeed),
-                    String.format("Flight time %.2f s", shot.timeOfFlight)));
+            telemetry.addLine(String.format("Ball speed %.0f in/s", shot.exitSpeed));
+            telemetry.addLine(String.format("Flight time %.2f s", shot.timeOfFlight));
             // How far flywheel speed and turret angle can be off and the ball still goes in
-            telemetry.addLine(columns(String.format("Speed margin ±%.1f%%", shot.speedTolerance / shot.exitSpeed * 100),
-                    String.format("Aim margin ±%.1f°", Math.toDegrees(shot.angleTolerance))));
+            telemetry.addLine(String.format("Speed margin ±%.1f%%", shot.speedTolerance / shot.exitSpeed * 100));
+            telemetry.addLine(String.format("Aim margin ±%.1f°", Math.toDegrees(shot.angleTolerance)));
             // How far off the hive the turret points to make up for the robot's motion
-            telemetry.addLine(mono(String.format("Aim ahead %+.1f°", Math.toDegrees(shot.leadAngle))));
+            telemetry.addLine(String.format("Aim ahead %+.1f°", Math.toDegrees(shot.leadAngle)));
         }
         String heading = TURN_MODE == TurnMode.TWIN_STICK
                 // Where the robot is pointing → where the driver asked it to point
                 ? String.format("Heading %.0f° → %.0f°", Math.toDegrees(Angle.normalizeSigned(pose.heading())),
                         Math.toDegrees(robot.drivebase.getTargetHeading()))
                 : String.format("Heading %.0f°", Math.toDegrees(pose.heading()));
-        telemetry.addLine(columns(String.format("Pose %.1f, %.1f", pose.x(), pose.y()), heading));
-        telemetry.addLine(columns(String.format("Loop %.1f ms %.0f Hz", loopMs, 1000 / loopMs),
-                "Follower " + robot.drivebase.getFollower().mode()));
+        telemetry.addLine(String.format("Pose %.1f, %.1f", pose.x(), pose.y()));
+        telemetry.addLine(heading);
+        telemetry.addLine(String.format("Loop %.1f ms %.0f Hz", loopMs, 1000 / loopMs));
+        telemetry.addLine("Follower " + robot.drivebase.getFollower().mode());
 
         // ---- 3. Everything else ----
         telemetry.addLine(color("──── details ────", GRAY));
@@ -236,13 +229,6 @@ public class TeleOp extends OpMode {
         telemetry.update();
 
         panelsDisplay.update(robot, loopMs);
-    }
-
-    /** Two plain-text columns on one line, lined up by setting the whole line in monospace. */
-    private static String columns(String left, String right) {
-        StringBuilder line = new StringBuilder(left);
-        for (int i = left.length(); i < LEFT_COLUMN; i++) line.append(NBSP);
-        return mono(line + NBSP + right);
     }
 
     private static String nudge(double value, String unit) {
