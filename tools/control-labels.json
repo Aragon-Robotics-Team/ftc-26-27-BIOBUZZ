@@ -119,10 +119,10 @@
   },
 
   "Intake + Flywheel Test": {
-    "gamepad1.right_bumper": "Hold: intake + flywheel forward",
-    "gamepad1.left_bumper": "Hold: intake + flywheel reverse",
-    "gamepad1.dpad_up": "More power (both)",
-    "gamepad1.dpad_down": "Less power (both)"
+    "gamepad1.right_bumper": "Hold: intake (full power) + flywheel forward",
+    "gamepad1.left_bumper": "Hold: intake (full power) + flywheel reverse",
+    "gamepad1.dpad_up": "More flywheel power",
+    "gamepad1.dpad_down": "Less flywheel power"
   },
 
   "Ball Chase Test": {

@@ -14,9 +14,10 @@ import org.firstinspires.ftc.robotcore.external.navigation.CurrentUnit;
 import org.firstinspires.ftc.teamcode.core.RobotConstants;
 
 /**
- * Temporary: spin the intake and the flywheel together at one power, like the Motor Tester but for both at once.
- * Gamepad 1: hold RB = both forward, hold LB = both reverse, let go = stop. D-pad up / down = power up / down by
- * powerStep. Power is also editable under Configurables > IntakeFlywheelTest.
+ * Temporary: spin the intake and the flywheel together, like the Motor Tester but for both at once. The intake always
+ * runs at full power; the flywheel runs at the power setting.
+ * Gamepad 1: hold RB = both forward, hold LB = both reverse, let go = stop. D-pad up / down = flywheel power up / down
+ * by powerStep. Power is also editable under Configurables > IntakeFlywheelTest.
  *
  * <p>Raw power (no flywheel PIDF), with each motor's direction from RobotConstants so forward = intake in / shoot.
  * Both coast when stopped, like their subsystems. A motor missing from the config is skipped.
@@ -55,24 +56,25 @@ public class IntakeFlywheelTest extends OpMode {
         if (gamepad1.dpadDownWasPressed()) power -= powerStep;
         power = Range.clip(power, 0, 1);
 
-        double output = 0;
-        if (gamepad1.right_bumper) output = power;
-        else if (gamepad1.left_bumper) output = -power;
-        setPower(output);
+        double direction = 0;
+        if (gamepad1.right_bumper) direction = 1;
+        else if (gamepad1.left_bumper) direction = -1;
+        setPower(direction);
 
         panels.addLine("== INTAKE + FLYWHEEL TEST (gamepad 1) ==");
         panels.addLine("Hold RB: both forward   Hold LB: both reverse");
-        panels.addLine("D-pad UP / DOWN: more / less power");
+        panels.addLine("D-pad UP / DOWN: more / less flywheel power");
         panels.addLine("");
-        panels.addData("Power setting", String.format("%.2f", power));
+        panels.addData("Flywheel power setting", String.format("%.2f", power));
         show("Intake", RobotConstants.Intake.MOTOR_NAME, intake);
         show("Flywheel", RobotConstants.Launcher.FLYWHEEL_MOTOR_NAME, flywheel);
         panels.update(telemetry);
     }
 
-    private void setPower(double output) {
-        if (intake != null) intake.setPower(output);
-        if (flywheel != null) flywheel.setPower(output);
+    /** @param direction 1 forward, -1 reverse, 0 stop */
+    private void setPower(double direction) {
+        if (intake != null) intake.setPower(direction);
+        if (flywheel != null) flywheel.setPower(direction * power);
     }
 
     private void show(String label, String name, DcMotorEx motor) {
