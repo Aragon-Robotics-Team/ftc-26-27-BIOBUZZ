@@ -13,9 +13,10 @@ import org.junit.jupiter.api.Test;
 import java.nio.file.Paths;
 
 /**
- * The Chase And Shoot Test OpMode for 30 s: the pollen chase on the real ball vision (SimWebcam) until the robot has
- * 4, then the drive to the launch spot and the shots into red's up cell. Same field as BallChaseSimTest: red's left
- * corner, an empty hopper, balls scattered over the tiles (no staged nectar, so 4 pollen don't tip the hive).
+ * The Chase And Shoot Test OpMode for 2 minutes: cycles of the pollen chase on the real ball vision (SimWebcam) until
+ * the robot has 4, the drive to the launch spot and the shots into the cell hive vision says is up. Same field as
+ * BallChaseSimTest: red's left corner, an empty hopper, balls scattered over the tiles and no nectar staged in the
+ * cells, so the second 4 pollen tip red's hive and later shots have to follow it to the other cell.
  * Logged to chase-and-shoot.rlog.
  */
 class ChaseAndShootSimTest {
@@ -28,14 +29,14 @@ class ChaseAndShootSimTest {
     }
 
     @Test
-    void itChasesFourThenShootsThemIntoTheHive() {
+    void itKeepsChasingAndShootingIntoWhicheverCellIsUp() {
         BiobuzzRobotSim sim = new BiobuzzRobotSim().preload(0).scatter(SEED, POLLEN, NECTAR);
         sim.placeAt(RobotConstants.Field.RED_LEFT_CORNER.x(), RobotConstants.Field.RED_LEFT_CORNER.y(),
                 RobotConstants.Field.RED_LEFT_CORNER.heading());
 
         OpModeRunResult result = sim.runner(ChaseAndShootTest.class)
                 .initLoopTicks(40)
-                .activeTicks(1500) // 30 s
+                .activeTicks(6000) // 2 minutes
                 .gamepads(sim.drivers((phase, tick, gamepad1, gamepad2) -> {
                     // Red (B) in init, after init's 25-tick Pinpoint wait; the left corner is the default
                     gamepad1.b = phase == OpModePhase.INIT_LOOP && tick == 30;
@@ -45,9 +46,10 @@ class ChaseAndShootSimTest {
         String stage = SimTelemetry.lastLine(result.telemetry().transmissions(), "Stage");
         String chase = SimTelemetry.lastLine(result.telemetry().transmissions(), "Chase");
         System.out.println("Chase and shoot warnings: " + result.warnings());
-        System.out.printf("Chase and shoot: %s; %s; %d shots, %d still held, %d in red's up cell, robot at x %.1f y %.1f%n",
-                stage, chase, sim.shotsFired(), sim.field.getHeldCount(), sim.match.cellBalls(Alliance.RED), sim.x(), sim.y());
+        System.out.printf("Chase and shoot: %s; %s; %d shots, %d still held, red tipped %d times, %d in its up cell, "
+                + "robot at x %.1f y %.1f%n", stage, chase, sim.shotsFired(), sim.field.getHeldCount(),
+                sim.match.tips(Alliance.RED), sim.match.cellBalls(Alliance.RED), sim.x(), sim.y());
 
-        assertTrue(sim.shotsFired() >= 1, "it should shoot what it picked up: " + stage + "; " + chase);
+        assertTrue(sim.match.tips(Alliance.RED) >= 2, "after a tip it should shoot into the new up cell: " + stage);
     }
 }

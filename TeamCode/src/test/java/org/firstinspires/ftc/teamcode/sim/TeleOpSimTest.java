@@ -22,6 +22,7 @@ class TeleOpSimTest {
     @Test
     void fullStickDrivesTheRobotAndThePinpointFollows() {
         BiobuzzRobotSim sim = new BiobuzzRobotSim();
+        sim.placeAt(36, 24, 0); // open floor ahead: from the field center it would drive into the hive's foot
         double startX = sim.x(), startY = sim.y(), startHeading = sim.heading();
 
         OpModeRunResult result = sim.runner(TeleOp.class)

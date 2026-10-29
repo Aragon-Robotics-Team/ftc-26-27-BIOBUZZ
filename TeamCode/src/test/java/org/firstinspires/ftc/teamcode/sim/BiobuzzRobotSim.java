@@ -19,7 +19,9 @@ import org.horizon36596.simloop.fakehardware.FakeLimelight3A;
 import org.horizon36596.simloop.fakehardware.FakeMotor;
 import org.horizon36596.simloop.fakehardware.FakeServo;
 import org.horizon36596.simloop.fakehardware.FakeVoltageSensor;
+import org.horizon36596.simloop.field.FootprintContact;
 import org.horizon36596.simloop.field.GamePieceTracker;
+import org.horizon36596.simloop.field.ObstacleBox;
 import org.horizon36596.simloop.opmode.GamepadScript;
 import org.horizon36596.simloop.opmode.OpModePhase;
 import org.horizon36596.simloop.opmode.OpModeRunner;
@@ -153,6 +155,24 @@ public final class BiobuzzRobotSim {
     public final SimMatch match;
     private SimPartner partner;
     private double lastFieldX = Double.NaN, lastFieldY;
+    /** What the chassis can't drive into, field frame: the four walls (thick boxes just outside the tiles) and the field's obstacles. */
+    private final List<ObstacleBox> solid = new ArrayList<>();
+    private String touching = "";
+    /** Which cell of each hive (red, blue) the Limelight's tags show up: moved when a tray tips. */
+    private final Hive[] tagsUp = new Hive[2];
+    /**
+     * FakeLimelight3A's tag layout. It's final and SimLoop has no setter, so the tags move by reflection when a tray
+     * tips: a stopgap until SimLoop lets a layout change during a run.
+     */
+    private static final java.lang.reflect.Field LIMELIGHT_LAYOUT;
+    static {
+        try {
+            LIMELIGHT_LAYOUT = FakeLimelight3A.class.getDeclaredField("layout");
+            LIMELIGHT_LAYOUT.setAccessible(true);
+        } catch (NoSuchFieldException e) {
+            throw new ExceptionInInitializerError(e);
+        }
+    }
 
     public final MecanumDrivePlant drivePlant;
     public final Mechanism1DofPlant turretPlant;
@@ -166,8 +186,15 @@ public final class BiobuzzRobotSim {
     public BiobuzzRobotSim(Hive redHiveUp, Hive blueHiveUp) {
         field.setBodyMotion(SimHiveTrays.RED, SimHiveTrays.angle(false, redHiveUp), 0);
         field.setBodyMotion(SimHiveTrays.BLUE, SimHiveTrays.angle(true, blueHiveUp), 0);
+        tagsUp[0] = redHiveUp;
+        tagsUp[1] = blueHiveUp;
         robots.add(us);
         match = new SimMatch(field, robots);
+        solid.add(new ObstacleBox("wallRight", 72, 100, -100, 100, 0, 12));
+        solid.add(new ObstacleBox("wallLeft", -100, -72, -100, 100, 0, 12));
+        solid.add(new ObstacleBox("wallRed", -100, 100, -100, -72, 0, 12));
+        solid.add(new ObstacleBox("wallBlue", -100, 100, 72, 100, 0, 12));
+        solid.addAll(field.getWorld().getObstacles());
         for (int i = 0; i < 4; i++) {
             driveMotors[i] = new FakeMotor(DRIVE_MAX_TICKS_PER_SECOND, DRIVE_RATE, DRIVE_TICKS_PER_REV);
             hardwareMap.register(DRIVE_MOTOR_NAMES[i], driveMotors[i]);
@@ -293,6 +320,7 @@ public final class BiobuzzRobotSim {
     /** One tick of physics, after the OpMode has set its powers and the fakes have updated (the runner's order). */
     public void advancePhysics(double deltaTime) {
         drivePlant.update(deltaTime);
+        collide();
         pinpoint.moveChassisTo(drivePlant.getX() * 25.4, drivePlant.getY() * 25.4, drivePlant.getHeading());
 
         turretPlant.update(deltaTime);
@@ -310,12 +338,58 @@ public final class BiobuzzRobotSim {
                 fh + turretAngle(), vx, vy, SimHiveTrays.upOpening(field, us.alliance == Alliance.BLUE));
         if (partner != null) partner.update(deltaTime);
         field.advance(deltaTime);
+        moveTagsWithTrays();
         us.x = fx;
         us.y = fy;
         us.heading = fh;
         webcam.tick(field, fx, fy, fh);
         match.update(deltaTime);
         log();
+    }
+
+    /**
+     * Stops the chassis at the walls and the hive's feet: SimLoop's drive plant only keeps the robot's center on the
+     * field, so after it moves, push the footprint back out of anything it overlaps (FootprintContact) and take away
+     * its speed into it, so it slides along. A few passes, for a corner. The Pinpoint then reads the pushed pose, as a
+     * robot pinned against a wall measures itself standing still. Heading isn't touched.
+     */
+    private void collide() {
+        touching = "";
+        for (int pass = 0; pass < 3; pass++) {
+            double fx = FieldFrame.x(x(), y()), fy = FieldFrame.y(x(), y()), fh = FieldFrame.heading(heading());
+            FootprintContact.Push push = null;
+            for (ObstacleBox box : solid) {
+                push = FootprintContact.pushOutOf(fx, fy, fh, RobotConstants.Field.ROBOT_LENGTH,
+                        RobotConstants.Field.ROBOT_WIDTH, box);
+                if (push != null) {
+                    touching = touching.isEmpty() ? box.getName() : touching + "," + box.getName();
+                    break;
+                }
+            }
+            if (push == null) return;
+            // Field (dx, dy) in Pedro: x is field +Y, y is field -X. The plant's frame is Pedro moved to the center
+            double dx = push.getDyInches(), dy = -push.getDxInches();
+            drivePlant.setPose(drivePlant.getX() + dx, drivePlant.getY() + dy, drivePlant.getHeading());
+            drivePlant.removeVelocityInto(dx, dy);
+        }
+    }
+
+    /** Once a tray has tipped to its other stop, its tags are where the Limelight would now see them. */
+    private void moveTagsWithTrays() {
+        boolean moved = false;
+        for (int i = 0; i < 2; i++) {
+            Hive up = SimHiveTrays.up(i == 1, field.getBodyAngleRad(i == 0 ? SimHiveTrays.RED : SimHiveTrays.BLUE));
+            if (up != null && up != tagsUp[i]) {
+                tagsUp[i] = up;
+                moved = true;
+            }
+        }
+        if (!moved) return;
+        try {
+            LIMELIGHT_LAYOUT.set(limelight, SimHives.layout(tagsUp[0], tagsUp[1]));
+        } catch (IllegalAccessException e) {
+            throw new IllegalStateException("can't move the Limelight's tags", e);
+        }
     }
 
     /**
@@ -347,6 +421,7 @@ public final class BiobuzzRobotSim {
         // Where the robot thinks it is: the Pinpoint's last reading, which is the pose Pedro follows
         Logger.recordOutput("Sim/PinpointPose", Pose2d.struct, FieldFrame.pose2d(pinpoint.getPosX(DistanceUnit.INCH),
                 pinpoint.getPosY(DistanceUnit.INCH), pinpoint.getHeading(AngleUnit.RADIANS)));
+        Logger.recordOutput("Sim/Touching", touching); // the walls or obstacles the chassis is against, if any
         Logger.recordOutput("Sim/TurretAngleDeg", Math.toDegrees(turretAngle()));
         Logger.recordOutput("Sim/TurretFieldPose", Pose2d.struct, FieldFrame.pose2d(x(), y(), heading() + turretAngle()));
         Logger.recordOutput("Sim/FlywheelTicksPerSec", flywheel.getVelocity());
