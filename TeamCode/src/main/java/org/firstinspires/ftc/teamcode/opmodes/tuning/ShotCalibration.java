@@ -21,6 +21,7 @@ import org.firstinspires.ftc.teamcode.core.Robot;
 import org.firstinspires.ftc.teamcode.core.RobotConstants;
 import org.firstinspires.ftc.teamcode.core.ShotSolver;
 import org.firstinspires.ftc.teamcode.core.ShotSolver.Shot;
+import org.firstinspires.ftc.teamcode.util.PanelsDisplay;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -32,7 +33,8 @@ import java.util.List;
  * - DRAG_COEFFICIENT: if far shots need a different ticks / exit speed than near ones, the model's drag is off.
  *   Too little drag in the model shows up as the ratio rising with distance.
  *
- * <p>Localize first (gamepad 2 share / options with the robot pushed into a corner), then for each spot:
+ * <p>Localize first (gamepad 2 share / options with the robot pushed into a corner), and check the robot sits in the
+ * right place on Panels' Field tab, with the turret line through the hive cell. Then for each spot:
  * 1. Drive there and stop, facing roughly at the hive. Flywheel on (gamepad 1 RB); turret and flywheel aim at the
  *    up cell for a standing shot.
  * 2. Shoot (hold gamepad 1 RT) and nudge the flywheel (gamepad 2 dpad up / down) until balls go through the middle.
@@ -97,6 +99,7 @@ public class ShotCalibration extends OpMode {
 
     private Robot robot;
     private TelemetryManager panels;
+    private PanelsDisplay panelsDisplay; // Field tab only
     private Result current; // at the DRAG_COEFFICIENT in RobotConstants
     private Result fitted;  // at the best drag, or null
     private String message = "";
@@ -107,6 +110,7 @@ public class ShotCalibration extends OpMode {
 
         robot = new Robot(hardwareMap);
         panels = PanelsTelemetry.INSTANCE.getTelemetry();
+        panelsDisplay = new PanelsDisplay();
         if (MatchState.pose != null) {
             robot.drivebase.setPose(MatchState.pose);
             robot.launcher.setCurrentTurretAngle(MatchState.turretAngle);
@@ -277,6 +281,7 @@ public class ShotCalibration extends OpMode {
             panels.addLine(String.format("Fit needs %d+ spots at least %.0f in apart", fitMinSamples, fitMinSpan));
         }
         panels.update(telemetry);
+        panelsDisplay.drawField(robot);
     }
 
     private static String driftAdvice(double change) {

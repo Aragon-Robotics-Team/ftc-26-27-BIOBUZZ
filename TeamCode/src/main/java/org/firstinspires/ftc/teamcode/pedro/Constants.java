@@ -45,10 +45,6 @@ public class Constants {
         c.offsetUnits.set(DistanceUnit.INCH);
     });
 
-    // TODO: paste the Foresight Tuner output over this. Placeholders until then (Oct 26), estimated for 312 RPM motors
-    // on 104 mm mecanum wheels with the tuner's own formulas, from: about 57 in/s forward and 46 in/s strafe flat out,
-    // a 0.2 s speed-up time constant, 45 / 60 in/s² coasting to a stop, and turning about a point ~12 in from the
-    // wheels. The kP values are half what those numbers give, so a wrong guess is sluggish rather than shaky.
     public static ForesightConfig foresightConfig = new ForesightConfig(
             c -> {
                 Controller primaryTranslationalForward = Controller.proportional(0.27232908107134046);

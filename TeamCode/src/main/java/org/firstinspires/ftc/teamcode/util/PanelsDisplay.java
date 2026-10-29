@@ -37,6 +37,7 @@ public class PanelsDisplay {
         Pose pose = robot.drivebase.getPose();
         panels.addData("Flywheel target (ticks/s)", robot.launcher.getTargetVelocity());
         panels.addData("Flywheel actual (ticks/s)", robot.launcher.getFlywheelVelocity());
+        panels.addData("Flywheel power", robot.launcher.getFlywheelPower());
         panels.addData("Turret target (deg)", Math.toDegrees(robot.launcher.getTurretTargetAngle()));
         panels.addData("Turret actual (deg)", Math.toDegrees(robot.launcher.getTurretAngle()));
         panels.addData("Loop (ms)", loopMs);
@@ -45,7 +46,14 @@ public class PanelsDisplay {
         panels.addData("Heading (deg)", Math.toDegrees(pose.heading()));
         panels.update();
 
-        if (field.getShouldUpdateCanvas()) draw(robot.drivebase.getFollower(), pose, robot.launcher, robot.hiveTarget());
+        drawField(robot);
+    }
+
+    /** Only the Field tab, for OpModes that send their own Panels telemetry (e.g. Shot Calibration). Once per loop. */
+    public void drawField(Robot robot) {
+        if (field.getShouldUpdateCanvas()) {
+            draw(robot.drivebase.getFollower(), robot.drivebase.getPose(), robot.launcher, robot.hiveTarget());
+        }
     }
 
     private void draw(Follower follower, Pose pose, Launcher launcher, Pose target) {

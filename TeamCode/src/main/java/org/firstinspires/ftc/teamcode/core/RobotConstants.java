@@ -162,19 +162,28 @@ public class RobotConstants {
         public static String FLYWHEEL_MOTOR_NAME = "flywheel";
         public static String TURRET_MOTOR_NAME = "turret";
 
-        // TODO: set directions (+ power = shoot / turret CCW)
         public static DcMotorSimple.Direction FLYWHEEL_DIRECTION = DcMotorSimple.Direction.FORWARD;
         public static DcMotorSimple.Direction TURRET_DIRECTION = DcMotorSimple.Direction.FORWARD;
 
         // ---- Flywheel ----
         // goBILDA 6000 RPM: 28 ticks/rev, about 2800 ticks/sec flat out. The counter-rollers are geared off this motor.
-        public static double FLYWHEEL_MAX_VELOCITY = 1709; // ticks/sec (Oct 26)
+        public static double FLYWHEEL_MAX_VELOCITY = 2100; // ticks/sec (Oct 26)
         // Fixed speed for spinUp() and the Flywheel Tuner
         public static double TARGET_VELOCITY = 1609;  // ticks/sec (Oct 26)
         public static double VELOCITY_TOLERANCE = 50; // ticks/sec, when not aiming with ShotSolver. TODO: tune
         public static double VELOCITY_NUDGE = 25;     // ticks/sec per operator press. TODO: tune
-        // Velocity PIDF on the hub: F ≈ 32767 / 2800 max ticks/sec, P ≈ F / 10
-        public static PIDFCoefficients FLYWHEEL_PIDF = new PIDFCoefficients(1.2, 0, 0, 17.26); // Oct 26. TODO: retune wednesday
+        /** How the flywheel holds its speed. */
+        public enum FlywheelControl {
+            BANG_BANG, // our loop: full power below target, FLYWHEEL_KV hold power at or above it. Fastest recovery between shots
+            HUB_PIDF   // the hub's own velocity loop, with FLYWHEEL_PIDF
+        }
+        public static FlywheelControl FLYWHEEL_CONTROL = FlywheelControl.BANG_BANG;
+        // Bang-bang hold power per tick/sec at 12 V; scaled by 12 / battery volts, so it holds the same on a tired battery.
+        // The Flywheel Auto Tuner prints it. A little low is fine (full power tops it up); too high and the flywheel
+        // settles above target. (Oct 28)
+        public static double FLYWHEEL_KV = 0.000541;
+        // Velocity PIDF on the hub, for HUB_PIDF: F ≈ 32767 / max ticks/sec, P ≈ F / 10
+        public static PIDFCoefficients FLYWHEEL_PIDF = new PIDFCoefficients(16.84, 0, 0, 16.84); // Oct 28.
 
         // ---- Turret ----
         // Angles are robot-relative radians: 0 = facing the front of the robot, positive = counter-clockwise.

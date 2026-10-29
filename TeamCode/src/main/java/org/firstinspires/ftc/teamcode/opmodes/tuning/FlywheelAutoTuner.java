@@ -31,6 +31,9 @@ import java.util.List;
  * SMOOTH_S before it's judged, and the noise left after that is measured while holding the low speed. The settle band
  * and the overshoot limit both widen to NOISE_BANDS times that noise, so noise isn't mistaken for overshoot.
  *
+ * It also prints FLYWHEEL_KV, the hold power for bang-bang control, from the top speed and the battery voltage at full
+ * power (the voltage sags under load, so it's measured then, not at rest).
+ *
  * The result prints as a line to paste into RobotConstants.Launcher. Fine-tune it in the Flywheel Tuner,
  * and check recovery with real shots.
  */
@@ -43,12 +46,14 @@ public class FlywheelAutoTuner extends LinearOpMode {
     public static double MAX_OVERSHOOT = 0.05;            // fraction of the step size, beyond the noise
     public static double SMOOTH_S = 0.1;                  // velocity readings are averaged over this long
     public static double NOISE_BANDS = 3;                 // noise allowance, in standard deviations of the smoothed speed
-    // P values to try, as multiples of F (the FTC rule of thumb is 0.1)
-    public static double[] P_MULTIPLIERS = {0.05, 0.1, 0.15, 0.2, 0.25, 0.3, 0.35};
+    // P values to try, as multiples of F (the FTC rule of thumb is 0.1). The search stops early once P overshoots or
+    // rings, so the top of the range only runs if the lower ones were still clean. 0.35 was the best on Oct 28.
+    public static double[] P_MULTIPLIERS = {0.05, 0.1, 0.15, 0.2, 0.25, 0.3, 0.35, 0.45, 0.6, 0.8, 1.0};
 
     private DcMotorEx flywheel;
     private TelemetryManager panels;
     private final ElapsedTime displayTimer = new ElapsedTime();
+    private double fullPowerVolts; // battery voltage while measuring top speed
 
     /** Velocity readings over time. */
     static class Trace {
@@ -117,6 +122,8 @@ public class FlywheelAutoTuner extends LinearOpMode {
         StepResult best = null;
         List<String> report = new ArrayList<>();
         report.add(String.format("Top speed %.0f ticks/sec at %.1f V  ->  F = %.2f", maxVelocity, voltage, f));
+        report.add(String.format("Bang-bang: %.1f V at full power  ->  public static double FLYWHEEL_KV = %.6f;",
+                fullPowerVolts, fullPowerVolts / (12 * maxVelocity)));
         report.add("Step tests at " + Math.round(testVelocity) + " ticks/sec (noise = ± one standard deviation):");
         for (double multiplier : P_MULTIPLIERS) {
             if (!opModeIsActive()) return;
@@ -168,14 +175,16 @@ public class FlywheelAutoTuner extends LinearOpMode {
                 lastCheck = t;
             }
         }
-        double sum = 0;
+        double sum = 0, volts = 0;
         int samples = 0;
         timer.reset();
         while (opModeIsActive() && timer.seconds() < 0.5) {
             sum += flywheel.getVelocity();
+            volts += batteryVoltage();
             samples++;
         }
         flywheel.setPower(0);
+        fullPowerVolts = samples > 0 ? volts / samples : 0;
         return samples > 0 ? sum / samples : 0;
     }
 

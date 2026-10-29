@@ -14,8 +14,11 @@ import org.firstinspires.ftc.teamcode.core.RobotConstants;
 import org.firstinspires.ftc.teamcode.subsystems.Launcher;
 
 /**
- * Tune the flywheel velocity PIDF with Panels: edit the values under Configurables > FlywheelTuner and
- * watch target / actual in the Graph. Copy the final values into RobotConstants.Launcher.
+ * Tune the flywheel speed control with Panels: edit the values under Configurables > FlywheelTuner and
+ * watch target / actual / power in the Graph. Copy the final values into RobotConstants.Launcher.
+ * With FLYWHEEL_CONTROL = BANG_BANG only kV matters: lower it if the speed sits above target with the power at the hold
+ * value; it's fine for the power to flick to full now and then.
+ * With HUB_PIDF:
  * 1. With P = I = D = 0, raise F until the actual speed sits just under the target (or use F ≈ 32767 / max ticks/sec).
  * 2. Raise P until it recovers quickly from a shot without oscillating. Add I only if it settles below target.
  * A (gamepad 1) toggles the flywheel on / off.
@@ -28,6 +31,7 @@ public class FlywheelTuner extends OpMode {
     public static double i = RobotConstants.Launcher.FLYWHEEL_PIDF.i;
     public static double d = RobotConstants.Launcher.FLYWHEEL_PIDF.d;
     public static double f = RobotConstants.Launcher.FLYWHEEL_PIDF.f;
+    public static double kV = RobotConstants.Launcher.FLYWHEEL_KV; // bang-bang hold power per tick/sec at 12 V
 
     private Launcher launcher;
     private TelemetryManager panels;
@@ -56,14 +60,17 @@ public class FlywheelTuner extends OpMode {
         Scheduler.execute();
 
         panels.addLine(launcher.isSpinning() ? "Flywheel ON (A to stop)" : "Flywheel OFF (A to start)");
+        panels.addLine("Control: " + RobotConstants.Launcher.FLYWHEEL_CONTROL);
         panels.addData("Target", launcher.getTargetVelocity());
         panels.addData("Actual", launcher.getFlywheelVelocity());
         panels.addData("Error", launcher.getTargetVelocity() - launcher.getFlywheelVelocity());
+        panels.addData("Power", launcher.getFlywheelPower());
         panels.update(telemetry);
     }
 
     /** Send any values edited in Panels to the launcher. */
     private void pushChanges() {
+        RobotConstants.Launcher.FLYWHEEL_KV = kV; // the launcher reads it every loop
         if (p != pushedPidf.p || i != pushedPidf.i || d != pushedPidf.d || f != pushedPidf.f) {
             pushedPidf.p = p;
             pushedPidf.i = i;
