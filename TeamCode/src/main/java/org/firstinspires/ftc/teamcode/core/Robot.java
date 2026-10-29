@@ -198,5 +198,8 @@ public class Robot {
         Logger.recordOutput("Vision/available", hiveVision.isAvailable());
         Logger.recordOutput("Vision/locked", hiveVision.isLocked());
         Logger.recordOutput("BallVision/balls", ballVision.getBalls().size());
+        // What the chase works from: the pipeline's time per frame, and how old the newest frame is (both ms)
+        Logger.recordOutput("BallVision/pipelineMs", ballVision.getPipelineMs());
+        Logger.recordOutput("BallVision/frameAgeMs", (System.nanoTime() / 1e9 - ballVision.getFrameTime()) * 1000);
     }
 }

@@ -44,7 +44,8 @@ public final class PlannedPath {
 
     /**
      * Starts a row that's driven no faster than the number after it, in in/s ({@code SLOW, 20, x0, y0, …}): Pedro's
-     * maxPathSpeed while on that segment, for shooting on the move. Pedro coasts down to it, so the planner starts
+     * maxVelocityConstraint while on that segment, for shooting on the move (not maxPathSpeed, which is a fraction of
+     * the top speed). Pedro coasts down to it, so the planner starts
      * the capped stretch early enough.
      */
     public static final double SLOW = Double.NaN;
@@ -75,7 +76,7 @@ public final class PlannedPath {
                 heading = heading.until(d[k], Interpolator.linear(f.of(0, 0, d[k - 1]).heading(), f.of(0, 0, d[k + 1]).heading()));
             }
             parts[s] = Paths.curve(points).heading(heading);
-            if (o > 0) parts[s] = parts[s].with(Constants.foresightConfig.maxPathSpeed.at(d[1]));
+            if (o > 0) parts[s] = parts[s].with(Constants.foresightConfig.maxVelocityConstraint.at(d[1]));
         }
         Path path = Paths.path(parts);
         if (!stopAtEnd) path = path.with(Constants.foresightConfig.brakeAtEnd.at(false));

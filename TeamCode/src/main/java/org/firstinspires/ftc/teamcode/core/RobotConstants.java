@@ -159,6 +159,8 @@ public class RobotConstants {
 
         // ---- Chase ----
         public static double CHASE_MAX_SPEED = 30;  // in/s. TODO: tune
+        public static double NEAR_BALL_SPEED = 22;     // in/s within NEAR_BALL_DISTANCE of the ball, for the camera and intake
+        public static double NEAR_BALL_DISTANCE = 24;  // inches, robot center to ball
         public static double OVERSHOOT = 4;         // inches the mouth drives past the ball
         public static double REPLAN_DISTANCE = 2;   // inches the target has to move before the path is redone
         public static double LOST_S = 0.5;          // a target out of view this long (not at the intake) is given up
@@ -169,12 +171,24 @@ public class RobotConstants {
         // A search turns from a spot with room to turn (the robot's half diagonal plus KEEP_OUT_MARGIN clear of the
         // walls, the hive's feet and the flowers), driving there first, for up to SEARCH_MOVE_S
         public static double SEARCH_MOVE_S = 3;
-        // Stuck: a target the robot gets no closer to for STUCK_S (moved under STUCK_DISTANCE and turned under
-        // STUCK_TURN), as against a wall, is skipped for the rest of the chase, with any pollen within SKIP_RADIUS of it
+        // Giving up on a target, skipping it (and any pollen within SKIP_RADIUS of it) for SKIP_S: when the robot gets
+        // no closer for STUCK_S (moved under STUCK_DISTANCE and turned under STUCK_TURN), as against a wall, or when it
+        // has been within IN_REACH of the robot's center (the mouth's reach plus a bit) for IN_REACH_S without going in
         public static double STUCK_S = 0.75;
         public static double STUCK_DISTANCE = 1;
         public static double STUCK_TURN = Math.toRadians(5);
+        public static double IN_REACH = 10;
+        public static double IN_REACH_S = 1.5;
         public static double SKIP_RADIUS = 4;
+        public static double SKIP_S = 6;
+        // A target rolling faster than this (net, over MOVING_WINDOW_S) is waited for, not chased
+        public static double MOVING_SPEED = 10;     // in/s
+        public static double MOVING_WINDOW_S = 0.3;
+        // A ball within LINE_UP_DISTANCE of a wall, a hive foot or a flower column is approached square from its open
+        // side: first to LINE_UP_OUT out on that line (unless already within LINE_UP_TOLERANCE of it), then nose in
+        public static double LINE_UP_DISTANCE = 10;
+        public static double LINE_UP_OUT = 14;
+        public static double LINE_UP_TOLERANCE = 3;
     }
 
     public static class Launcher {

@@ -112,9 +112,13 @@ public class BallVision implements Subsystem {
                 CAMERA_MATRIX[0], CAMERA_MATRIX[1], CAMERA_MATRIX[2], CAMERA_MATRIX[3], mount);
     }
 
-    /** Pollen near here isn't chased until clearSkips(): the robot couldn't get to it. */
-    public void skip(double x, double y) {
-        skipped.add(new double[] {x, y});
+    /** Pollen within SKIP_RADIUS of here isn't chased for the next seconds (or until clearSkips): the robot couldn't get it. */
+    public void skip(double x, double y, double seconds) {
+        skipped.add(new double[] {x, y, now() + seconds});
+    }
+
+    private static double now() {
+        return System.nanoTime() / 1e9;
     }
 
     public void clearSkips() {
@@ -123,8 +127,9 @@ public class BallVision implements Subsystem {
 
     /** Inside the walls, off the hive's feet, away from the flowers and not skipped. */
     private boolean chaseable(double x, double y) {
+        double now = now();
         for (double[] s : skipped) {
-            if (Math.hypot(x - s[0], y - s[1]) < SKIP_RADIUS) return false;
+            if (now < s[2] && Math.hypot(x - s[0], y - s[1]) < SKIP_RADIUS) return false;
         }
         return onOpenFloor(x, y);
     }
@@ -190,6 +195,11 @@ public class BallVision implements Subsystem {
     /** Balls in the newest frame. */
     public List<Ball> getBalls() {
         return lastBalls;
+    }
+
+    /** How long the pipeline took on the newest frame, milliseconds; NaN before the first. */
+    public double getPipelineMs() {
+        return lastResult == null ? Double.NaN : lastResult.detectMs;
     }
 
     /** Capture time of the newest frame, seconds (System.nanoTime), or NaN before the first. */

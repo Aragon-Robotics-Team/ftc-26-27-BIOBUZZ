@@ -15,6 +15,8 @@ bodies, `ShotArcRecorder`, `StaticRobot`) and our own field assets. The sim's cl
 - Robot code: `util/MatchLog` and `Robot.log()` log the robot's own state (off on the robot until
   `RobotConstants.Logging.ENABLED`; always in the sim).
 - Tests: `AutoSimTest` (every Auto with the partner; the two preloads tip our hive), `BallChaseSimTest` (Ball Chase Test for 30 s on the real ball vision: `SimWebcam` draws the camera's frames; balls scattered over the tiles with `scatter()`), `LauncherSimTest` (TeleOp shoots
+- Ball camera frames: the balls have wiffle holes painted on (`WiffleHoles`: 26 holes, about a fifth of the diameter each, rolling with the ball), in `SimWebcam` and `BallVisionSimTest`.
+- Real frames: `vision/RealFramesTest` scores the robot's ball vision (the Java `BallVisionProcessor`) on biobuzz_detection's 329 hand-labeled Arducam frames, as its `evaluate.py` does. Oct 28: recall 63.9%, precision 99.2% (the Python reference: 66.0%, 99.0%); 84% recall on the plain pollen video, 52% on the crowded, blurred handheld one; 21.5 ms median per frame on a Mac. Skipped when the dataset isn't next to this repo.
   its preload and picks a ball up), `HiveTippingSimTest`, `HiveVisionSimTest`, `BallVisionSimTest`, `TeleOpSimTest`.
   Logs land in `TeamCode/build/sim/*.rlog`.
 

@@ -25,7 +25,6 @@ import org.opencv.core.CvType;
 import org.opencv.core.Mat;
 
 import java.io.IOException;
-import java.io.OutputStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
@@ -39,7 +38,8 @@ import java.util.List;
  * The frame is drawn through the webcam's real calibration and distortion (RobotConstants.BallVision) from the CAD
  * mount, so undistortion and the pixel-to-floor geometry are exercised too. The colors are PLACEHOLDERS: flat,
  * one light, no shadows. Tune them toward real frames (biobuzz_detection's captures) before trusting thresholds.
- * The frame is saved to build/sim/ball-frame.png to look at.
+ * The balls have wiffle holes painted on (WiffleHoles), as the real ones do. The frame is saved to
+ * build/sim/ball-frame.png to look at.
  */
 class BallVisionSimTest {
     // PLACEHOLDER colors, 0xRRGGBB: inside the pipeline's hue windows, but not measured from real balls or tiles
@@ -91,11 +91,10 @@ class BallVisionSimTest {
                 .sensorNoise(36596, 2.0) // seeded; PLACEHOLDER spread, 8-bit counts
                 .build();
         SimFrame frame = renderer.render(field.getPieces(), 0, 0, 0, CameraOccluders.none(), AprilTagLayout.empty());
-        Path png = Paths.get("build", "sim", "ball-frame.png");
-        Files.createDirectories(png.getParent());
-        try (OutputStream out = Files.newOutputStream(png)) {
-            frame.writePng(out);
-        }
+        byte[] bytes = frame.getRgbBytes();
+        new WiffleHoles(lens, RobotConstants.BallVision.LENS_FORWARD, RobotConstants.BallVision.LENS_LEFT,
+                RobotConstants.BallVision.LENS_HEIGHT, RobotConstants.BallVision.YAW, RobotConstants.BallVision.TILT)
+                .paint(frame, bytes, field.getPieces(), 0, 0, 0, 0);
 
         BallVisionProcessor processor = new BallVisionProcessor(geometry,
                 new BallPipeline(geometry, BallVision.pipelineSettings()), RobotConstants.BallVision.DISTORTION);
@@ -104,7 +103,10 @@ class BallVisionSimTest {
         Mat rgb = new Mat(frame.getHeightPx(), frame.getWidthPx(), CvType.CV_8UC3);
         BallVisionProcessor.Result result;
         try {
-            rgb.put(0, 0, frame.getRgbBytes());
+            rgb.put(0, 0, bytes);
+            Path png = Paths.get("build", "sim", "ball-frame.png");
+            Files.createDirectories(png.getParent());
+            SimWebcam.save(rgb, png);
             result = (BallVisionProcessor.Result) processor.processFrame(rgb, 0);
         } finally {
             rgb.release();

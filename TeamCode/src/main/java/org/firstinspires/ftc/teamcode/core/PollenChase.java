@@ -26,8 +26,11 @@ import java.util.List;
  * path is done, the target has to stay out of sight for CONFIRM_S to count as picked up; if it shows up again (pushed
  * or bounced) the chase goes after it again, up to MAX_TRIES times.
  *
- * A flower or hive foot in the way is driven around (FieldRoutes): the path goes to the first waypoint, then on.
- * A target the robot gets no closer to for STUCK_S (pinned against a wall, say) is skipped for the rest of the chase.
+ * Paths are capped at CHASE_MAX_SPEED, and NEAR_BALL_SPEED within NEAR_BALL_DISTANCE of the target. A flower or hive
+ * foot in the way is driven around (FieldRoutes): the path goes to the first waypoint, then on. A ball beside a wall,
+ * a foot or a flower is lined up first: LINE_UP_OUT out from it on its open side, then straight in, square. A rolling
+ * target is waited for. A target the robot gets no closer to for STUCK_S (pinned against a wall, say), or that sits
+ * within reach for IN_REACH_S without going in, is skipped for SKIP_S.
  *
  * With nothing to chase it searches: turns in place at SEARCH_TURN_RATE, toward the side the camera looks, until pollen
  * comes into view. A frame up against a wall can't turn, so it first drives out to the nearest spot with room to turn.
@@ -62,8 +65,14 @@ public class PollenChase {
     private PollenTracker.Target chasing;
     private int tries;
     private Pose goal;
-    // A waypoint around a flower or hive foot on the way to goal, while the robot is driving to it
+    // A waypoint on the way to goal, while the robot is driving to it: around a flower or hive foot, or the line-up
+    // point in front of a ball beside something (detourLinesUp)
     private Pose detour;
+    private boolean detourLinesUp, linedUp;
+    private double pathSpeed;
+    // The target's recent positions {t, x, y}, to tell a rolling ball; when it came within reach (NaN: it isn't)
+    private final java.util.ArrayDeque<double[]> track = new java.util.ArrayDeque<>();
+    private double inReachSince = Double.NaN;
 
     public PollenChase(Robot robot, int maxBalls, double timeoutS) {
         this.robot = robot;
@@ -127,6 +136,9 @@ public class PollenChase {
             tries = 0;
             goal = null;
             detour = null;
+            linedUp = false;
+            track.clear();
+            inReachSince = Double.NaN;
             state = State.APPROACH;
             progressPose = null;
         }
@@ -137,10 +149,17 @@ public class PollenChase {
         searchFrom = null;
         turnStart = Double.NaN;
         boolean inView = target.lastSeen == vision.getFrameTime();
-        if (state != State.CONFIRM && stuck(t)) {
-            vision.skip(target.x, target.y);
+        if ((state != State.CONFIRM && stuck(t)) || inReachTooLong(target, t)) {
+            vision.skip(target.x, target.y, SKIP_S);
             tracker.drop();
             detour = null;
+            return;
+        }
+        if (state == State.APPROACH && rolling(target, t)) {
+            follower.hold(follower.pose()); // let it settle
+            goal = null;
+            detour = null;
+            progressPose = null;
             return;
         }
 
@@ -266,25 +285,102 @@ public class PollenChase {
         double distance = Math.hypot(dx, dy);
         if (distance < 1e-3) return;
         double ux = dx / distance, uy = dy / distance;
+        // Beside a wall, a hive foot or a flower: in square from the open side, lined up LINE_UP_OUT out first
+        double[] open = besideSomething(target.x, target.y);
+        Pose lineUp = null;
+        if (open != null) {
+            ux = -open[0];
+            uy = -open[1];
+            double along = (pose.x() - target.x) * open[0] + (pose.y() - target.y) * open[1];
+            double across = Math.abs((pose.y() - target.y) * open[0] - (pose.x() - target.x) * open[1]);
+            if (along > 0 && across < LINE_UP_TOLERANCE) linedUp = true;
+        }
+        double heading = Math.atan2(uy, ux) - INTAKE_HEADING_OFFSET;
+        if (open != null && !linedUp) {
+            lineUp = new Pose(clamp(target.x + open[0] * LINE_UP_OUT), clamp(target.y + open[1] * LINE_UP_OUT), heading);
+        }
         double x = clamp(target.x + ux * (OVERSHOOT - INTAKE_REACH));
         double y = clamp(target.y + uy * (OVERSHOOT - INTAKE_REACH));
+        double speed = distance < NEAR_BALL_DISTANCE ? NEAR_BALL_SPEED : CHASE_MAX_SPEED;
         if (detour != null) {
-            if (follower.following()) return; // still going around
-            detour = null;                    // around it: on to the ball
+            if (follower.following()) return; // still on the way there
+            if (detourLinesUp) linedUp = true;
+            detour = null;                    // there: on to the ball
             goal = null;
+            if (open != null && linedUp) lineUp = null;
         }
-        if (goal != null && Math.hypot(x - goal.x(), y - goal.y()) < REPLAN_DISTANCE) return;
+        // Redo the path if the target moved enough, or it's come within NEAR_BALL_DISTANCE (a slower cap)
+        if (goal != null && Math.hypot(x - goal.x(), y - goal.y()) < REPLAN_DISTANCE && speed == pathSpeed) return;
 
-        double heading = Math.atan2(uy, ux) - INTAKE_HEADING_OFFSET;
         goal = new Pose(x, y, heading);
+        pathSpeed = speed;
+        Pose next = lineUp != null ? lineUp : goal;
+        List<double[]> route = FieldRoutes.between(pose, next);
         Pose end = goal;
-        List<double[]> route = FieldRoutes.between(pose, goal);
         if (!route.isEmpty()) {
             detour = new Pose(route.get(0)[0], route.get(0)[1], heading);
+            detourLinesUp = false;
             end = detour;
+        } else if (lineUp != null) {
+            detour = lineUp;
+            detourLinesUp = true;
+            end = lineUp;
         }
         follower.follow(line(pose, end).constant(heading)
-                .with(Constants.foresightConfig.maxPathSpeed.at(CHASE_MAX_SPEED)));
+                .with(Constants.foresightConfig.maxVelocityConstraint.at(end == goal ? speed : CHASE_MAX_SPEED)));
+    }
+
+    /**
+     * The unit direction, {x, y}, away from the wall, hive foot or flower column the ball is within LINE_UP_DISTANCE
+     * of (the nearest), toward the open side; null if it's in the open.
+     */
+    static double[] besideSomething(double x, double y) {
+        double best = LINE_UP_DISTANCE;
+        double[] open = null;
+        double[][] walls = {{x, 1, 0}, {144 - x, -1, 0}, {y, 0, 1}, {144 - y, 0, -1}}; // distance, then the way out
+        for (double[] w : walls) {
+            if (w[0] < best) {
+                best = w[0];
+                open = new double[] {w[1], w[2]};
+            }
+        }
+        for (double[] foot : RobotConstants.Field.HIVE_FEET) {
+            double qx = Math.max(foot[0], Math.min(foot[2], x)), qy = Math.max(foot[1], Math.min(foot[3], y));
+            double d = Math.hypot(x - qx, y - qy);
+            if (d > 1e-6 && d < best) {
+                best = d;
+                open = new double[] {(x - qx) / d, (y - qy) / d};
+            }
+        }
+        for (Pose flower : RobotConstants.Field.FLOWERS) {
+            double r = Math.hypot(x - flower.x(), y - flower.y());
+            if (r > 1e-6 && r - RobotConstants.Field.FLOWER_RADIUS < best) {
+                best = r - RobotConstants.Field.FLOWER_RADIUS;
+                open = new double[] {(x - flower.x()) / r, (y - flower.y()) / r};
+            }
+        }
+        return open;
+    }
+
+    /** Whether the target has rolled more than MOVING_SPEED, net, over the last MOVING_WINDOW_S. */
+    private boolean rolling(PollenTracker.Target target, double t) {
+        track.addLast(new double[] {t, target.x, target.y});
+        while (track.size() > 1 && t - track.peekFirst()[0] > MOVING_WINDOW_S) track.removeFirst();
+        double[] first = track.peekFirst();
+        double span = t - first[0];
+        return span >= MOVING_WINDOW_S / 2
+                && Math.hypot(target.x - first[1], target.y - first[2]) / span > MOVING_SPEED;
+    }
+
+    /** Whether the target has been within IN_REACH of the robot's center for IN_REACH_S without being picked up. */
+    private boolean inReachTooLong(PollenTracker.Target target, double t) {
+        Pose pose = follower.pose();
+        if (Math.hypot(target.x - pose.x(), target.y - pose.y()) >= IN_REACH) {
+            inReachSince = Double.NaN;
+            return false;
+        }
+        if (Double.isNaN(inReachSince)) inReachSince = t;
+        return t - inReachSince >= IN_REACH_S;
     }
 
     /** Keeps path ends inside the walls, by half the robot's longer side. */

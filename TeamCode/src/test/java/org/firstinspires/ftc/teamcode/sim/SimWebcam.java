@@ -26,7 +26,6 @@ import org.opencv.core.CvType;
 import org.opencv.core.Mat;
 
 import java.io.IOException;
-import java.io.OutputStream;
 import java.io.UncheckedIOException;
 import java.nio.file.DirectoryStream;
 import java.nio.file.Files;
@@ -40,18 +39,20 @@ import java.util.List;
  * processor on it, as the portal's camera thread would.
  *
  * Drawn through the webcam's calibration and distortion from the CAD mount, like BallVisionSimTest, with the field
- * walls, the flower columns and the hive feet as boxes that hide balls behind them. The colors are PLACEHOLDERS: flat,
- * one light, no shadows, not measured from real frames.
+ * walls, the flower columns and the hive feet as boxes that hide balls behind them, and wiffle holes painted on the
+ * balls (WiffleHoles). The colors are PLACEHOLDERS: flat, one light, no shadows, not measured from real frames.
  */
 final class SimWebcam extends AbstractFakeDevice implements WebcamName, java.util.function.Consumer<VisionProcessor> {
     // PLACEHOLDER colors, 0xRRGGBB: inside the pipeline's hue windows, but not measured from real balls or tiles
     static final int POLLEN_RGB = 0xF2C21B, RED_NECTAR_RGB = 0xC8282D, BLUE_NECTAR_RGB = 0x2D6BD2;
     static final int TILE_RGB = 0x7A7A7A, SEAM_RGB = 0x5A5A5A, WALL_RGB = 0x3A3A3A, BOX_RGB = 0x9A9A9A;
     static final int FRAME_EVERY = 2; // ticks: 25 frames a second at the sim's 50 Hz. PLACEHOLDER: the webcam's real rate
+    private static final double TICK_S = 0.02; // the sim's tick
 
     private final SimFrameRenderer renderer;
     private final int width, height;
     private final CameraOccluders boxes;
+    private final WiffleHoles holes;
     private VisionProcessor processor;
     private Mat rgb;
     private int ticks;
@@ -80,6 +81,8 @@ final class SimWebcam extends AbstractFakeDevice implements WebcamName, java.uti
                 .sensorNoise(36596, 2.0) // seeded; PLACEHOLDER spread, 8-bit counts
                 .build();
         boxes = CameraOccluders.field(fieldBoxes());
+        holes = new WiffleHoles(lens, RobotConstants.BallVision.LENS_FORWARD, RobotConstants.BallVision.LENS_LEFT,
+                RobotConstants.BallVision.LENS_HEIGHT, RobotConstants.BallVision.YAW, RobotConstants.BallVision.TILT);
     }
 
     /** What hides balls from the camera: the walls (12 in tall), the flower columns and the hive's feet. */
@@ -113,10 +116,14 @@ final class SimWebcam extends AbstractFakeDevice implements WebcamName, java.uti
         if (processor == null || ticks++ % FRAME_EVERY != 0) return;
         SimFrame frame = renderer.render(field.getPieces(), x, y, heading, boxes, AprilTagLayout.empty());
         if (rgb == null) rgb = new Mat(frame.getHeightPx(), frame.getWidthPx(), CvType.CV_8UC3);
-        rgb.put(0, 0, frame.getRgbBytes());
+        byte[] bytes = frame.getRgbBytes();
+        holes.paint(frame, bytes, field.getPieces(), x, y, heading, FRAME_EVERY * TICK_S);
+        rgb.put(0, 0, bytes);
         // No capture time: BallVision then uses when the pipeline got the frame, which in the sim is the same moment
         processor.processFrame(rgb, Long.MAX_VALUE);
-        if (saveTo != null && frames % saveEvery == 0) save(frame, saveTo.resolve(String.format("frame-%04d.png", frames)));
+        if (saveTo != null && frames % saveEvery == 0) {
+            save(rgb, saveTo.resolve(String.format("frame-%04d.png", frames)));
+        }
         frames++;
     }
 
@@ -130,12 +137,14 @@ final class SimWebcam extends AbstractFakeDevice implements WebcamName, java.uti
         saveEvery = n;
     }
 
-    private static void save(SimFrame frame, Path png) {
-        try (OutputStream out = Files.newOutputStream(png)) {
-            frame.writePng(out);
-        } catch (IOException e) {
-            throw new UncheckedIOException(e);
+    /** Writes the frame as the pipeline got it, holes and all, as a PNG. */
+    static void save(Mat rgb, Path png) {
+        Mat bgr = new Mat();
+        org.opencv.imgproc.Imgproc.cvtColor(rgb, bgr, org.opencv.imgproc.Imgproc.COLOR_RGB2BGR);
+        if (!org.opencv.imgcodecs.Imgcodecs.imwrite(png.toString(), bgr)) {
+            throw new UncheckedIOException(new IOException("couldn't write " + png));
         }
+        bgr.release();
     }
 
     int frames() {

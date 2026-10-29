@@ -90,7 +90,7 @@ A point (or area) can shoot at a hive cell, in one of two ways:
   only stops at the end of a path, so the path is driven as separate Pedro paths with `robot.shoot()` between them;
   the robot may leave a stop in any direction. Allowed on any point, including the start and the end.
 - **Shoot on the move**: the volley is centred on a point in the middle of the path, on a stretch where Pedro's speed
-  is capped (`maxPathSpeed`, set per segment). Pedro doesn't slow down ahead of a cap, and on a capped segment it
+  is capped (`maxVelocityConstraint`, in/s, set per segment; Pedro's `maxPathSpeed` is a fraction of the top speed). Pedro doesn't slow down ahead of a cap, and on a capped segment it
   coasts while too fast, so the capped stretch starts where coasting from the planned speed reaches the cap in time.
 
 Shots are simulated with TeamCode's `ShotSolver`, ported line for line (`src/core/shot.ts`): ball flight with drag and
