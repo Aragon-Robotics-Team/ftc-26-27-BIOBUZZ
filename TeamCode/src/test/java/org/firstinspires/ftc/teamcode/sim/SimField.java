@@ -201,7 +201,8 @@ final class SimField {
         for (int i = 0; i < RobotConstants.Field.FLOWERS.length; i++) {
             double[] c = flowerCenter(i);
             for (int k = 0; k < POLLEN_PER_FLOWER; k++) {
-                field.addPieceAt(Ball.Type.POLLEN.name(), c[0], c[1], r + k * (2 * r + 0.05), r);
+                int id = field.addPieceAt(Ball.Type.POLLEN.name(), c[0], c[1], r + k * (2 * 0.999 * r), r);
+                asleep(field.getPiece(id));
             }
         }
         for (int k = 0; k < POLLEN_PER_GARDEN; k++) {
@@ -211,6 +212,23 @@ final class SimField {
         }
         SimHiveTrays.stageNectar(field, false, NECTAR_PER_CELL);
         SimHiveTrays.stageNectar(field, true, NECTAR_PER_CELL);
+    }
+
+    /**
+     * Puts a staged piece to sleep, as the physics does with one that has come to rest: it stays exactly where it is
+     * until something near it moves or another piece hits it. The flowers' stacks need it: balls stacked straight up
+     * are balanced on a point, and with the tube open underneath the bottom one rolled out before the match started
+     * (the rest after it), so the robot chased the flowers' pollen off the tiles; on the field it stays in the flower.
+     * SimLoop has no public setter, so by reflection (as BiobuzzRobotSim moves the Limelight's tags).
+     */
+    private static void asleep(GamePiece piece) {
+        try {
+            java.lang.reflect.Method set = GamePiece.class.getDeclaredMethod("setSleeping", boolean.class);
+            set.setAccessible(true);
+            set.invoke(piece, true);
+        } catch (ReflectiveOperationException e) {
+            throw new IllegalStateException("SimLoop's GamePiece.setSleeping changed", e);
+        }
     }
 
     /** How many balls sit in the garden: any part of one over the tape. */
