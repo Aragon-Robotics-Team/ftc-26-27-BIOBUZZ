@@ -120,14 +120,37 @@ final class SimWebcam extends AbstractFakeDevice implements WebcamName, java.uti
         holes.paint(frame, bytes, field.getPieces(), x, y, heading, FRAME_EVERY * TICK_S);
         rgb.put(0, 0, bytes);
         // No capture time: BallVision then uses when the pipeline got the frame, which in the sim is the same moment
-        processor.processFrame(rgb, Long.MAX_VALUE);
+        Object result = processor.processFrame(rgb, Long.MAX_VALUE);
         if (saveTo != null && frames % saveEvery == 0) {
-            save(rgb, saveTo.resolve(String.format("frame-%04d.png", frames)));
+            Mat shown = rgb.clone();
+            drawFound(shown, result);
+            save(shown, saveTo.resolve(String.format("frame-%04d.png", frames)));
+            shown.release();
         }
         frames++;
     }
 
-    /** Also writes every n-th frame to dir as a PNG, to look at what the camera saw. */
+    /**
+     * Rings what the pipeline found, RGB: green on pollen, white on nectar. The result is read by field name: an OpMode
+     * run loads the team's classes again (SimClockLoader), so its BallVisionProcessor.Result isn't this one's.
+     */
+    private static void drawFound(Mat rgb, Object result) {
+        if (result == null) return;
+        try {
+            for (Object b : (List<?>) result.getClass().getField("balls").get(result)) {
+                Class<?> c = b.getClass();
+                boolean pollen = c.getField("type").get(b).toString().equals(Ball.Type.POLLEN.name());
+                org.opencv.core.Scalar color = pollen
+                        ? new org.opencv.core.Scalar(40, 230, 60) : new org.opencv.core.Scalar(255, 255, 255);
+                org.opencv.imgproc.Imgproc.circle(rgb, new org.opencv.core.Point(c.getField("x").getDouble(b),
+                        c.getField("y").getDouble(b)), (int) Math.round(c.getField("radius").getDouble(b) + 3), color, 2);
+            }
+        } catch (ReflectiveOperationException e) {
+            throw new IllegalStateException("BallVisionProcessor.Result changed shape", e);
+        }
+    }
+
+    /** Also writes every n-th frame to dir as a PNG, with what the pipeline found ringed, to look at what it saw. */
     void saveFrames(Path dir, int n) throws IOException {
         Files.createDirectories(dir);
         try (DirectoryStream<Path> old = Files.newDirectoryStream(dir, "frame-*.png")) {

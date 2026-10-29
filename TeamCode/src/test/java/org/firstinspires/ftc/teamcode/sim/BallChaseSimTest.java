@@ -21,7 +21,8 @@ import java.nio.file.Paths;
  * with an empty hopper, on a field with balls scattered over the tiles (SimField.scatter, seeded) instead of the
  * match's staging: pollen to chase and nectar it should leave alone.
  *
- * Logged to ball-chase.rlog; one camera frame a second goes to build/sim/ball-chase-frames/.
+ * Logged to ball-chase.rlog; one camera frame a second goes to build/sim/ball-chase-frames/ (every n-th with
+ * -PsimFrameEvery=n), with what the pipeline found drawn on.
  */
 class BallChaseSimTest {
     private static final long SEED = 26; // another seed, another field
@@ -37,7 +38,7 @@ class BallChaseSimTest {
         BiobuzzRobotSim sim = new BiobuzzRobotSim().preload(0).scatter(SEED, POLLEN, NECTAR);
         double startX = RobotConstants.Field.RED_LEFT_CORNER.x(), startY = RobotConstants.Field.RED_LEFT_CORNER.y();
         sim.placeAt(startX, startY, RobotConstants.Field.RED_LEFT_CORNER.heading());
-        sim.webcam.saveFrames(Paths.get("build", "sim", "ball-chase-frames"), 25);
+        sim.webcam.saveFrames(Paths.get("build", "sim", "ball-chase-frames"), Integer.getInteger("simFrameEvery", 25));
 
         OpModeRunResult result = sim.runner(BallChaseTest.class)
                 .initLoopTicks(40)

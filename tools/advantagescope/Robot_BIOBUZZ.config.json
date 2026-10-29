@@ -29,7 +29,7 @@
         1280,
         800
       ],
-      "fov": 70.3
+      "fov": 76.02
     },
     {
       "name": "Limelight (turret centered)",
@@ -48,7 +48,7 @@
         640,
         480
       ],
-      "fov": 54.5
+      "fov": 56.0
     }
   ],
   "components": [

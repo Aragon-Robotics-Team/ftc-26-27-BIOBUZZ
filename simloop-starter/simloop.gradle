@@ -107,8 +107,9 @@ android {
     testOptions {
         unitTests.all {
             useJUnitPlatform()
-            // Choices for the sim tests from the command line, e.g. -PsimRoutine=one_cycle_garden_park -PsimAlliance=blue
-            ['simRoutine', 'simAlliance'].each { name ->
+            // Choices for the sim tests from the command line, e.g. -PsimRoutine=one_cycle_garden_park -PsimAlliance=blue,
+            // -PsimFrameEvery=1 (BallChaseSimTest saves every camera frame)
+            ['simRoutine', 'simAlliance', 'simFrameEvery'].each { name ->
                 if (project.hasProperty(name)) systemProperty name, project.property(name)
             }
         }
