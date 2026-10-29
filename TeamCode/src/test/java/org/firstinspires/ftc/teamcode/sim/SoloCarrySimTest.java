@@ -96,6 +96,14 @@ class SoloCarrySimTest {
                 scenario("no-tags-drifting", Alliance.RED, 33, 1, sim -> sim.blindLimelight().imuDrift(IMU_DRIFT), 1, 1, 2),
                 // The ball camera as a Control Hub runs it: 10 frames a second, 100 ms late, 30% of balls missed
                 scenario("slow-ball-camera", Alliance.RED, 33, sim -> sim.ballCamera(10, 100, 6, 0.3), 0, 0, 0),
+                // Tags lost in bursts of up to 1 s, a fifth of the time: longer than "tags gone 0.6 s means tipped"
+                scenario("tags-flicker", Alliance.RED, 33, sim -> sim.flickerLimelight(1, 0.2, 1), 0, 0, 0),
+                scenario("tags-flicker-2", Alliance.RED, 33, sim -> sim.flickerLimelight(2, 0.2, 1), 0, 0, 0),
+                scenario("tags-flicker-3", Alliance.RED, 33, sim -> sim.flickerLimelight(3, 0.2, 1), 0, 0, 0),
+                // The preload misses the tip (every shot 8% slow) and a burst fakes "tipped" right after it: hive
+                // vision has to see the RIGHT cell still up and send the next load there
+                scenario("tags-flicker-false-tip", Alliance.RED, 20,
+                        sim -> sim.shotBias(-0.08).flickerLimelight(4, 0.2, 1), 0, 0, 0),
                 // A drive like a real mecanum's (85% speed, strafing 80%, 150 in/s² of grip), and that with the slow
                 // ball camera and the IMU drifting
                 scenario("real-drive", Alliance.RED, 33, sim -> sim, 0, 0, 0),

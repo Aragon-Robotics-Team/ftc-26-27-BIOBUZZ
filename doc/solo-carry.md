@@ -2,8 +2,8 @@
 
 `routines/SoloCarry.java` (Auto menu: `SOLO_CARRY`) scores alone with a partner that only parks. It shoots the 4
 preloads into the up cell (with the 3 staged nectar, that tips it), chases pollen with the ball camera (the garden first),
-shoots it into the cell that's up now, and parks. The sim runs it in 19 scenarios (`SoloCarrySimTest`): 39 to 47
-points, both robots parked in all (the flowers' pollen stays in the flowers; the intake only takes a ball whose
+shoots it into the cell that's up now, and parks. The sim runs it in 23 scenarios (`SoloCarrySimTest`): 39 to 47
+points (outside the deliberate missed-tip one), both robots parked in all (the flowers' pollen stays in the flowers; the intake only takes a ball whose
 center is between its side plates). None of its timing or noise numbers have been checked on the
 robot yet. This is what to check, roughly in order.
 
@@ -44,7 +44,8 @@ so frames can be up to about 20 ms older than they say.
 ## How it decides, and its margins
 
 - **Which cell is up:** at a cell's launch spot the tags face it only while that cell is up. After a shot the count says
-  should tip it, tags gone for 0.6 s means tipped. Tags missing on arrival only send it to the other cell when the
+  should tip it, tags gone for 0.6 s means tipped. A burst of lost tags can fake that (glare, a robot in front); hive
+  vision seeing the old cell still up then sends it back (the sim's `tags-flicker-false-tip`). Tags missing on arrival only send it to the other cell when the
   count is within 2 of a tip, once a load (so a Limelight that stops seeing can't send it back and forth). With no
   tags at the spot, it goes by the count, which errs high.
 - **Balls held:** counted from the camera, erring high (every pollen the mouth passes over, and two that won't go in

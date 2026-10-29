@@ -178,6 +178,10 @@ public final class BiobuzzRobotSim {
     private String touching = "";
     private final double[] lastAxis = {Double.NaN, Double.NaN, Double.NaN}; // reportLimelight's last turret pose
     private double limelightBlindAfter = Double.POSITIVE_INFINITY;
+    // flickerLimelight(): tags lost in bursts, this share of the time, each up to flickerMaxS long; null: never
+    private java.util.Random flicker;
+    private double flickerShare, flickerMaxS, flickerUntil = -1;
+    private static final double TICK_S = 0.02; // the sim's tick
     // The Pinpoint's IMU drifting (imuDrift): radians a second, and how far it has drifted. The Pinpoint is fed a
     // chassis turned that far, moved along by each tick's true motion turned that far too, so its pods still count
     // the true motion in the robot's frame and only its heading is off (Pedro inches)
@@ -328,6 +332,32 @@ public final class BiobuzzRobotSim {
     public BiobuzzRobotSim blindLimelight(double afterSeconds) {
         limelightBlindAfter = afterSeconds;
         return this;
+    }
+
+    /**
+     * The Limelight loses every tag in bursts (glare, blur, a robot passing in front): blind about this share of the
+     * time, each burst 0.1 s to maxBurstS long, seeded. Lost together, not tag by tag: what can fool "tags gone means
+     * tipped".
+     */
+    public BiobuzzRobotSim flickerLimelight(long seed, double share, double maxBurstS) {
+        flicker = new java.util.Random(seed);
+        flickerShare = share;
+        flickerMaxS = maxBurstS;
+        return this;
+    }
+
+    /** This tick, in a burst of lost tags (flickerLimelight)? */
+    private boolean flickering() {
+        if (flicker == null) return false;
+        double now = match.elapsed();
+        if (now < flickerUntil) return true;
+        double meanBurst = (0.1 + flickerMaxS) / 2;
+        // Bursts start at the rate that leaves the robot blind flickerShare of the time
+        if (flicker.nextDouble() < flickerShare / (1 - flickerShare) * TICK_S / meanBurst) {
+            flickerUntil = now + 0.1 + flicker.nextDouble() * (flickerMaxS - 0.1);
+            return true;
+        }
+        return false;
     }
 
     /** Which alliance the robot is on (default red): what it scores for and which hive it aims at. */
@@ -542,7 +572,7 @@ public final class BiobuzzRobotSim {
         lastAxis[0] = axis[0];
         lastAxis[1] = axis[1];
         lastAxis[2] = yaw;
-        if (match.elapsed() >= limelightBlindAfter) limelight.setRobotPose(-10000, -10000, 0); // far off the field: no tag in range
+        if (match.elapsed() >= limelightBlindAfter || flickering()) limelight.setRobotPose(-10000, -10000, 0); // far off the field: no tag in range
         else limelight.setRobotPose(x - 72, y - 72, ahead);
     }
 
