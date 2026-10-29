@@ -68,6 +68,10 @@ public class Auto extends OpMode {
         telemetry.addData("Routine", "%s   (%d/%d, dpad ↑↓)", bold(selected.toString()), index + 1, routines.size());
         Pose start = routine.startPose();
         telemetry.addData("Place robot at", "x %.1f  y %.1f  h %.0f°", start.x(), start.y(), Math.toDegrees(start.heading()));
+        // The pose leans on the hive's tags (and Solo Carry on them for which cell is up): check the Limelight sees them
+        int tags = robot.hiveVision.tagsInView();
+        if (tags > 0) telemetry.addData("Limelight", "%d hive tags in view", tags);
+        else if (tags == 0) telemetry.addLine(Html.color(bold("Limelight sees no hive tags: turn the turret to the hive to check it"), Html.YELLOW));
         telemetry.update();
     }
 

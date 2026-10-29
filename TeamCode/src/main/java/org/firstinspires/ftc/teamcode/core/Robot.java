@@ -85,6 +85,7 @@ public class Robot {
         return parallel(instant(() -> {
             MatchState.hive = side;
             hiveVision.manualSet();
+            drivebase.getLocalizer().setHive(MatchState.alliance, side); // the tags' arm angle, for the pose
         }) /*, led.flash() */);
     }
 

@@ -13,6 +13,7 @@ import org.firstinspires.ftc.robotcore.external.Telemetry;
 import org.firstinspires.ftc.robotcore.external.navigation.DistanceUnit;
 import org.firstinspires.ftc.robotcore.external.navigation.Position;
 import org.firstinspires.ftc.teamcode.core.Hive;
+import org.firstinspires.ftc.teamcode.core.HiveTags;
 import org.firstinspires.ftc.teamcode.core.MatchState;
 import org.firstinspires.ftc.teamcode.core.PoseFilter;
 import org.firstinspires.ftc.teamcode.core.RobotConstants;
@@ -60,7 +61,7 @@ public class HiveVision implements Subsystem {
     private final Limelight3A limelight; // null if it isn't configured
     private final HiveTracker tracker = new HiveTracker(FRAMES_TO_SWITCH, MANUAL_HOLDOFF_S, MANUAL_DISAGREE_S);
     private boolean enabled = false;
-    private boolean running = false;
+    private boolean running = false, checking = false; // checking: started by tagsInView, before start()
 
     private List<Seen> lastSeen = Collections.emptyList();
     private HiveReader.Frame lastFrame = null;
@@ -102,6 +103,25 @@ public class HiveVision implements Subsystem {
 
     public boolean isAvailable() {
         return limelight != null;
+    }
+
+    /**
+     * For a check before the match: how many hive tags the Limelight sees now (starting it if it isn't yet), or -1
+     * with no Limelight configured.
+     */
+    public int tagsInView() {
+        if (limelight == null) return -1;
+        if (!checking && !running) {
+            limelight.start();
+            checking = true;
+        }
+        LLResult result = limelight.getLatestResult();
+        if (result == null || !result.isValid()) return 0;
+        int n = 0;
+        for (LLResultTypes.FiducialResult f : result.getFiducialResults()) {
+            if (HiveTags.hiveOf(f.getFiducialId()) >= 0) n++;
+        }
+        return n;
     }
 
     // ---- Operator ----

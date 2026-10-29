@@ -71,6 +71,7 @@ public final class PoseFilter {
     private double since = Double.NEGATIVE_INFINITY;
     private int used, rejected, armResets;
     private final int[] armDisagree = new int[2];
+    private final double[] lastSeen = {Double.NEGATIVE_INFINITY, Double.NEGATIVE_INFINITY};
 
     public PoseFilter(Camera camera, double x, double y, double heading, double redArm, double blueArm) {
         this.camera = camera;
@@ -164,6 +165,7 @@ public final class PoseFilter {
     public boolean addTag(double time, double turret, int id, double cx, double cy, double cz) {
         int hive = HiveTags.hiveOf(id);
         if (hive < 0 || time < since) return false;
+        lastSeen[hive] = Math.max(lastSeen[hive], time);
         // The step the frame was taken at (or the oldest kept), and the steps since
         Step base = null;
         int after = 0;
@@ -314,6 +316,8 @@ public final class PoseFilter {
     public double y() { return state[Y]; }
     public double heading() { return state[HEADING]; }
     public double arm(int hive) { return state[RED_ARM + hive]; }
+    /** When a tag of that hive was last in a frame (taken then, used or not), or -infinity: none yet. */
+    public double lastSeen(int hive) { return lastSeen[hive]; }
 
     /** Standard deviation of state i (X, Y, HEADING, RED_ARM, BLUE_ARM). */
     public double sigma(int i) {
