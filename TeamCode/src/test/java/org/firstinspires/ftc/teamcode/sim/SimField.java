@@ -197,6 +197,14 @@ final class SimField {
      * area (the human player's) and each robot's preload, which BiobuzzRobotSim gives its robot.
      */
     static void stage(GamePieceTracker field) {
+        stage(field, null);
+    }
+
+    /**
+     * stage(), with each garden's row of 4 placed by hand rather than measured: moved 0 to 6 in toward the center and
+     * up to 1.5 in more between balls (seeded; null: as BiobuzzSim lays them).
+     */
+    static void stage(GamePieceTracker field, java.util.Random jitter) {
         double r = Ball.Type.POLLEN.diameter / 2;
         for (int i = 0; i < RobotConstants.Field.FLOWERS.length; i++) {
             double[] c = flowerCenter(i);
@@ -205,10 +213,13 @@ final class SimField {
                 asleep(field.getPiece(id));
             }
         }
-        for (int k = 0; k < POLLEN_PER_GARDEN; k++) {
-            double along = 71.5 - 0.6 - r - k * (2 * r + 0.15);
-            field.addLoosePiece(Ball.Type.POLLEN.name(), 72 - 0.5 - r, -along, r);  // red garden
-            field.addLoosePiece(Ball.Type.POLLEN.name(), -72 + 0.5 + r, along, r);  // blue garden
+        for (int garden = 0; garden < 2; garden++) {
+            double along = 71.5 - 0.6 - r - (jitter == null ? 0 : jitter.nextDouble() * 6);
+            for (int k = 0; k < POLLEN_PER_GARDEN; k++) {
+                if (garden == 0) field.addLoosePiece(Ball.Type.POLLEN.name(), 72 - 0.5 - r, -along, r);  // red garden
+                else field.addLoosePiece(Ball.Type.POLLEN.name(), -72 + 0.5 + r, along, r);             // blue garden
+                along -= 2 * r + 0.15 + (jitter == null ? 0 : jitter.nextDouble() * 1.5);
+            }
         }
         SimHiveTrays.stageNectar(field, false, NECTAR_PER_CELL);
         SimHiveTrays.stageNectar(field, true, NECTAR_PER_CELL);

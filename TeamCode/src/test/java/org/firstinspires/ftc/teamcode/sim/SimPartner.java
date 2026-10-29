@@ -6,6 +6,7 @@ import org.firstinspires.ftc.teamcode.core.Alliance;
 import org.firstinspires.ftc.teamcode.core.RobotConstants;
 import org.firstinspires.ftc.teamcode.vision.Ball;
 import org.horizon36596.simloop.field.GamePieceTracker;
+import org.horizon36596.simloop.field.ObstacleBox;
 import org.horizon36596.simloop.field.StaticRobot;
 import org.psilynx.psikit.core.Logger;
 import org.psilynx.psikit.core.wpi.math.Pose2d;
@@ -35,6 +36,7 @@ final class SimPartner {
     private static final double SHOOT_OUT = 34, SHOOT_X = 40;
     private static final Pose PARK = new Pose(14, 110, Math.PI);
     private final Pose shootFrom;
+    private double parkShift; // parkShift(): inches along the zone from PARK, red's +y
 
     final SimMatch.Robot robot;
     private final Alliance alliance;
@@ -66,6 +68,17 @@ final class SimPartner {
         report();
     }
 
+    /** Parks this far along the zone from flush at its rear end (red's +y; negative is short, toward us). */
+    void parkShift(double inches) {
+        parkShift = inches;
+    }
+
+    /** What we bump into: its 18 in square where it is now, field frame (the turns ignored: it drives square). */
+    ObstacleBox box() {
+        double fx = 72 - y, fy = x - 72;
+        return new ObstacleBox("partner", fx - SIZE / 2, fx + SIZE / 2, fy - SIZE / 2, fy + SIZE / 2, 0, HEIGHT);
+    }
+
     /** Where it is, Pedro inches {x, y}. */
     double[] at() {
         return new double[] {x, y};
@@ -90,7 +103,9 @@ final class SimPartner {
                 if (shotsLeft == 0 && wait <= 0) stage = 2;
                 break;
             case 2:
-                if (driveTo(alliance.apply(PARK), deltaTime)) stage = 3;
+                if (driveTo(alliance.apply(new Pose(PARK.x(), PARK.y() + parkShift, PARK.heading())), deltaTime)) {
+                    stage = 3;
+                }
                 break;
             default:
                 break;

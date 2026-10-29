@@ -103,6 +103,7 @@ public final class BiobuzzRobotSim {
     private long scatterSeed;
     private int scatterPollen = -1, scatterNectar;
     private List<double[]> scattered = Collections.emptyList();
+    private java.util.Random gardenJitter; // vary(): the gardens laid by hand
 
     // A drive like a real mecanum's (BiobuzzRobotSim(true)): the motors at this share of free speed (battery, gearbox
     // and wheel losses), strafing at this share of forward, and the tiles' grip capping acceleration (in/s²).
@@ -299,6 +300,20 @@ public final class BiobuzzRobotSim {
      * Shots go off by chance (seeded): exit speed off by speedFraction and direction by headingDegrees, standard
      * deviations, as balls that differ and a flywheel that sags would send them.
      */
+    /**
+     * A match as it varies from one to the next, seeded: the gardens laid by hand (SimField.stage), the partner parked
+     * up to 2 in short of flush or 1 in past, the ball camera missing a tenth of balls, shots scattering 3% and 1°.
+     * Before the partner is added only if it has none yet; call after withParkingPartner().
+     */
+    public BiobuzzRobotSim vary(long seed) {
+        java.util.Random random = new java.util.Random(seed);
+        gardenJitter = new java.util.Random(random.nextLong());
+        if (partner != null) partner.parkShift(-2 + random.nextDouble() * 3);
+        webcam.realism(SimWebcam.FRAME_EVERY, 0, random.nextLong(), 0.1);
+        launcher.spread(random.nextLong(), 0.03, Math.toRadians(1));
+        return this;
+    }
+
     public BiobuzzRobotSim shotSpread(long seed, double speedFraction, double headingDegrees) {
         launcher.spread(seed, speedFraction, Math.toRadians(headingDegrees));
         return this;
@@ -441,7 +456,7 @@ public final class BiobuzzRobotSim {
         if (!preloaded) {
             // The field's balls go in here, not in the constructor, so placeAt() and scatter() come first
             if (scatterPollen >= 0) scattered = SimField.scatter(field, scatterSeed, scatterPollen, scatterNectar, x(), y());
-            else SimField.stage(field);
+            else SimField.stage(field, gardenJitter);
             launcher.preload(Ball.Type.POLLEN, preload);
         }
         preloaded = true;
@@ -508,7 +523,7 @@ public final class BiobuzzRobotSim {
         for (int pass = 0; pass < 3; pass++) {
             double fx = FieldFrame.x(x(), y()), fy = FieldFrame.y(x(), y()), fh = FieldFrame.heading(heading());
             FootprintContact.Push push = null;
-            for (ObstacleBox box : solid) {
+            for (ObstacleBox box : solids()) {
                 push = FootprintContact.pushOutOf(fx, fy, fh, RobotConstants.Field.ROBOT_LENGTH,
                         RobotConstants.Field.ROBOT_WIDTH, box);
                 if (push != null) {
@@ -524,11 +539,19 @@ public final class BiobuzzRobotSim {
         }
     }
 
+    /** The walls, the hive's and flowers' bodies, and the partner where it is now. */
+    private List<ObstacleBox> solids() {
+        if (partner == null) return solid;
+        List<ObstacleBox> all = new ArrayList<>(solid);
+        all.add(partner.box());
+        return all;
+    }
+
     /** How deep the footprint is in everything solid, inches summed, at the plant's position and this heading. */
     private double overlap(double plantHeading) {
         double fx = FieldFrame.x(x(), y()), fy = FieldFrame.y(x(), y()), fh = FieldFrame.heading(plantHeading);
         double depth = 0;
-        for (ObstacleBox box : solid) {
+        for (ObstacleBox box : solids()) {
             FootprintContact.Push push = FootprintContact.pushOutOf(fx, fy, fh, RobotConstants.Field.ROBOT_LENGTH,
                     RobotConstants.Field.ROBOT_WIDTH, box);
             if (push != null) depth += push.getDepthInches();

@@ -2,10 +2,14 @@
 
 `routines/SoloCarry.java` (Auto menu: `SOLO_CARRY`) scores alone with a partner that only parks. It shoots the 4
 preloads into the up cell (with the 3 staged nectar, that tips it), chases pollen with the ball camera (the garden first),
-shoots it into the cell that's up now, and parks. The sim runs it in 23 scenarios (`SoloCarrySimTest`): 39 to 47
-points (outside the deliberate missed-tip one), both robots parked in all (the flowers' pollen stays in the flowers; the intake only takes a ball whose
+shoots it into the cell that's up now, and parks. The sim runs it in 23 scenarios (`SoloCarrySimTest`): 38 to 47
+points, both robots parked in all but the no-tags, drifting one, (the flowers' pollen stays in the flowers; the intake only takes a ball whose
 center is between its side plates). None of its timing or noise numbers have been checked on the
 robot yet. This is what to check, roughly in order.
+
+Ten more (`variedMatches`) vary the match as it would really: gardens laid by hand, the partner parking up to 2 in
+short, the robot set down up to 1 in and 2° off, the camera missing a tenth of balls, shots scattering, the IMU
+drifting. All tip and park, 42 to 45.
 
 ## Before every match
 
@@ -18,7 +22,7 @@ robot yet. This is what to check, roughly in order.
   uncorrected (the sim's worst case: 16 in off by the end).
 - **Partner:** starts in our LEFT corner (back to the alliance wall by the loading zone) and parks **flush at the rear
   end of the loading zone**. We park at its audience end, nose 2 in into the zone, which leaves about 3 in between
-  us and an 18 in partner parked flush at the rear. Anywhere else in the zone and we hit it.
+  us and an 18 in partner parked flush at the rear. Every inch short of flush comes off that gap; 3 short and we touch.
 
 ## Tune on the robot
 
@@ -63,5 +67,6 @@ so frames can be up to about 20 ms older than they say.
   and whether garden balls count at the end of AUTO (then taking them is +1 each) or only at the end of the match.
 - Also check whether robots may cross the center line in AUTO: the chase goes after any pollen on open floor
   (`BallVision.onOpenFloor`), our half or not. If there's a rule, add the half there.
-- With no tags at all and the IMU drifting, nothing corrects the heading; the park can miss the zone.
+- With no tags at all and the IMU drifting, nothing corrects the heading; the park can miss the zone (in the sim it
+  drives into the partner and stops short: 35 points).
 - It can't take pollen from the flowers.
