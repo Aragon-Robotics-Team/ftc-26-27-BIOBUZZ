@@ -30,6 +30,19 @@ drifting. All tip and park, 42 to 45.
   end of the loading zone**. We park at its audience end, nose 2 in into the zone, which leaves about 3 in between
   us and an 18 in partner parked flush at the rear. Every inch short of flush comes off that gap; 3 short and we touch.
 
+## Once, before the first run
+
+The sim takes these from the same constants as the code, so it can't catch them:
+
+- **Turret direction:** command +30° and it should turn left (counterclockwise from above) and read +30°. The
+  comment by `Launcher.TURRET_DIRECTION` and the setting disagree.
+- **Turret limits:** turn it by hand to ±90° (`TURRET_MIN_ANGLE`/`MAX`, a TODO from CAD): no hard stop, no pulled
+  Limelight cable. It swings to both in every 360° search turn.
+- **Turret encoder:** after a run, face it forward; it should read 0° ± 1. If it drifts, move the Through Bore to a
+  hub port that keeps up with its count rate.
+- **Loop time:** the "Loop" telemetry line with Solo Carry selected (ball camera open) on the Control Hub. The sim's
+  is a fixed 20 ms.
+
 ## Tune on the robot
 
 | What | Where | How to measure | Now |
