@@ -16,16 +16,19 @@ import com.qualcomm.robotcore.util.Range;
 
 import org.firstinspires.ftc.robotcore.external.Telemetry;
 import org.firstinspires.ftc.teamcode.pedro.Constants;
+import org.firstinspires.ftc.teamcode.pedro.FusedLocalizer;
 
 import java.util.function.DoubleSupplier;
 
 /**
- * Thin wrapper around the Pedro Pathing {@link Follower}, configured in {@link Constants}.
+ * Thin wrapper around the Pedro Pathing {@link Follower}, configured in {@link Constants}, localized by the Pinpoint
+ * with the hive's AprilTags fused in ({@link FusedLocalizer}).
  * Autos drive paths with {@code PedroCommands.follow(follower, path)}.
  * Twin stick TeleOp driving turns the robot with a PID loop on the localizer heading.
  */
 public class Drivetrain implements Subsystem {
     private final Follower follower;
+    private final FusedLocalizer localizer;
 
     private double targetHeading = 0; // field radians, for the front of the robot
     private double turnPower = 0;
@@ -38,7 +41,13 @@ public class Drivetrain implements Subsystem {
     private boolean headingHeldThisLoop = false;
 
     public Drivetrain(HardwareMap hardwareMap) {
-        follower = Constants.create(hardwareMap);
+        // The Pinpoint, with the hive's tags fused in (HiveVision feeds them) when Localization.FUSE_HIVE_TAGS
+        localizer = new FusedLocalizer(Constants.localizer(hardwareMap));
+        follower = new Follower(localizer, Constants.drivetrain(hardwareMap), Constants.foresight());
+    }
+
+    public FusedLocalizer getLocalizer() {
+        return localizer;
     }
 
     public Follower getFollower() {

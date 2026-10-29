@@ -53,6 +53,8 @@ public class Robot {
         // led = new Led(hardwareMap, launcher); // LED: commented out until it's on the robot
         hiveVision = new HiveVision(hardwareMap); // off until an OpMode enables it
         ballVision = new BallVision(hardwareMap, drivebase::getPose); // off until an OpMode enables it
+        // The hive's tags correct the pose (RobotConstants.Localization); the Limelight turns with the turret
+        hiveVision.fuseInto(drivebase.getLocalizer());
 
         // Hive vision first, so this loop aims at the cell it just read; ball vision after the drivetrain, so it has
         // this loop's pose; launcher before Led, so the light shows this loop's launcher state
@@ -75,6 +77,7 @@ public class Robot {
         return parallel(instant(() -> {
             MatchState.hive = side;
             hiveVision.manualSet();
+            drivebase.getLocalizer().setHive(MatchState.alliance, side); // the tags' arm angle, for the pose
         }) /*, led.flash() */);
     }
 
@@ -143,6 +146,8 @@ public class Robot {
     public void update() {
         for (LynxModule hub : hubs) hub.clearBulkCache();
         for (Subsystem subsystem : subsystems) subsystem.update();
+        // Where the turret was when this loop's pose was read: both from this loop's reads
+        hiveVision.recordTurret(drivebase.getLocalizer().getLastUpdateTime(), launcher.getTurretAngle());
     }
 
     public void stop() {

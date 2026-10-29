@@ -13,7 +13,11 @@ import org.firstinspires.ftc.robotcore.external.Telemetry;
 import org.firstinspires.ftc.robotcore.external.navigation.DistanceUnit;
 import org.firstinspires.ftc.robotcore.external.navigation.Position;
 import org.firstinspires.ftc.teamcode.core.Hive;
+import org.firstinspires.ftc.teamcode.core.HiveTags;
 import org.firstinspires.ftc.teamcode.core.MatchState;
+import org.firstinspires.ftc.teamcode.core.PoseFilter;
+import org.firstinspires.ftc.teamcode.core.RobotConstants;
+import org.firstinspires.ftc.teamcode.pedro.FusedLocalizer;
 import org.firstinspires.ftc.teamcode.vision.HiveReader;
 import org.firstinspires.ftc.teamcode.vision.HiveTracker;
 
@@ -29,6 +33,10 @@ import java.util.List;
  *
  * Off unless enabled (TeleOp enables it; Auto keeps its own flips). If the Limelight isn't in the configuration,
  * everything else still runs and telemetry says so.
+ *
+ * Also hands every hive tag it sees to the drivetrain's FusedLocalizer, to correct the pose (fuseInto, when
+ * Localization.FUSE_HIVE_TAGS): then the camera runs whether or not the hive state is enabled. Each frame goes in once,
+ * with the turret angle from when it was taken (frames are a few tens of ms old by the time they're read).
  */
 public class HiveVision implements Subsystem {
     /** Every tag in the last frame, ours or not, for the Hive Vision Test OpMode. */
@@ -53,12 +61,21 @@ public class HiveVision implements Subsystem {
     private final Limelight3A limelight; // null if it isn't configured
     private final HiveTracker tracker = new HiveTracker(FRAMES_TO_SWITCH, MANUAL_HOLDOFF_S, MANUAL_DISAGREE_S);
     private boolean enabled = false;
-    private boolean running = false;
+    private boolean running = false, checking = false; // checking: started by tagsInView, before start()
+    private double lastSwitchTry = Double.NEGATIVE_INFINITY;
+    private int flat; // tagsInView(): hive tags seen without a 3D pose
 
     private List<Seen> lastSeen = Collections.emptyList();
     private HiveReader.Frame lastFrame = null;
     private long lastStaleness = -1;
     private int switches = 0;
+
+    private FusedLocalizer localizer;   // null: tags don't go to the pose
+    // Turret angle each loop (a ring of the last TURRET_HISTORY), to look up where it was when a frame was taken
+    private final double[] turretTimes = new double[TURRET_HISTORY], turretAngles = new double[TURRET_HISTORY];
+    private int turretCount, turretNext;
+    private long lastFused = 0;
+    private int fusedTags = 0;
 
     public HiveVision(HardwareMap hardwareMap) {
         Limelight3A found = null;
@@ -77,8 +94,50 @@ public class HiveVision implements Subsystem {
         this.enabled = enabled;
     }
 
+    /** Also correct this localizer's pose from the tags. Robot gives it the turret angle each loop (recordTurret). */
+    public void fuseInto(FusedLocalizer localizer) {
+        this.localizer = localizer;
+    }
+
+    private boolean fusing() {
+        return localizer != null && RobotConstants.Localization.FUSE_HIVE_TAGS;
+    }
+
     public boolean isAvailable() {
         return limelight != null;
+    }
+
+    /**
+     * For a check before the match: how many hive tags the Limelight sees now with a 3D pose, which is all that
+     * update() uses (starting it if it isn't yet), or -1 with no Limelight configured; tagsWithout3d() says how many
+     * it saw without one. A Limelight still booting when the robot was built missed the pipeline switch:
+     * this asks again, once a second, until its results say it's on PIPELINE.
+     */
+    public int tagsInView() {
+        if (limelight == null) return -1;
+        if (!checking && !running) {
+            limelight.start();
+            checking = true;
+        }
+        LLResult result = limelight.getLatestResult();
+        if (result != null && result.getPipelineIndex() != PIPELINE && now() - lastSwitchTry > 1) {
+            lastSwitchTry = now();
+            limelight.pipelineSwitch(PIPELINE);
+        }
+        flat = 0;
+        if (result == null || !result.isValid()) return 0;
+        int n = 0;
+        for (LLResultTypes.FiducialResult f : result.getFiducialResults()) {
+            if (HiveTags.hiveOf(f.getFiducialId()) < 0) continue;
+            if (f.getTargetPoseCameraSpace().getPosition().toUnit(DistanceUnit.INCH).z > 0) n++;
+            else flat++; // no 3D pose: the pipeline's Full 3D is off, or its tag size is wrong
+        }
+        return n;
+    }
+
+    /** Hive tags the last tagsInView() saw without a 3D pose, which update() throws away. */
+    public int tagsWithout3d() {
+        return flat;
     }
 
     // ---- Operator ----
@@ -101,7 +160,7 @@ public class HiveVision implements Subsystem {
 
     @Override
     public void start() {
-        if (enabled && limelight != null) {
+        if ((enabled || fusing()) && limelight != null) {
             limelight.start();
             running = true;
         }
@@ -114,6 +173,13 @@ public class HiveVision implements Subsystem {
         if (result == null) return;
         lastStaleness = result.getStaleness();
         if (!result.isValid() || lastStaleness > MAX_STALENESS_MS) return;
+        // The Limelight's own frame time: the hub's timestamp changes on every poll, even of the same frame
+        long frameId = Double.doubleToLongBits(result.getTimestamp());
+        if (fusing() && frameId != lastFused) {
+            lastFused = frameId;
+            fuse(result);
+        }
+        if (!enabled) return;
 
         List<HiveReader.Tag> tags = new ArrayList<>();
         List<Seen> seen = new ArrayList<>();
@@ -131,8 +197,6 @@ public class HiveVision implements Subsystem {
         lastSeen = seen;
         lastFrame = HiveReader.read(tags, MatchState.alliance, LENS_HEIGHT, TILT, HEIGHT_THRESHOLD);
 
-        // The Limelight's own frame time: the hub's timestamp changes on every poll, even of the same frame
-        long frameId = Double.doubleToLongBits(result.getTimestamp());
         Hive next = tracker.onFrame(now(), frameId, lastFrame.up, lastFrame.conflict, MatchState.hive);
         if (next != null) {
             MatchState.hive = next;
@@ -140,10 +204,55 @@ public class HiveVision implements Subsystem {
         }
     }
 
+    /** Every hive tag in the frame to the localizer, at the moment and turret angle the frame was taken. */
+    private void fuse(LLResult result) {
+        double taken = now() - (lastStaleness + result.getCaptureLatency() + result.getTargetingLatency()) / 1000;
+        double turret = turretAt(taken);
+        for (LLResultTypes.FiducialResult f : result.getFiducialResults()) {
+            Position p = f.getTargetPoseCameraSpace().getPosition().toUnit(DistanceUnit.INCH);
+            if (p.z <= 0) continue;
+            if (localizer.addTag(taken, turret, f.getFiducialId(), p.x, p.y, p.z)) fusedTags++;
+        }
+    }
+
+    /**
+     * The turret's angle as of time: this loop's encoder reading, stamped with the time of this loop's pose
+     * (FusedLocalizer.getLastUpdateTime), so a frame's turret angle and robot pose are from the same moment. Call after
+     * the launcher has read the encoder.
+     */
+    public void recordTurret(double time, double angle) {
+        if (Double.isNaN(time)) return;
+        turretTimes[turretNext] = time;
+        turretAngles[turretNext] = angle;
+        turretNext = (turretNext + 1) % TURRET_HISTORY;
+        turretCount = Math.min(turretCount + 1, TURRET_HISTORY);
+    }
+
+    /** The turret's angle at a time, between the two loops either side of it (the oldest or newest kept beyond). */
+    private double turretAt(double time) {
+        if (turretCount == 0) return 0;
+        double beforeT = Double.NEGATIVE_INFINITY, beforeA = 0, afterT = Double.POSITIVE_INFINITY, afterA = 0;
+        for (int i = 0; i < turretCount; i++) {
+            double t = turretTimes[i];
+            if (t <= time && t > beforeT) {
+                beforeT = t;
+                beforeA = turretAngles[i];
+            }
+            if (t >= time && t < afterT) {
+                afterT = t;
+                afterA = turretAngles[i];
+            }
+        }
+        if (beforeT == Double.NEGATIVE_INFINITY) return afterA;
+        if (afterT == Double.POSITIVE_INFINITY || afterT == beforeT) return beforeA;
+        return beforeA + (afterA - beforeA) * (time - beforeT) / (afterT - beforeT);
+    }
+
     @Override
     public void stop() {
-        if (running) limelight.stop();
+        if (running || checking) limelight.stop();
         running = false;
+        checking = false;
     }
 
     private static double now() {
@@ -165,6 +274,7 @@ public class HiveVision implements Subsystem {
     public String status() {
         if (limelight == null) return "no Limelight";
         if (!running) return "off";
+        if (!enabled) return "pose only";
         if (tracker.isLocked()) return "AUTO HIVE OFF";
         return "auto";
     }
@@ -172,7 +282,13 @@ public class HiveVision implements Subsystem {
     @Override
     public void telemetry(Telemetry telemetry) {
         telemetry.addData("Hive vision", status());
-        if (!running) return;
+        if (fusing() && running) {
+            PoseFilter filter = localizer.getFilter();
+            telemetry.addData("Pose from tags", "%d tags used, %d thrown out, ±%.1f in ±%.1f°", fusedTags,
+                    filter.getRejected(), Math.hypot(filter.sigma(PoseFilter.X), filter.sigma(PoseFilter.Y)),
+                    Math.toDegrees(filter.sigma(PoseFilter.HEADING)));
+        }
+        if (!running || !enabled) return;
         StringBuilder tags = new StringBuilder();
         for (Seen s : lastSeen) {
             if (s.cell == null) continue;
