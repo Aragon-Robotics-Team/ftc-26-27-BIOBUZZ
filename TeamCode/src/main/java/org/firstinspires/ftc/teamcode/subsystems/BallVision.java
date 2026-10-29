@@ -20,6 +20,7 @@ import org.firstinspires.ftc.vision.VisionPortal;
 import org.firstinspires.ftc.vision.VisionProcessor;
 
 import java.util.ArrayDeque;
+import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.concurrent.TimeUnit;
@@ -42,6 +43,7 @@ public class BallVision implements Subsystem {
     private final BallGeometry geometry;
     private final BallPipeline pipeline;
     private final BallVisionProcessor processor;
+    private final List<double[]> skipped = new ArrayList<>();
     private final PollenTracker tracker;
     private VisionPortal portal;
     // A camera that runs the processor itself instead of through a VisionPortal: the sim's webcam (BallChaseSimTest)
@@ -80,7 +82,7 @@ public class BallVision implements Subsystem {
         settings.intakeAxisLeft = 0;
         settings.nearMouth = NEAR_MOUTH;
         settings.edgeMarginPx = EDGE_MARGIN_PX;
-        tracker = new PollenTracker(settings, BallVision::chaseable);
+        tracker = new PollenTracker(settings, this::chaseable);
     }
 
     /** The ball pipeline's settings from RobotConstants.BallVision; the rest keep BallPipeline's defaults. */
@@ -110,8 +112,25 @@ public class BallVision implements Subsystem {
                 CAMERA_MATRIX[0], CAMERA_MATRIX[1], CAMERA_MATRIX[2], CAMERA_MATRIX[3], mount);
     }
 
+    /** Pollen near here isn't chased until clearSkips(): the robot couldn't get to it. */
+    public void skip(double x, double y) {
+        skipped.add(new double[] {x, y});
+    }
+
+    public void clearSkips() {
+        skipped.clear();
+    }
+
+    /** Inside the walls, off the hive's feet, away from the flowers and not skipped. */
+    private boolean chaseable(double x, double y) {
+        for (double[] s : skipped) {
+            if (Math.hypot(x - s[0], y - s[1]) < SKIP_RADIUS) return false;
+        }
+        return onOpenFloor(x, y);
+    }
+
     /** Inside the walls, off the hive's feet and away from the flowers. */
-    static boolean chaseable(double x, double y) {
+    static boolean onOpenFloor(double x, double y) {
         if (x < 0 || y < 0 || x > 144 || y > 144) return false;
         double m = RobotConstants.Field.KEEP_OUT_MARGIN;
         for (double[] r : RobotConstants.Field.HIVE_FEET) {

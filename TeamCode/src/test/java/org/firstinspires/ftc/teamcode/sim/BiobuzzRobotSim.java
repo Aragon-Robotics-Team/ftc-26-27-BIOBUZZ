@@ -195,6 +195,7 @@ public final class BiobuzzRobotSim {
         solid.add(new ObstacleBox("wallRed", -100, 100, -100, -72, 0, 12));
         solid.add(new ObstacleBox("wallBlue", -100, 100, 72, 100, 0, 12));
         solid.addAll(field.getWorld().getObstacles());
+        for (int i = 0; i < RobotConstants.Field.FLOWERS.length; i++) solid.add(SimField.flowerColumn(i));
         for (int i = 0; i < 4; i++) {
             driveMotors[i] = new FakeMotor(DRIVE_MAX_TICKS_PER_SECOND, DRIVE_RATE, DRIVE_TICKS_PER_REV);
             hardwareMap.register(DRIVE_MOTOR_NAMES[i], driveMotors[i]);
@@ -319,8 +320,9 @@ public final class BiobuzzRobotSim {
 
     /** One tick of physics, after the OpMode has set its powers and the fakes have updated (the runner's order). */
     public void advancePhysics(double deltaTime) {
+        double headingBefore = drivePlant.getHeading();
         drivePlant.update(deltaTime);
-        collide();
+        collide(headingBefore);
         pinpoint.moveChassisTo(drivePlant.getX() * 25.4, drivePlant.getY() * 25.4, drivePlant.getHeading());
 
         turretPlant.update(deltaTime);
@@ -348,13 +350,18 @@ public final class BiobuzzRobotSim {
     }
 
     /**
-     * Stops the chassis at the walls and the hive's feet: SimLoop's drive plant only keeps the robot's center on the
-     * field, so after it moves, push the footprint back out of anything it overlaps (FootprintContact) and take away
-     * its speed into it, so it slides along. A few passes, for a corner. The Pinpoint then reads the pushed pose, as a
-     * robot pinned against a wall measures itself standing still. Heading isn't touched.
+     * Stops the chassis at the walls, the hive's feet and the flower columns: SimLoop's drive plant only keeps the
+     * robot's center on the field. A turn that swings the frame further into something doesn't happen (the heading goes
+     * back to where it was this tick), so a robot up against a wall can't turn there. Then the footprint is pushed back
+     * out of anything it overlaps (FootprintContact) and loses its speed into it, so it slides along. A few passes, for
+     * a corner. The Pinpoint reads the result, as a robot pinned against a wall measures itself standing still.
      */
-    private void collide() {
+    private void collide(double headingBefore) {
         touching = "";
+        double depth = overlap(drivePlant.getHeading());
+        if (depth > 0 && overlap(headingBefore) < depth - 1e-9) {
+            drivePlant.setPose(drivePlant.getX(), drivePlant.getY(), headingBefore);
+        }
         for (int pass = 0; pass < 3; pass++) {
             double fx = FieldFrame.x(x(), y()), fy = FieldFrame.y(x(), y()), fh = FieldFrame.heading(heading());
             FootprintContact.Push push = null;
@@ -372,6 +379,18 @@ public final class BiobuzzRobotSim {
             drivePlant.setPose(drivePlant.getX() + dx, drivePlant.getY() + dy, drivePlant.getHeading());
             drivePlant.removeVelocityInto(dx, dy);
         }
+    }
+
+    /** How deep the footprint is in everything solid, inches summed, at the plant's position and this heading. */
+    private double overlap(double plantHeading) {
+        double fx = FieldFrame.x(x(), y()), fy = FieldFrame.y(x(), y()), fh = FieldFrame.heading(plantHeading);
+        double depth = 0;
+        for (ObstacleBox box : solid) {
+            FootprintContact.Push push = FootprintContact.pushOutOf(fx, fy, fh, RobotConstants.Field.ROBOT_LENGTH,
+                    RobotConstants.Field.ROBOT_WIDTH, box);
+            if (push != null) depth += push.getDepthInches();
+        }
+        return depth;
     }
 
     /** Once a tray has tipped to its other stop, its tags are where the Limelight would now see them. */

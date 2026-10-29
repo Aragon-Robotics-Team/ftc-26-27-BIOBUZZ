@@ -205,6 +205,7 @@ public class ChaseAndShootTest extends OpMode {
         if (MatchLog.active()) {
             Logger.recordOutput("ChaseAndShoot/cycle", cycle);
             Logger.recordOutput("ChaseAndShoot/stage", stage);
+            Logger.recordOutput("ChaseAndShoot/chase", chase.status());
             Logger.recordOutput("ChaseAndShoot/pickedUp", pickedUp + chase.getPickedUp());
             Logger.recordOutput("ChaseAndShoot/held", held);
         }

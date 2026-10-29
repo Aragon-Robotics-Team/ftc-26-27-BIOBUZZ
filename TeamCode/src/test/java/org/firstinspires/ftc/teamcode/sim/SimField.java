@@ -125,6 +125,16 @@ final class SimField {
         return world.build();
     }
 
+    /**
+     * Flower i's column as the chassis meets it: a square around the tube, field frame, from the gap under it up. The
+     * intake's mouth reaches past the bumper to under the tube's middle, so the bottom ball can still be taken.
+     */
+    static ObstacleBox flowerColumn(int i) {
+        double[] c = flowerCenter(i);
+        double r = FLOWER_INNER_RADIUS + FLOWER_WALL;
+        return new ObstacleBox("flower" + i, c[0] - r, c[0] + r, c[1] - r, c[1] + r, FLOWER_TUBE_BOTTOM, FLOWER_TOP);
+    }
+
     /** Field frame (inches) of flower i's axis. */
     static double[] flowerCenter(int i) {
         Pose p = RobotConstants.Field.FLOWERS[i];

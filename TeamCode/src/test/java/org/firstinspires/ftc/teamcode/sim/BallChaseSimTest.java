@@ -65,6 +65,6 @@ class BallChaseSimTest {
 
         assertTrue(sim.webcam.frames() > 0, "BallVision never enabled the camera");
         assertTrue(picked >= 1, "the chase should pick up some of the scattered pollen: " + chase);
-        // Not checked: nectar held. The chase aims at pollen only, but the intake takes any ball in its mouth
+        assertTrue(nectarHeld == 0, "the intake can't take nectar, but holds " + nectarHeld);
     }
 }

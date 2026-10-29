@@ -16,7 +16,7 @@ import java.util.ArrayList;
 import java.util.List;
 
 /**
- * The robot's ball path in the sim, from what the code commands: the intake takes balls that reach its mouth while it
+ * The robot's ball path in the sim, from what the code commands: the intake takes pollen (never nectar) that reaches its mouth while it
  * runs; with the gate open and the intake running, stored balls go to the flywheel one at a time and leave from the
  * turret at the hood angle, as fast as the flywheel is really spinning (FLYWHEEL_TICKS_PER_EXIT_SPEED), carrying the
  * robot's motion. SimLoop flies them with gravity and drag and no lift, like ShotSolver with LIFT_COEFFICIENT 0 (the
@@ -39,6 +39,8 @@ final class SimLauncher {
     private final FakeServo gate;
     // The intake's mouth: just inside the front bumper to past INTAKE_REACH, between the side plates (RobotConstants)
     private final TriggerVolume mouth;
+    // The intake only takes pollen: nectar is too big for it, so the robot pushes nectar like any other obstacle
+    private static final List<String> POLLEN_ONLY = java.util.Collections.singletonList(Ball.Type.POLLEN.name());
     private final ShotArcRecorder shots = new ShotArcRecorder(SHOT_SLOTS);
 
     private double intakeWait, feedWait;
@@ -78,7 +80,7 @@ final class SimLauncher {
         feedWait -= deltaTime;
 
         boolean room = field.getHeldCount() < CAPACITY;
-        if (intakeWait <= 0 && field.tryAcquire(mouth, intakeRunning && room, null, 1) > 0) intakeWait = INTAKE_INTERVAL;
+        if (intakeWait <= 0 && field.tryAcquire(mouth, intakeRunning && room, POLLEN_ONLY, 1) > 0) intakeWait = INTAKE_INTERVAL;
 
         int next = field.nextHeldPieceId();
         if (gateOpen && intakeRunning && feedWait <= 0 && next >= 0) {

@@ -166,6 +166,15 @@ public class RobotConstants {
         // With no pollen to chase the robot turns in place to look for more: left, the way the camera already looks
         public static double SEARCH_TURN_RATE = Math.toRadians(90); // rad/s. TODO: tune, slow enough not to blur frames
         public static double SEARCH_TURN = Math.toRadians(360);     // turned this far without seeing pollen, the chase ends
+        // A search turns from a spot with room to turn (the robot's half diagonal plus KEEP_OUT_MARGIN clear of the
+        // walls, the hive's feet and the flowers), driving there first, for up to SEARCH_MOVE_S
+        public static double SEARCH_MOVE_S = 3;
+        // Stuck: a target the robot gets no closer to for STUCK_S (moved under STUCK_DISTANCE and turned under
+        // STUCK_TURN), as against a wall, is skipped for the rest of the chase, with any pollen within SKIP_RADIUS of it
+        public static double STUCK_S = 0.75;
+        public static double STUCK_DISTANCE = 1;
+        public static double STUCK_TURN = Math.toRadians(5);
+        public static double SKIP_RADIUS = 4;
     }
 
     public static class Launcher {
@@ -286,6 +295,7 @@ public class RobotConstants {
                 {46.27, 51.5, 48.27, 92.5},
                 {95.73, 51.5, 97.73, 92.5},
         };
+        public static double FLOWER_RADIUS = 2.65;   // a flower column's outside. TODO: check against the real field
         public static double FLOWER_KEEP_OUT = 5;  // inches from a flower column's center: inside it, or only the bottom one can be taken
         public static double KEEP_OUT_MARGIN = 2;  // inches added around the hive's feet
 
