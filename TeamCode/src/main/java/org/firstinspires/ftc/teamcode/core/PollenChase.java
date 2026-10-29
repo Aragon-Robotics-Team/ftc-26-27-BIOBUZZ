@@ -265,7 +265,7 @@ public class PollenChase {
      */
     private void search(double t) {
         if (searchFrom == null) {
-            searchFrom = roomToTurn(follower.pose());
+            searchFrom = roomToTurn(follower.pose(), vision.half());
             searchBegan = t;
         }
         if (Double.isNaN(turnStart)) {
@@ -307,8 +307,15 @@ public class PollenChase {
 
     /**
      * The nearest spot to the pose where the robot can turn in place: its half diagonal plus KEEP_OUT_MARGIN from the
-     * walls, the hive's feet and the flowers. Keeps the heading.
+     * walls, the hive's feet and the flowers, and kept to half's side of the field (null: either). Keeps the heading.
      */
+    static Pose roomToTurn(Pose pose, Alliance half) {
+        Pose room = roomToTurn(pose);
+        if (half == null) return room;
+        double r = Math.hypot(ROBOT_LENGTH, ROBOT_WIDTH) / 2; // turning in place sweeps this circle
+        return new Pose(toHalf(half, room.x(), r), room.y(), room.heading());
+    }
+
     static Pose roomToTurn(Pose pose) {
         double r = Math.hypot(ROBOT_LENGTH, ROBOT_WIDTH) / 2 + RobotConstants.Field.KEEP_OUT_MARGIN;
         double x = Math.max(r, Math.min(144 - r, pose.x())), y = Math.max(r, Math.min(144 - r, pose.y()));
@@ -333,6 +340,32 @@ public class PollenChase {
             else y = y1;
         }
         return new Pose(Math.max(r, Math.min(144 - r, x)), Math.max(r, Math.min(144 - r, y)), pose.heading());
+    }
+
+    /** How far the robot's footprint at this heading reaches along x from its center. */
+    static double reachX(double heading) {
+        return Math.abs(Math.cos(heading)) * ROBOT_LENGTH / 2 + Math.abs(Math.sin(heading)) * ROBOT_WIDTH / 2;
+    }
+
+    /** x, moved if need be so that reach from it stays HALF_MARGIN short of the center line, on half's side. */
+    static double toHalf(Alliance half, double x, double reach) {
+        double line = RobotConstants.Field.CENTER_LINE, margin = RobotConstants.Field.HALF_MARGIN;
+        return half == Alliance.RED ? Math.min(x, line - margin - reach) : Math.max(x, line + margin + reach);
+    }
+
+    /**
+     * A drive target (x, y, heading) kept to our side, if the chase is (vision.half()): backed off along the way it's
+     * approached from (ux, uy), so a path to a ball still runs at it, or else just moved in x.
+     */
+    private double[] onOurHalf(double x, double y, double heading, double ux, double uy) {
+        Alliance half = vision.half();
+        if (half == null) return new double[] {x, y};
+        double kept = toHalf(half, x, reachX(heading));
+        if (kept == x) return new double[] {x, y};
+        boolean toward = half == Alliance.RED ? ux > 1e-3 : ux < -1e-3;
+        if (!toward) return new double[] {kept, y};
+        double back = (x - kept) / ux;
+        return new double[] {kept, y - back * uy};
     }
 
     private void enter(State next, PollenTracker.Target target, double t) {
@@ -370,13 +403,16 @@ public class PollenChase {
         }
         double heading = Math.atan2(uy, ux) - INTAKE_HEADING_OFFSET;
         if (open != null && !linedUp) {
-            lineUp = new Pose(clamp(target.x + open[0] * LINE_UP_OUT), clamp(target.y + open[1] * LINE_UP_OUT), heading);
+            double[] at = onOurHalf(clamp(target.x + open[0] * LINE_UP_OUT), clamp(target.y + open[1] * LINE_UP_OUT),
+                    heading, 0, 0);
+            lineUp = new Pose(at[0], at[1], heading);
         }
         // A wall close ahead of the ball: on to the wall (clamp stops it short), for any balls in a row behind this one
         double past = wallAhead(target.x, target.y, ux, uy) < WALL_RUN && !flowerNear(target.x, target.y)
                 ? WALL_RUN : OVERSHOOT;
-        double x = clamp(target.x + ux * (past - INTAKE_REACH));
-        double y = clamp(target.y + uy * (past - INTAKE_REACH));
+        double[] at = onOurHalf(clamp(target.x + ux * (past - INTAKE_REACH)), clamp(target.y + uy * (past - INTAKE_REACH)),
+                heading, ux, uy);
+        double x = at[0], y = at[1];
         double speed = distance < NEAR_BALL_DISTANCE ? NEAR_BALL_SPEED : CHASE_MAX_SPEED;
         if (detour != null) {
             if (follower.following()) return; // still on the way there
@@ -394,10 +430,11 @@ public class PollenChase {
         goal = new Pose(x, y, heading);
         pathSpeed = speed;
         Pose next = lineUp != null ? lineUp : goal;
-        List<double[]> route = FieldRoutes.between(pose, next);
+        List<double[]> route = FieldRoutes.between(pose, next, vision.half());
         Pose end = goal;
         if (!route.isEmpty()) {
-            detour = new Pose(route.get(0)[0], route.get(0)[1], heading);
+            double[] via = onOurHalf(route.get(0)[0], route.get(0)[1], heading, 0, 0);
+            detour = new Pose(via[0], via[1], heading);
             detourLinesUp = false;
             end = detour;
         } else if (lineUp != null) {

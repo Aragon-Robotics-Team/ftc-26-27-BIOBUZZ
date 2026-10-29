@@ -10,6 +10,7 @@ import org.firstinspires.ftc.robotcore.external.Telemetry;
 import org.firstinspires.ftc.robotcore.external.hardware.camera.WebcamName;
 import org.firstinspires.ftc.robotcore.external.hardware.camera.controls.ExposureControl;
 import org.firstinspires.ftc.robotcore.external.hardware.camera.controls.GainControl;
+import org.firstinspires.ftc.teamcode.core.Alliance;
 import org.firstinspires.ftc.teamcode.core.RobotConstants;
 import org.firstinspires.ftc.teamcode.vision.Ball;
 import org.firstinspires.ftc.teamcode.vision.BallGeometry;
@@ -44,6 +45,7 @@ public class BallVision implements Subsystem {
     private final BallPipeline pipeline;
     private final BallVisionProcessor processor;
     private final List<double[]> skipped = new ArrayList<>();
+    private Alliance half; // keepToHalf(): pollen and the chase kept to this alliance's side; null, either
     private final PollenTracker tracker;
     private VisionPortal portal;
     // A camera that runs the processor itself instead of through a VisionPortal: the sim's webcam (BallChaseSimTest)
@@ -125,8 +127,26 @@ public class BallVision implements Subsystem {
         skipped.clear();
     }
 
-    /** Inside the walls, off the hive's feet, away from the flowers and not skipped. */
+    /**
+     * In AUTO (G402): chase only pollen the robot can take without its footprint crossing to the other alliance's side,
+     * from whichever way it comes at it, and keep the chase's drives and turns to this side. Null for either.
+     */
+    public void keepToHalf(Alliance alliance) {
+        half = alliance;
+    }
+
+    public Alliance half() {
+        return half;
+    }
+
+    /** Inside the walls, off the hive's feet, away from the flowers, not skipped and on our side if kept to it. */
     private boolean chaseable(double x, double y) {
+        if (half != null) {
+            // With the ball at the mouth, the footprint reaches at most this far past it, whatever the approach
+            double reach = Math.hypot(RobotConstants.Field.ROBOT_LENGTH / 2 - INTAKE_REACH, RobotConstants.Field.ROBOT_WIDTH / 2);
+            double line = RobotConstants.Field.CENTER_LINE, margin = RobotConstants.Field.HALF_MARGIN;
+            if (half == Alliance.RED ? x > line - margin - reach : x < line + margin + reach) return false;
+        }
         double now = now();
         for (double[] s : skipped) {
             if (now < s[2] && Math.hypot(x - s[0], y - s[1]) < SKIP_RADIUS) return false;

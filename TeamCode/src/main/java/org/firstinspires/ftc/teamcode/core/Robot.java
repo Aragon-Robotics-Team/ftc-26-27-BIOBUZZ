@@ -165,14 +165,14 @@ public class Robot {
             Follower follower = drivebase.getFollower();
             List<Command> legs = new ArrayList<>();
             Pose from = follower.pose();
-            Pose room = PollenChase.roomToTurn(from);
+            Pose room = PollenChase.roomToTurn(from, ballVision.half());
             double turn = Math.abs(Math.atan2(Math.sin(target.heading() - from.heading()),
                     Math.cos(target.heading() - from.heading())));
             if (turn > TURN_ROOM && Math.hypot(room.x() - from.x(), room.y() - from.y()) > 1) {
                 legs.add(holdIfCut(follower, follow(follower, line(from, room).constant(from.heading()))));
                 from = room;
             }
-            for (double[] p : FieldRoutes.between(from, target)) {
+            for (double[] p : FieldRoutes.between(from, target, ballVision.half())) {
                 Pose via = new Pose(p[0], p[1], target.heading());
                 legs.add(holdIfCut(follower, follow(follower, line(from, via).linear(from, via))));
                 from = via;

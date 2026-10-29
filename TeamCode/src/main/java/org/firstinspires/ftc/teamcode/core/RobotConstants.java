@@ -350,6 +350,11 @@ public class RobotConstants {
         public static double FLOWER_RADIUS = 2.65;   // a flower column's outside. TODO: check against the real field
         public static double FLOWER_KEEP_OUT = 5;  // inches from a flower column's center: inside it, or only the bottom one can be taken
         public static double KEEP_OUT_MARGIN = 2;  // inches added around the hive's feet
+        // In AUTO each alliance has its side of the field, columns A to C for red (x < CENTER_LINE), D to F for blue;
+        // driving onto the other side may be STRATEGIC (G402). A chase kept to our side stays HALF_MARGIN short of it
+        // (the pose estimate's error and the drive's overshoot); its drives pass our hive foot on the far side
+        public static double CENTER_LINE = 72;
+        public static double HALF_MARGIN = 2;
 
         // Robot frame, inches: width side to side, length front to back.
         public static double ROBOT_WIDTH = 15.748; //see below (incldues number sign) Oct 26

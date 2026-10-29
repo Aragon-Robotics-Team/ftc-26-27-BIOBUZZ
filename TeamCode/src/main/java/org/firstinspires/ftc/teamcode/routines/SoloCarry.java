@@ -94,6 +94,7 @@ public class SoloCarry extends AutoRoutine {
     @Override
     public void setUp() {
         robot.hiveVision.setEnabled(true);
+        robot.ballVision.keepToHalf(alliance); // G402: our side of the field in AUTO
         clock.reset(); // the match starts now
     }
 

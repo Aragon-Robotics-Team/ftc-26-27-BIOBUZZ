@@ -142,6 +142,11 @@ class SoloCarrySimTest {
             boolean realDrive = name.startsWith("real-drive");
             BiobuzzRobotSim sim = setUp.apply(new BiobuzzRobotSim(realDrive).alliance(alliance).withParkingPartner());
             Outcome run = run("solo-carry-" + name, alliance, sim, dx, dy, dhDegrees);
+            System.out.printf("Solo carry %s: footprint at most %.1f in past the center line%n", name, sim.pastCenterLine());
+            // G402. Except with no tags and the IMU drifting, when the robot doesn't know where it is
+            if (!name.equals("no-tags-drifting")) {
+                assertTrue(sim.pastCenterLine() <= 0, name + ": it went " + sim.pastCenterLine() + " in onto the other side");
+            }
             assertTrue(run.parked >= parked, name + ": " + run.parked + " robots parked, should be " + parked);
             // In a varied match the partner can park 2 in short, which takes the gap down to touching
             double clear = name.startsWith("varied") ? 0 : 0.5;

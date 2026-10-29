@@ -79,16 +79,25 @@ so frames can be up to about 20 ms older than they say.
 - **Time:** it counts 29 s. Each chase leaves time to drive to the launch spot, shoot, and park from there, plus
   1.5 s. Parking starts when the drive there (by an approach point on the audience side, clear of the partner) is all
   that's left, plus 1 s. Every drive gives up after twice its estimate and holds where it is.
+- **Our side of the field (G402):** in AUTO columns A to C are red's, D to F blue's, and driving onto the other side
+  "may be seen as STRATEGIC". Solo Carry keeps the chase to pollen it can take with its footprint `HALF_MARGIN`
+  (2 in) short of the center line, whichever way it comes at it (about 10 in or more inside), pulls every chase
+  drive and turn back to that, and passes our hive foot on the far side (x about 34) rather than the side by the
+  line, where cornering at speed swung it over. In the sim it comes no closer than 1.5 in, except with no tags and the
+  IMU drifting (it doesn't know where it is).
 
 ## Known limits
 
-- One tip in 30 s is all there is to get: a second needs 8 more pollen in the new up cell, and our side only has the
-  4 garden balls and whatever of our 4 preloads spills our way (some crosses the center line). In the sim it gets one
-  load of 3 or 4 in after the tip; the chase from the other launch spot then finds nothing to take.
-- The scoring, Park and Leave rules in the sim come from BiobuzzSim (the Roblox sim), not the manual: check them,
-  and whether garden balls count at the end of AUTO (then taking them is +1 each) or only at the end of the match.
-- Also check whether robots may cross the center line in AUTO: the chase goes after any pollen on open floor
-  (`BallVision.onOpenFloor`), our half or not. If there's a rule, add the half there.
+- One tip in 30 s is all there is to get alone: the two tips need 11 pollen's worth (3 more for the first, the cell
+  starting with 3 nectar; 8 for the empty cell that comes up), and our side has 8 pollen (4 preloads, 4 in the
+  garden) without the flowers. A partner that shoots its 4 preloads, intake from the bottom of a flower (G418.B) or
+  taking our own nectar would each make a second tip possible.
+- Scoring (Competition Manual Table 10-2 and 10.5): AUTO scores only LEAVE 3, PARK 5 and a TIP 20 each. Pollen and
+  nectar in a cell (2 each) and in the garden (1 each) count only at the end of the match. So Solo Carry's AUTO is
+  28 points of ours (36 with the partner's leave and park); the load it shoots in after the tip is a start on the
+  next tip in TELEOP, and each garden ball it takes is one fewer in the garden at the end. LEAVE plus PARK of 16 for
+  the alliance is the SWARM ranking point: both robots leaving and parking in AUTO makes it. The sim's score
+  (SimMatch) still counts cells and the garden in AUTO.
 - With no tags at all and the IMU drifting, nothing corrects the heading; the park can miss the zone (in the sim it
   drives into the partner and stops short: 35 points).
 - It can't take pollen from the flowers.

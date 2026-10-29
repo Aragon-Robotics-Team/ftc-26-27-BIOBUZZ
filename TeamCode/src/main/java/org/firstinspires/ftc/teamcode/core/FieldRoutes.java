@@ -30,24 +30,32 @@ public final class FieldRoutes {
 
     /** The waypoints, {x, y} each, to drive through on the way from a to b; empty if the straight line is clear. */
     public static List<double[]> between(Pose a, Pose b) {
+        return between(a, b, null);
+    }
+
+    /**
+     * As between(a, b), keeping to half's side of the field (null: either): its hive foot is passed on the side away
+     * from the center line, since a robot cornering at speed past the other side swings over the line.
+     */
+    public static List<double[]> between(Pose a, Pose b, Alliance half) {
         List<double[]> route = new ArrayList<>();
-        add(route, a.x(), a.y(), b.x(), b.y(), MAX_SPLITS);
+        add(route, a.x(), a.y(), b.x(), b.y(), MAX_SPLITS, half);
         return route;
     }
 
     /** Adds the waypoints from (ax, ay) to (bx, by): around the first obstacle, then each leg the same way. */
-    private static void add(List<double[]> route, double ax, double ay, double bx, double by, int splits) {
+    private static void add(List<double[]> route, double ax, double ay, double bx, double by, int splits, Alliance half) {
         if (splits == 0) return;
-        double[] via = around(ax, ay, bx, by);
+        double[] via = around(ax, ay, bx, by, half);
         // None, or one where it already is (no way found): drive straight
         if (via == null || Math.hypot(via[0] - ax, via[1] - ay) < 1) return;
-        add(route, ax, ay, via[0], via[1], splits - 1);
+        add(route, ax, ay, via[0], via[1], splits - 1, half);
         route.add(via);
-        add(route, via[0], via[1], bx, by, splits - 1);
+        add(route, via[0], via[1], bx, by, splits - 1, half);
     }
 
     /** A waypoint around the first obstacle on the line from (ax, ay) to (bx, by), or null if it's clear. */
-    private static double[] around(double ax, double ay, double bx, double by) {
+    private static double[] around(double ax, double ay, double bx, double by, Alliance half) {
         for (double[] foot : HIVE_FEET) {
             if (inBox(ax, ay, foot, PASS) || inBox(bx, by, foot, PASS)) continue;
             if (!crosses(ax, ay, bx, by, foot[0] - PASS, foot[1] - PASS, foot[2] + PASS, foot[3] + PASS)) continue;
@@ -60,6 +68,13 @@ public final class FieldRoutes {
                 // a is beside it: past the end nearer the middle of the drive, on a's side
                 y = (ay + by) / 2 < (foot[1] + foot[3]) / 2 ? foot[1] - CLEARANCE : foot[3] + CLEARANCE;
                 x = ax < (foot[0] + foot[2]) / 2 ? foot[0] - CLEARANCE : foot[2] + CLEARANCE;
+            }
+            if (half != null) {
+                // Kept to a side: the far side of the foot. Already there, round the end toward b; else get there
+                // round the end chosen above
+                x = half == Alliance.RED ? foot[0] - CLEARANCE : foot[2] + CLEARANCE;
+                boolean onFarSide = half == Alliance.RED ? ax <= foot[0] - PASS : ax >= foot[2] + PASS;
+                if (onFarSide) y = by < (foot[1] + foot[3]) / 2 ? foot[1] - CLEARANCE : foot[3] + CLEARANCE;
             }
             return new double[] {onField(x), onField(y)};
         }

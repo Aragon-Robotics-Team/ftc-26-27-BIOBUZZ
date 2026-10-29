@@ -169,6 +169,7 @@ public final class BiobuzzRobotSim {
     public final GamePieceTracker field = new GamePieceTracker(SimLauncher.CAPACITY + 1, SimField.world());
     private final SimLauncher launcher = new SimLauncher(field, intake, gate, flywheel);
     private SimMatch.Robot us = new SimMatch.Robot(Alliance.RED);
+    private double pastCenterLine = Double.NEGATIVE_INFINITY;
     private final List<SimMatch.Robot> robots = new ArrayList<>();
     /** The clock and the score. */
     public final SimMatch match;
@@ -429,6 +430,9 @@ public final class BiobuzzRobotSim {
 
     /** Where the robot really is, in Pedro coordinates (inches from the field corner). */
     public double x() { return drivePlant.getX() + 72; }
+
+    /** The furthest the robot's footprint has been past the center line onto the other side, inches (negative: never). */
+    public double pastCenterLine() { return pastCenterLine; }
     public double y() { return drivePlant.getY() + 72; }
     /** Radians CCW, unwrapped. */
     public double heading() { return drivePlant.getHeading(); }
@@ -483,6 +487,10 @@ public final class BiobuzzRobotSim {
         double headingBefore = drivePlant.getHeading();
         drivePlant.update(deltaTime);
         collide(headingBefore);
+        // How far the footprint has been on the other alliance's side (Pedro x, the center line at 72)
+        double reach = Math.abs(Math.cos(heading())) * RobotConstants.Field.ROBOT_LENGTH / 2
+                + Math.abs(Math.sin(heading())) * RobotConstants.Field.ROBOT_WIDTH / 2;
+        pastCenterLine = Math.max(pastCenterLine, us.alliance == Alliance.RED ? x() + reach - 72 : 72 - (x() - reach));
         imuDrift += imuDriftPerS * deltaTime;
         double mx = drivePlant.getX() - lastTrueX, my = drivePlant.getY() - lastTrueY;
         lastTrueX = drivePlant.getX();
