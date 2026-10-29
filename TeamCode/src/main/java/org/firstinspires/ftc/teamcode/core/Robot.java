@@ -12,6 +12,8 @@ import static com.pedropathing.ivy.pedro.PedroCommands.follow;
 import static org.firstinspires.ftc.teamcode.core.RobotConstants.Gate.AUTO_SHOOT_MS;
 
 import com.pedropathing.follower.Follower;
+import com.pedropathing.ivy.CommandBuilder;
+import com.pedropathing.ivy.behaviors.EndCondition;
 import com.pedropathing.ivy.Command;
 import com.pedropathing.math.Pose;
 import com.pedropathing.math.Velocity;
@@ -144,6 +146,16 @@ public class Robot {
     private static final double TURN_ROOM = Math.toRadians(30);
 
     /**
+     * A path leg that, cut short (a race or a deadline ends it), holds where the robot is: Pedro's follow command
+     * otherwise leaves the follower driving the path while whatever comes next starts.
+     */
+    private static Command holdIfCut(Follower follower, CommandBuilder leg) {
+        return leg.setEnd(end -> {
+            if (end == EndCondition.INTERRUPTED) follower.hold(follower.pose());
+        });
+    }
+
+    /**
      * From wherever the robot is when this starts, in straight lines to target, around the flowers and the hive's
      * feet in the way (FieldRoutes), turning to target's heading on the way. With a turn of more than TURN_ROOM to make
      * and something too close to turn by (nose to a wall or a flower, say), it backs out straight to room first.
@@ -157,15 +169,15 @@ public class Robot {
             double turn = Math.abs(Math.atan2(Math.sin(target.heading() - from.heading()),
                     Math.cos(target.heading() - from.heading())));
             if (turn > TURN_ROOM && Math.hypot(room.x() - from.x(), room.y() - from.y()) > 1) {
-                legs.add(follow(follower, line(from, room).constant(from.heading())));
+                legs.add(holdIfCut(follower, follow(follower, line(from, room).constant(from.heading()))));
                 from = room;
             }
             for (double[] p : FieldRoutes.between(from, target)) {
                 Pose via = new Pose(p[0], p[1], target.heading());
-                legs.add(follow(follower, line(from, via).linear(from, via)));
+                legs.add(holdIfCut(follower, follow(follower, line(from, via).linear(from, via))));
                 from = via;
             }
-            legs.add(follow(follower, line(from, target).linear(from, target)));
+            legs.add(holdIfCut(follower, follow(follower, line(from, target).linear(from, target))));
             return sequential(legs.toArray(new Command[0]));
         });
     }

@@ -234,8 +234,9 @@ public class HiveVision implements Subsystem {
 
     @Override
     public void stop() {
-        if (running) limelight.stop();
+        if (running || checking) limelight.stop();
         running = false;
+        checking = false;
     }
 
     private static double now() {

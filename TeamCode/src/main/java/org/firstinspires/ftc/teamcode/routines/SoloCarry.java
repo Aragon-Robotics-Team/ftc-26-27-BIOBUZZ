@@ -110,6 +110,7 @@ public class SoloCarry extends AutoRoutine {
                 deadline(carry.raceWith(waitUntil(this::timeToPark)), robot.aimAtHive(), robot.enableFlywheel()),
                 robot.stopShooting(),
                 robot.intake.off(),
+                robot.launcher.idle(),
                 instant(() -> stage("parking")),
                 drive(approach),
                 drive(park),

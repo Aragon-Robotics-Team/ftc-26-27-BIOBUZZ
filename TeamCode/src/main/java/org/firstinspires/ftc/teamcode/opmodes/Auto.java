@@ -64,6 +64,7 @@ public class Auto extends OpMode {
         selected = routines.get(index);
         AutoRoutine routine = selected.create(robot, MatchState.alliance);
         if (routine.usesBallVision()) robot.ballVision.enable(false); // the camera takes a moment to open
+        else robot.ballVision.stop(); // opened scrolling past one that does: its pipeline would eat loop time
 
         telemetry.addData("Routine", "%s   (%d/%d, dpad ↑↓)", bold(selected.toString()), index + 1, routines.size());
         Pose start = routine.startPose();
