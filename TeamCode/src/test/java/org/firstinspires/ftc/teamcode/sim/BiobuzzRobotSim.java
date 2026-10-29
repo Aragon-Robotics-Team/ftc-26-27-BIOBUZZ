@@ -92,6 +92,9 @@ public final class BiobuzzRobotSim {
     // ---- Limelight 3A: on the turret, 4.8 in ahead of its axis, lens 12.2 in up, tilted up (RobotConstants.Vision) ----
     private static final double LIMELIGHT_AHEAD_OF_TURRET_AXIS = 4.8; // inches (CAD, Oct 26)
     private static final double LIMELIGHT_H_FOV = 54.5, LIMELIGHT_V_FOV = 42; // degrees, Limelight 3A spec
+    // Frames a second and latency for AprilTags. PLACEHOLDER: about what the 3A manages at 640x480. Whole ticks: a frame
+    // becomes available on a tick, so a latency between ticks would make it older than it reports
+    private static final double LIMELIGHT_FPS = 50, LIMELIGHT_CAPTURE_MS = 20, LIMELIGHT_TARGETING_MS = 20;
 
     private static final int PRELOAD = 4; // pollen each robot starts with (Competition Manual)
     private int preload = PRELOAD;
@@ -158,8 +161,16 @@ public final class BiobuzzRobotSim {
     /** What the chassis can't drive into, field frame: the four walls (thick boxes just outside the tiles) and the field's obstacles. */
     private final List<ObstacleBox> solid = new ArrayList<>();
     private String touching = "";
-    /** Which cell of each hive (red, blue) the Limelight's tags show up: moved when a tray tips. */
-    private final Hive[] tagsUp = new Hive[2];
+    private final double[] lastAxis = {Double.NaN, Double.NaN, Double.NaN}; // reportLimelight's last turret pose
+    // The Pinpoint's IMU drifting (imuDrift): radians a second, and how far it has drifted. The Pinpoint is fed a
+    // chassis turned that far, moved along by each tick's true motion turned that far too, so its pods still count
+    // the true motion in the robot's frame and only its heading is off (Pedro inches)
+    private double imuDriftPerS = 0, imuDrift = 0;
+    private double fedX, fedY, lastTrueX, lastTrueY;
+    /** Each tick: {x, y, heading} where the robot really is, then the Pinpoint's reading. Pedro inches, radians. */
+    public final List<double[]> trace = new ArrayList<>();
+    /** Each hive's arm angle (red, blue) the Limelight's tags were last put at: moved as a tray turns. */
+    private final double[] tagsAt = new double[2];
     /**
      * FakeLimelight3A's tag layout. It's final and SimLoop has no setter, so the tags move by reflection when a tray
      * tips: a stopgap until SimLoop lets a layout change during a run.
@@ -186,8 +197,8 @@ public final class BiobuzzRobotSim {
     public BiobuzzRobotSim(Hive redHiveUp, Hive blueHiveUp) {
         field.setBodyMotion(SimHiveTrays.RED, SimHiveTrays.angle(false, redHiveUp), 0);
         field.setBodyMotion(SimHiveTrays.BLUE, SimHiveTrays.angle(true, blueHiveUp), 0);
-        tagsUp[0] = redHiveUp;
-        tagsUp[1] = blueHiveUp;
+        tagsAt[0] = SimHiveTrays.angle(false, redHiveUp);
+        tagsAt[1] = SimHiveTrays.angle(true, blueHiveUp);
         robots.add(us);
         match = new SimMatch(field, robots);
         solid.add(new ObstacleBox("wallRight", 72, 100, -100, 100, 0, 12));
@@ -220,8 +231,8 @@ public final class BiobuzzRobotSim {
         // The mount is fixed to the turret, so the Limelight is told the turret's pose rather than the chassis's
         CameraMount onTurret = new CameraMount(LIMELIGHT_AHEAD_OF_TURRET_AXIS, 0, RobotConstants.Vision.LENS_HEIGHT, 0,
                 -RobotConstants.Vision.TILT); // CameraMount's pitch is positive down
-        limelight = FakeLimelight3A.builder(SimHives.layout(redHiveUp, blueHiveUp), onTurret, LIMELIGHT_H_FOV,
-                LIMELIGHT_V_FOV).build();
+        limelight = FakeLimelight3A.builder(SimHives.layout(tagsAt[0], tagsAt[1]), onTurret, LIMELIGHT_H_FOV,
+                LIMELIGHT_V_FOV).frameRateHz(LIMELIGHT_FPS).latencyMs(LIMELIGHT_CAPTURE_MS, LIMELIGHT_TARGETING_MS).build();
         hardwareMap.register(RobotConstants.Vision.LIMELIGHT_NAME, limelight);
 
         drivePlant = new MecanumDrivePlant(driveMotors, DRIVETRAIN);
@@ -237,8 +248,21 @@ public final class BiobuzzRobotSim {
      */
     public void placeAt(double x, double y, double heading) {
         drivePlant.setPose(x - 72, y - 72, heading);
+        fedX = lastTrueX = drivePlant.getX();
+        fedY = lastTrueY = drivePlant.getY();
+        imuDrift = 0;
         pinpoint.attachChassisAt(drivePlant.getX() * 25.4, drivePlant.getY() * 25.4, drivePlant.getHeading());
+        lastAxis[0] = Double.NaN; // no speed to carry on across a placement
         reportLimelight();
+    }
+
+    /**
+     * The Pinpoint's heading drifts this many degrees a second (CCW), as its IMU does when the drive shakes it; its
+     * position, worked out along that heading, goes off with it. 0 (the default) is a perfect IMU.
+     */
+    public BiobuzzRobotSim imuDrift(double degreesPerSecond) {
+        imuDriftPerS = Math.toRadians(degreesPerSecond);
+        return this;
     }
 
     /** Which alliance the robot is on (default red): what it scores for and which hive it aims at. */
@@ -251,9 +275,24 @@ public final class BiobuzzRobotSim {
 
     /** Adds a scripted alliance partner (SimPartner) on our alliance: it shoots its preload and parks. After alliance(). */
     public BiobuzzRobotSim withPartner() {
-        partner = new SimPartner(us.alliance, field);
+        partner = new SimPartner(us.alliance, field, false);
         robots.add(partner.robot);
         return this;
+    }
+
+    /**
+     * Adds a partner that only starts in our LEFT corner (back to the alliance wall) and parks in the loading zone:
+     * no shots. After alliance().
+     */
+    public BiobuzzRobotSim withParkingPartner() {
+        partner = new SimPartner(us.alliance, field, true);
+        robots.add(partner.robot);
+        return this;
+    }
+
+    /** Where the partner is, Pedro inches {x, y}, or null without one. */
+    public double[] partnerAt() {
+        return partner == null ? null : partner.at();
     }
 
     /**
@@ -323,7 +362,16 @@ public final class BiobuzzRobotSim {
         double headingBefore = drivePlant.getHeading();
         drivePlant.update(deltaTime);
         collide(headingBefore);
-        pinpoint.moveChassisTo(drivePlant.getX() * 25.4, drivePlant.getY() * 25.4, drivePlant.getHeading());
+        imuDrift += imuDriftPerS * deltaTime;
+        double mx = drivePlant.getX() - lastTrueX, my = drivePlant.getY() - lastTrueY;
+        lastTrueX = drivePlant.getX();
+        lastTrueY = drivePlant.getY();
+        fedX += mx * Math.cos(imuDrift) - my * Math.sin(imuDrift);
+        fedY += mx * Math.sin(imuDrift) + my * Math.cos(imuDrift);
+        pinpoint.moveChassisTo(fedX * 25.4, fedY * 25.4, drivePlant.getHeading() + imuDrift);
+
+        trace.add(new double[] {x(), y(), heading(), pinpoint.getPosX(DistanceUnit.INCH),
+                pinpoint.getPosY(DistanceUnit.INCH), pinpoint.getHeading(AngleUnit.RADIANS)});
 
         turretPlant.update(deltaTime);
         reportTurret();
@@ -393,19 +441,19 @@ public final class BiobuzzRobotSim {
         return depth;
     }
 
-    /** Once a tray has tipped to its other stop, its tags are where the Limelight would now see them. */
+    /** The tags go where the trays' arms are now, so the Limelight sees them move through a tip and settle. */
     private void moveTagsWithTrays() {
         boolean moved = false;
         for (int i = 0; i < 2; i++) {
-            Hive up = SimHiveTrays.up(i == 1, field.getBodyAngleRad(i == 0 ? SimHiveTrays.RED : SimHiveTrays.BLUE));
-            if (up != null && up != tagsUp[i]) {
-                tagsUp[i] = up;
+            double angle = field.getBodyAngleRad(i == 0 ? SimHiveTrays.RED : SimHiveTrays.BLUE);
+            if (Math.abs(angle - tagsAt[i]) > Math.toRadians(0.05)) {
+                tagsAt[i] = angle;
                 moved = true;
             }
         }
         if (!moved) return;
         try {
-            LIMELIGHT_LAYOUT.set(limelight, SimHives.layout(tagsUp[0], tagsUp[1]));
+            LIMELIGHT_LAYOUT.set(limelight, SimHives.layout(tagsAt[0], tagsAt[1]));
         } catch (IllegalAccessException e) {
             throw new IllegalStateException("can't move the Limelight's tags", e);
         }
@@ -417,7 +465,19 @@ public final class BiobuzzRobotSim {
      */
     private void reportLimelight() {
         double[] axis = turretAxis();
-        limelight.setRobotPose(axis[0] - 72, axis[1] - 72, heading() + turretAngle());
+        double yaw = heading() + turretAngle();
+        // The fake captures its next frame at the end of the next tick, from the pose it was given now: so it's given
+        // where the turret will be then, carried on at this tick's speed. Then a frame is as old as its stamps say
+        double x = axis[0], y = axis[1], ahead = yaw;
+        if (!Double.isNaN(lastAxis[0])) {
+            x += axis[0] - lastAxis[0];
+            y += axis[1] - lastAxis[1];
+            ahead += Math.IEEEremainder(yaw - lastAxis[2], 2 * Math.PI);
+        }
+        lastAxis[0] = axis[0];
+        lastAxis[1] = axis[1];
+        lastAxis[2] = yaw;
+        limelight.setRobotPose(x - 72, y - 72, ahead);
     }
 
     /** The turret axis, Pedro coordinates: TURRET_OFFSET_X/Y from the robot center. */

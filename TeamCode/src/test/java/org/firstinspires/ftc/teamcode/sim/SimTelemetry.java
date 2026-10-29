@@ -16,6 +16,23 @@ final class SimTelemetry {
         return last(transmissions, POSE, "Pose");
     }
 
+    /** Pedro's pose {x, y, heading} from each transmission's "Pose" line, null for one without it. */
+    static List<double[]> poses(List<List<String>> transmissions) {
+        List<double[]> poses = new java.util.ArrayList<>();
+        for (List<String> lines : transmissions) {
+            double[] pose = null;
+            for (String line : lines) {
+                Matcher m = POSE.matcher(line);
+                if (m.find()) {
+                    pose = new double[] {Double.parseDouble(m.group(1)), Double.parseDouble(m.group(2)),
+                            Double.parseDouble(m.group(3))};
+                }
+            }
+            poses.add(pose);
+        }
+        return poses;
+    }
+
     /** Auto's "Place robot at" {x, y, heading in degrees} from the last transmission that has one. */
     static double[] placeRobotAt(List<List<String>> transmissions) {
         return last(transmissions, PLACE, "Place robot at");

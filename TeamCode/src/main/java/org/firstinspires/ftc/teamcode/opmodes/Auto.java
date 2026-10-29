@@ -62,9 +62,11 @@ public class Auto extends OpMode {
         if (gamepad1.dpadDownWasPressed()) index = (index + 1) % routines.size();
         if (gamepad1.dpadUpWasPressed()) index = (index + routines.size() - 1) % routines.size();
         selected = routines.get(index);
+        AutoRoutine routine = selected.create(robot, MatchState.alliance);
+        if (routine.usesBallVision()) robot.ballVision.enable(false); // the camera takes a moment to open
 
         telemetry.addData("Routine", "%s   (%d/%d, dpad ↑↓)", bold(selected.toString()), index + 1, routines.size());
-        Pose start = selected.create(robot, MatchState.alliance).startPose();
+        Pose start = routine.startPose();
         telemetry.addData("Place robot at", "x %.1f  y %.1f  h %.0f°", start.x(), start.y(), Math.toDegrees(start.heading()));
         telemetry.update();
     }
@@ -74,6 +76,7 @@ public class Auto extends OpMode {
         // Alliance and routine are picked in init_loop, so the routine is built here instead of init()
         AutoRoutine routine = selected.create(robot, MatchState.alliance);
         follower.setPose(routine.startPose());
+        routine.setUp();
 
         robot.start();
         // Every run is logged for the path planner (tools/path-planner, Logs tab)

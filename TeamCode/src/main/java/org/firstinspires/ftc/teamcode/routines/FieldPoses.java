@@ -3,6 +3,9 @@ package org.firstinspires.ftc.teamcode.routines;
 import com.pedropathing.api.PoseFactory;
 import com.pedropathing.math.Pose;
 
+import org.firstinspires.ftc.teamcode.core.Hive;
+import org.firstinspires.ftc.teamcode.core.RobotConstants;
+
 /**
  * Named field locations shared by the auto routines. Every routine gets one as {@code poses}, already
  * flipped for its alliance, so tuning a pose here changes it in every auto that uses it.
@@ -32,7 +35,27 @@ public class FieldPoses {
     /** Backed off the rear-wall flower, where the flower pollen is shot. */
     public final Pose flowerShoot;
 
+    /**
+     * Where to shoot into each cell from, out in front of its opening: startLaunch for the RIGHT (audience) cell, and
+     * that spot mirrored across the hive's middle (y = 72 on red) for the LEFT (rear) one. Checked in the sim
+     * (ChaseAndShootSimTest, SoloCarrySimTest).
+     */
+    public final Pose rightLaunch, leftLaunch;
+    /** Back against the alliance wall on the second tile from the audience wall (A2), facing the field. */
+    public final Pose allianceWallStart;
+    /** Out from our garden corner, the ball camera on the garden's row of pollen. */
+    public final Pose gardenLook;
+    /** On the audience side of the hive, the ball camera on where an audience cell's balls roll when it tips. */
+    public final Pose audienceSpillLook;
+    /** On the rear side, likewise for the rear cell. */
+    public final Pose rearSpillLook;
 
+
+
+    /** Where to shoot into a cell from (rightLaunch / leftLaunch). */
+    public Pose launch(Hive cell) {
+        return cell == Hive.RIGHT ? rightLaunch : leftLaunch;
+    }
 
     public FieldPoses(PoseFactory poseFactory) {
         start = poseFactory.of(56, 8, 90);
@@ -45,6 +68,13 @@ public class FieldPoses {
         flowerLaunch = poseFactory.of(60, 119.7, 90);
         flowerIntake = poseFactory.of(51, 131, 95);
         flowerShoot = poseFactory.of(56, 121, 95);
+        rightLaunch = poseFactory.of(56, 20.219975, 90);
+        leftLaunch = poseFactory.of(56, 144 - 20.219975, -90);
+        // The camera looks 20° left of the intake (RobotConstants.BallVision.YAW): heading = where to look - 20°
+        allianceWallStart = poseFactory.of(RobotConstants.Field.ROBOT_LENGTH / 2, 36, 0);
+        gardenLook = poseFactory.of(30, 16, 190);
+        audienceSpillLook = poseFactory.of(34, 22, 40);
+        rearSpillLook = poseFactory.of(34, 122, -80);
 
 
     }

@@ -13,7 +13,9 @@ import com.pedropathing.math.Pose;
 
 import org.firstinspires.ftc.teamcode.pedro.Constants;
 import org.firstinspires.ftc.teamcode.subsystems.BallVision;
+import org.firstinspires.ftc.teamcode.util.MatchLog;
 import org.firstinspires.ftc.teamcode.vision.PollenTracker;
+import org.psilynx.psikit.core.Logger;
 
 import java.util.List;
 
@@ -42,7 +44,8 @@ public class PollenChase {
 
     private enum State {
         APPROACH, // driving at a target in view
-        BLIND,    // the target went under the camera into the blind spot ahead of the mouth; finishing the path
+        BLIND,    // the target went out of view where it's expected to (the blind spot ahead of the mouth, or beside the
+                  // camera once lined up square to a wall); finishing the path to where it was last seen
         CONFIRM   // path done; waiting to see whether the target is gone
     }
 
@@ -69,6 +72,7 @@ public class PollenChase {
     // point in front of a ball beside something (detourLinesUp)
     private Pose detour;
     private boolean detourLinesUp, linedUp;
+    private double linedUpAt = Double.NEGATIVE_INFINITY; // when it got to the line-up spot
     private double pathSpeed;
     // The target's recent positions {t, x, y}, to tell a rolling ball; when it came within reach (NaN: it isn't)
     private final java.util.ArrayDeque<double[]> track = new java.util.ArrayDeque<>();
@@ -131,12 +135,19 @@ public class PollenChase {
         double t = now();
         PollenTracker tracker = vision.tracker();
         PollenTracker.Target target = tracker.target();
+        if (MatchLog.active()) {
+            Logger.recordOutput("Chase/status", status());
+            Logger.recordOutput("Chase/target", target == null ? "none"
+                    : String.format("%.1f, %.1f%s%s", target.x, target.y, target.atIntake ? " at intake" : "",
+                    linedUp ? " lined up" : ""));
+        }
         if (target != chasing) {
             chasing = target;
             tries = 0;
             goal = null;
             detour = null;
             linedUp = false;
+            linedUpAt = Double.NEGATIVE_INFINITY;
             track.clear();
             inReachSince = Double.NaN;
             state = State.APPROACH;
@@ -167,7 +178,14 @@ public class PollenChase {
             case APPROACH:
                 if (!inView && target.atIntake) {
                     enter(State.BLIND, target, t);
-                } else if (!inView && t - target.lastSeen > LOST_S) {
+                } else if (!inView && linedUp && lineUpClose(target)) {
+                    // Square to the wall, close in: the camera (turned to one side) loses a ball against the wall
+                    // here. Nose in to where it was
+                    driveTo(target);
+                    if (detour == null) enter(State.BLIND, target, t);
+                } else if (!inView && !goingToLineUp() && t - Math.max(target.lastSeen, linedUpAt) > LOST_S) {
+                    // Out of view too long. Not while on the way to a line-up spot (it drives there already facing
+                    // the wall, the camera turned away), and counting from getting there
                     tracker.drop();
                 } else if (goal != null && detour == null && !follower.following()) {
                     enter(State.CONFIRM, target, t); // drove all the way and it's still in view
@@ -278,6 +296,16 @@ public class PollenChase {
         seenBefore = target.lastSeen;
     }
 
+    private boolean goingToLineUp() {
+        return detour != null && detourLinesUp && follower.following();
+    }
+
+    /** Whether the robot is about at the line-up spot for the target or closer in. */
+    private boolean lineUpClose(PollenTracker.Target target) {
+        Pose pose = follower.pose();
+        return Math.hypot(target.x - pose.x(), target.y - pose.y()) < LINE_UP_OUT + LINE_UP_TOLERANCE;
+    }
+
     /** (Re)plans a path that puts the mouth OVERSHOOT past the target, if the target moved enough to matter. */
     private void driveTo(PollenTracker.Target target) {
         Pose pose = follower.pose();
@@ -304,7 +332,10 @@ public class PollenChase {
         double speed = distance < NEAR_BALL_DISTANCE ? NEAR_BALL_SPEED : CHASE_MAX_SPEED;
         if (detour != null) {
             if (follower.following()) return; // still on the way there
-            if (detourLinesUp) linedUp = true;
+            if (detourLinesUp) {
+                linedUp = true;
+                linedUpAt = now();
+            }
             detour = null;                    // there: on to the ball
             goal = null;
             if (open != null && linedUp) lineUp = null;

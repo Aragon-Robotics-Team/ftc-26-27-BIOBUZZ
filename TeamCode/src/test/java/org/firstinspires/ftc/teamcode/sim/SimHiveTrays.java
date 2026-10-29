@@ -13,8 +13,8 @@ import java.util.List;
 
 /**
  * The hive trays as SimLoop bodies that tip by themselves: each tray is a {@link KinematicBody} on a hinge
- * ({@link HingeDynamics}), turned by its own weight and by the balls in its cells, between hard stops at ±30°. Nothing
- * here decides when a hive tips; the balls' weight does.
+ * ({@link HingeDynamics}), turned by its own weight and by the balls in its cells, between stops near ±30° (STOPS:
+ * where the shock absorbers let it rest). Nothing here decides when a hive tips; the balls' weight does.
  *
  * Frame: the game pieces' field frame (FieldFrame, inches: x toward the audience, y away from the red wall, z up).
  * Each tray's local frame is that frame moved to its pivot, so at angle 0 the tray is level with its cells along x:
@@ -38,7 +38,11 @@ final class SimHiveTrays {
     private static final double CELL_WIDTH = 20, CELL_DEPTH = 12, CELL_HEIGHT = 14, CELL_SIDE_HEIGHT = 7.61;
     private static final double FLOOR_BELOW_ARM = 1.25; // floor's underside below the arm axis
     private static final double SKIN = 0.5;            // wall thickness
-    private static final double TILT = Math.toRadians(30);
+    // Where each arm comes to rest: on its shock absorbers, a little short of 30°, and not quite the same either way
+    // or on both hives, since they don't always bottom out. Red's {rear down, rear up}, then blue's. PLACEHOLDER spread
+    private static final double[][] STOPS = {
+            {Math.toRadians(-28.6), Math.toRadians(29.4)},
+            {Math.toRadians(-29.3), Math.toRadians(28.7)}};
 
     // ---- Weights: pollen is the unit ----
     static final double POLLEN_MASS = 1, NECTAR_MASS = 5.0 / 3;
@@ -53,16 +57,16 @@ final class SimHiveTrays {
 
     private SimHiveTrays() {}
 
-    /** The tray's angle with the given cell up, as that alliance sees it: positive raises the rear cell. */
+    /** The tray's angle at rest with the given cell up, as that alliance sees it: positive raises the rear cell. */
     static double angle(boolean blue, Hive up) {
         boolean rearUp = (up == Hive.LEFT) != blue; // red's LEFT is the rear cell, blue's LEFT the audience one
-        return rearUp ? TILT : -TILT;
+        return STOPS[blue ? 1 : 0][rearUp ? 1 : 0];
     }
 
     /** Which cell is up at this angle, as that alliance sees it; null while the tray is between the stops. */
     static Hive up(boolean blue, double angle) {
-        if (Math.abs(Math.abs(angle) - TILT) > Math.toRadians(1)) return null;
         boolean rearUp = angle > 0;
+        if (Math.abs(angle - STOPS[blue ? 1 : 0][rearUp ? 1 : 0]) > Math.toRadians(1)) return null;
         return rearUp != blue ? Hive.LEFT : Hive.RIGHT;
     }
 
@@ -129,7 +133,7 @@ final class SimHiveTrays {
         KinematicBody body = new KinematicBody(name, new double[] {0, pivotY, SimHives.PIVOT_HEIGHT},
                 new double[] {0, 1, 0}, shapes, cells, TRAY_RESTITUTION, TRAY_FRICTION);
         return body.withHinge(new HingeDynamics(TRAY_MASS, new double[] {0, 0, TRAY_COM_HEIGHT}, TRAY_INERTIA,
-                TRAY_DAMPING, -TILT, TILT, 0));
+                TRAY_DAMPING, STOPS[blue ? 1 : 0][0], STOPS[blue ? 1 : 0][1], 0));
     }
 
     /** One cell, on the side s (-1 rear, +1 audience): floor, two sides, the back wall with its peak, the roof. */

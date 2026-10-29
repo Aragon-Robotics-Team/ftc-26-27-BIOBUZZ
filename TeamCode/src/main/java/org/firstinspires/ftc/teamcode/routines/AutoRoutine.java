@@ -42,6 +42,14 @@ public abstract class AutoRoutine {
     /** The whole auto as one command. */
     public abstract Command autoRoutine();
 
+    /** Whether it chases pollen with the ball camera: then Auto opens the camera during init, once it's picked. */
+    public boolean usesBallVision() {
+        return false;
+    }
+
+    /** Called once at the start, before the robot starts and autoRoutine() runs: e.g. to enable hive vision. */
+    public void setUp() {}
+
     /**
      * Waits until the follower has driven past a marker of a planned path, e.g. to start the intake partway along it:
      * {@code deadline(follow(follower, path), sequential(passed(path, GARDEN_CYCLE_INTAKE_ON), robot.intake.intake()))}.

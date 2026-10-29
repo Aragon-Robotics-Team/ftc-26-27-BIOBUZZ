@@ -15,7 +15,8 @@ import java.util.Collections;
 /**
  * A scripted alliance partner: an 18 in robot that drives from its wall to a spot in front of the up cell's opening
  * (which faces away from the hive, toward the rear or the audience wall), shoots its 4 preload pollen into it (each at
- * the speed that goes in), then parks in the loading zone. Balls bounce off it. It doesn't intake, and it ignores our
+ * the speed that goes in), then parks in the loading zone. Or, parkOnly, it starts in the alliance's LEFT corner and
+ * just parks. Balls bounce off it. It doesn't intake, and it ignores our
  * robot: the two can drive through each other.
  *
  * The script is written for red in Pedro coordinates and turned for blue with Alliance.apply, like our routines.
@@ -43,7 +44,8 @@ final class SimPartner {
     private int shotsLeft = PRELOAD;
     private double wait;
 
-    SimPartner(Alliance alliance, GamePieceTracker field) {
+    /** @param parkOnly start in the alliance's LEFT corner (back to its wall) and only park: no shots */
+    SimPartner(Alliance alliance, GamePieceTracker field, boolean parkOnly) {
         this.alliance = alliance;
         this.field = field;
         this.robot = new SimMatch.Robot(alliance);
@@ -53,11 +55,20 @@ final class SimPartner {
         Pose cell = rearUp ? RobotConstants.Field.RED_HIVE_LEFT_CELL : RobotConstants.Field.RED_HIVE_RIGHT_CELL;
         double shootY = cell.y() + (rearUp ? SHOOT_OUT : -SHOOT_OUT);
         shootFrom = new Pose(SHOOT_X, shootY, 0);
-        Pose start = alliance.apply(new Pose(9, shootY, 0));
+        Pose start = alliance.apply(parkOnly ? new Pose(SIZE / 2, 144 - SIZE / 2, 0) : new Pose(9, shootY, 0));
         x = start.x();
         y = start.y();
         heading = start.heading();
+        if (parkOnly) {
+            stage = 2;
+            shotsLeft = 0;
+        }
         report();
+    }
+
+    /** Where it is, Pedro inches {x, y}. */
+    double[] at() {
+        return new double[] {x, y};
     }
 
     /** One tick, before the field advances. */

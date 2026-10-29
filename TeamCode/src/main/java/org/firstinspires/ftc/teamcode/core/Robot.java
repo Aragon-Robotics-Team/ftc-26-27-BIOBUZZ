@@ -1,13 +1,17 @@
 package org.firstinspires.ftc.teamcode.core;
 
 import static com.pedropathing.ivy.commands.Commands.conditional;
+import static com.pedropathing.api.Paths.line;
 import static com.pedropathing.ivy.commands.Commands.instant;
+import static com.pedropathing.ivy.commands.Commands.lazy;
 import static com.pedropathing.ivy.commands.Commands.waitMs;
 import static com.pedropathing.ivy.commands.Commands.waitUntil;
 import static com.pedropathing.ivy.groups.Groups.parallel;
 import static com.pedropathing.ivy.groups.Groups.sequential;
+import static com.pedropathing.ivy.pedro.PedroCommands.follow;
 import static org.firstinspires.ftc.teamcode.core.RobotConstants.Gate.AUTO_SHOOT_MS;
 
+import com.pedropathing.follower.Follower;
 import com.pedropathing.ivy.Command;
 import com.pedropathing.math.Pose;
 import com.pedropathing.math.Velocity;
@@ -26,6 +30,7 @@ import org.firstinspires.ftc.teamcode.subsystems.Subsystem;
 import org.firstinspires.ftc.teamcode.util.MatchLog;
 import org.psilynx.psikit.core.Logger;
 
+import java.util.ArrayList;
 import java.util.List;
 
 /**
@@ -56,6 +61,8 @@ public class Robot {
         // led = new Led(hardwareMap, launcher); // LED: commented out until it's on the robot
         hiveVision = new HiveVision(hardwareMap); // off until an OpMode enables it
         ballVision = new BallVision(hardwareMap, drivebase::getPose); // off until an OpMode enables it
+        // The hive's tags correct the pose (RobotConstants.Localization); the Limelight turns with the turret
+        hiveVision.fuseInto(drivebase.getLocalizer());
 
         // Hive vision first, so this loop aims at the cell it just read; ball vision after the drivetrain, so it has
         // this loop's pose; launcher before Led, so the light shows this loop's launcher state
@@ -131,6 +138,27 @@ public class Robot {
         return new PollenChase(this, maxBalls, timeoutS).command();
     }
 
+    // ---- Driving ----
+
+    /**
+     * From wherever the robot is when this starts, in straight lines to target, around the flowers and the hive's
+     * feet in the way (FieldRoutes), facing target's heading the whole way.
+     */
+    public Command driveTo(Pose target) {
+        return lazy(() -> {
+            Follower follower = drivebase.getFollower();
+            List<Command> legs = new ArrayList<>();
+            Pose from = follower.pose();
+            for (double[] p : FieldRoutes.between(from, target)) {
+                Pose via = new Pose(p[0], p[1], target.heading());
+                legs.add(follow(follower, line(from, via).linear(from, via)));
+                from = via;
+            }
+            legs.add(follow(follower, line(from, target).linear(from, target)));
+            return sequential(legs.toArray(new Command[0]));
+        });
+    }
+
     // ---- Localization ----
 
     /** Snap the pose to a known spot, e.g. with the robot pushed into a corner. Takes a red-side pose. */
@@ -146,6 +174,8 @@ public class Robot {
     public void update() {
         for (LynxModule hub : hubs) hub.clearBulkCache();
         for (Subsystem subsystem : subsystems) subsystem.update();
+        // Where the turret was when this loop's pose was read: both from this loop's reads
+        hiveVision.recordTurret(drivebase.getLocalizer().getLastUpdateTime(), launcher.getTurretAngle());
     }
 
     public void stop() {
@@ -168,6 +198,15 @@ public class Robot {
         Logger.recordOutput("Robot/hive", MatchState.hive);
 
         Logger.recordOutput("Drive/pose", MatchLog.fieldPose(drivebase.getPose()));
+        // What the Pinpoint alone says, and how the tags have moved the pose off it
+        Logger.recordOutput("Drive/odometryPose", MatchLog.fieldPose(drivebase.getLocalizer().getOdometryPose()));
+        PoseFilter filter = drivebase.getLocalizer().getFilter();
+        Logger.recordOutput("Localization/sigmaInches", Math.hypot(filter.sigma(PoseFilter.X), filter.sigma(PoseFilter.Y)));
+        Logger.recordOutput("Localization/sigmaHeadingDeg", Math.toDegrees(filter.sigma(PoseFilter.HEADING)));
+        Logger.recordOutput("Localization/tagsUsed", filter.getUsed());
+        Logger.recordOutput("Localization/tagsRejected", filter.getRejected());
+        Logger.recordOutput("Localization/redArmDeg", Math.toDegrees(filter.arm(HiveTags.RED)));
+        Logger.recordOutput("Localization/blueArmDeg", Math.toDegrees(filter.arm(HiveTags.BLUE)));
         Velocity velocity = drivebase.getVelocity();
         Logger.recordOutput("Drive/speed", Math.hypot(velocity.vx, velocity.vy));
         Logger.recordOutput("Drive/turnRateDeg", Math.toDegrees(velocity.omega));

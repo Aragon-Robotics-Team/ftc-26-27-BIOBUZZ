@@ -37,6 +37,7 @@ public class RobotConstants {
         // While shooting. The intake drives the transfer, so this sets how fast balls go into the flywheel (Oct 28)
         public static double FEED_POWER = 0.7;
         public static double FLOWER_INTAKE_MS = 300; // how long Auto waits at a flower with the intake on TODO tune
+        public static int CAPACITY = 4;              // balls the robot holds
     }
 
     public static class Gate {
@@ -69,17 +70,52 @@ public class RobotConstants {
         // Mount, landscape on the turret, 4.8 in ahead of its axis (CAD, Oct 26). Calibrate the tilt with the Hive Vision
         // Test OpMode
         public static double LENS_HEIGHT = 12.2;           // inches from the tiles to the lens
+        public static double LENS_AHEAD = 4.8;             // inches from the turret axis to the lens, along the turret
         public static double TILT = Math.toRadians(45);    // above horizontal
         // Up-cell tags sit about 49.7 in above the tiles, down-cell tags about 35.5 in. TODO: measure on the practice hive
         public static double HEIGHT_THRESHOLD = 42;        // inches
         public static int FRAMES_TO_SWITCH = 3;            // new frames in a row showing the other state
         public static long MAX_STALENESS_MS = 100;         // ignore results older than this
+        public static int TURRET_HISTORY = 32;             // loops of turret angle kept, to know where it was for a frame
         // After the operator sets the hive by hand, the camera needs this long of steady disagreement to overrule it
         public static double MANUAL_HOLDOFF_S = 2;
         public static double MANUAL_DISAGREE_S = 1;
         // Operator: hold square / circle this long to set that cell and lock (or unlock) automatic hive detection
         public static double HOLD_TO_LOCK_S = 1;
         public static int LOCK_RUMBLE_MS = 250;
+    }
+
+    /**
+     * Fusing odometry with the hive's AprilTags (core.PoseFilter, run by pedro.FusedLocalizer). The drifts and noises
+     * are standard deviations; all PLACEHOLDERS until measured: drive a known square and watch the Pinpoint's error
+     * grow, and log the Limelight's tag positions with the robot standing still.
+     */
+    public static class Localization {
+        // Correct the pose from the hive's tags. Off: the pose is the Pinpoint's alone, as before
+        public static boolean FUSE_HIVE_TAGS = true;
+        // Odometry: how far off it gets
+        public static double TRANSLATION_DRIFT = 0.1;                 // inches per √inch driven
+        public static double HEADING_DRIFT_PER_RADIAN = 0.02;         // radians per √radian turned
+        public static double HEADING_DRIFT_PER_S = Math.toRadians(0.5); // radians per √s: the IMU shaken by the drive
+        // The hive's arm angle wanders this much while it settles on its shock absorbers
+        public static double ARM_DRIFT_PER_S = Math.toRadians(2);     // radians per √s
+        // How sure the filter is of a pose it's given (match start, corner reset) and of a hive's rest angle
+        public static double START_POSITION_SIGMA = 1;                // inches
+        public static double START_HEADING_SIGMA = Math.toRadians(1);
+        public static double START_ARM_SIGMA = Math.toRadians(3);
+        // A tag from the Limelight: its direction is good to about TAG_ANGLE_SIGMA, its distance to TAG_RANGE_FRACTION
+        public static double TAG_ANGLE_SIGMA = Math.toRadians(0.5);
+        public static double TAG_RANGE_FRACTION = 0.03;
+        public static double TAG_POSITION_FLOOR = 0.25;               // inches, added to both
+        // A tag further than this from where the filter expects it (squared Mahalanobis distance, 3 numbers: 16.3 is
+        // 1 in 1000 by chance) is a misread or a moving hive, and is thrown out
+        public static double GATE = 16.3;
+        // Tags whose height puts their arm this far from the estimate mean the hive tipped: the arm starts over from them
+        public static double ARM_JUMP = Math.toRadians(12);
+        public static int ARM_JUMP_TAGS = 3; // ...from this many of its tags in a row
+        // Loops kept to apply a late frame at the moment it was taken, and the oldest frame used (s)
+        public static int HISTORY = 50;
+        public static double MAX_AGE_S = 0.3;
     }
 
     /** Balls on the tiles from the goBILDA global shutter webcam by the intake (BallVision), and chasing pollen with it. */

@@ -89,6 +89,11 @@ final class SimMatch {
     }
 
     /** Balls in the alliance's up cell: the one on the side of the tray that's raised. */
+    /** The alliance's robots parked in its loading zone now. */
+    int parked(Alliance alliance) {
+        return count(alliance, false);
+    }
+
     int cellBalls(Alliance alliance) {
         String tray = alliance == Alliance.RED ? SimHiveTrays.RED : SimHiveTrays.BLUE;
         boolean rearUp = field.getBodyAngleRad(tray) > 0;

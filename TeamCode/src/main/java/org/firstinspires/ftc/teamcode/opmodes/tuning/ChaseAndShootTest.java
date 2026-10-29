@@ -1,6 +1,5 @@
 package org.firstinspires.ftc.teamcode.opmodes.tuning;
 
-import static com.pedropathing.api.Paths.line;
 import static com.pedropathing.ivy.Scheduler.schedule;
 import static com.pedropathing.ivy.commands.Commands.instant;
 import static com.pedropathing.ivy.commands.Commands.lazy;
@@ -8,13 +7,11 @@ import static com.pedropathing.ivy.commands.Commands.waitMs;
 import static com.pedropathing.ivy.commands.Commands.waitUntil;
 import static com.pedropathing.ivy.groups.Groups.deadline;
 import static com.pedropathing.ivy.groups.Groups.sequential;
-import static com.pedropathing.ivy.pedro.PedroCommands.follow;
 import static org.firstinspires.ftc.teamcode.core.RobotConstants.Field.RED_LEFT_CORNER;
 import static org.firstinspires.ftc.teamcode.core.RobotConstants.Field.RED_RIGHT_CORNER;
 
 import com.bylazar.configurables.annotations.Configurable;
 import com.pedropathing.api.PoseFactory;
-import com.pedropathing.follower.Follower;
 import com.pedropathing.ivy.Command;
 import com.pedropathing.ivy.Scheduler;
 import com.pedropathing.math.Pose;
@@ -22,7 +19,6 @@ import com.qualcomm.robotcore.eventloop.opmode.Autonomous;
 import com.qualcomm.robotcore.eventloop.opmode.OpMode;
 import com.qualcomm.robotcore.util.ElapsedTime;
 
-import org.firstinspires.ftc.teamcode.core.FieldRoutes;
 import org.firstinspires.ftc.teamcode.core.Hive;
 import org.firstinspires.ftc.teamcode.core.MatchState;
 import org.firstinspires.ftc.teamcode.core.PollenChase;
@@ -32,12 +28,10 @@ import org.firstinspires.ftc.teamcode.routines.FieldPoses;
 import org.firstinspires.ftc.teamcode.util.MatchLog;
 import org.psilynx.psikit.core.Logger;
 
-import java.util.ArrayList;
-import java.util.List;
 
 /**
  * Chase-and-shoot cycles, over and over: the pollen chase until the robot has maxBalls (or a search turn finds nothing,
- * or timeoutS), then it drives to the Autos' launch spot for the cell it thinks is up (MatchState.hive, which hive
+ * or timeoutS), then it drives to the launch spot for the cell it thinks is up (MatchState.hive, which hive
  * vision keeps right as the hive tips; see launchFor), around flowers and the hive's feet, with the turret on the hive and the
  * flywheel spinning up, shoots what it has, and chases again from there for the room left. It stops when a chase picks
  * up nothing, or when there's no shot from the launch spot. A test, not a menu Auto.
@@ -52,7 +46,6 @@ public class ChaseAndShootTest extends OpMode {
     public static double timeoutS = 25;
 
     private Robot robot;
-    private Follower follower;
     private Pose corner = RED_LEFT_CORNER;
     private PollenChase chase;
     private String stage = "not started";
@@ -65,7 +58,6 @@ public class ChaseAndShootTest extends OpMode {
         Scheduler.reset();
         MatchLog.start("ChaseAndShootTest");
         robot = new Robot(hardwareMap);
-        follower = robot.drivebase.getFollower();
         robot.ballVision.enable(true);
         robot.hiveVision.setEnabled(true);
         MatchState.hive = Hive.RIGHT; // new match
@@ -113,7 +105,7 @@ public class ChaseAndShootTest extends OpMode {
         Hive cell = MatchState.hive;
         stage = "driving to the launch spot for " + cell;
         return sequential(
-                driveTo(launchFor(cell)),
+                robot.driveTo(launchFor(cell)),
                 lazy(() -> MatchState.hive != cell ? driveAndShoot() : sequential(
                         instant(() -> stage = "shooting into " + cell),
                         waitUntil(robot.launcher::isReady).raceWith(waitMs(1500)),
@@ -126,27 +118,9 @@ public class ChaseAndShootTest extends OpMode {
                         }))));
     }
 
-    /**
-     * Where to shoot into a cell from: FieldPoses.startLaunch for the RIGHT (audience) cell, and that spot mirrored
-     * across the hive's middle (the field's center line, y = 72 on red) for the LEFT (rear) cell.
-     */
+    /** Where to shoot into a cell from (FieldPoses.launch), for our alliance. */
     private Pose launchFor(Hive cell) {
-        Pose right = new FieldPoses(PoseFactory.degrees()).startLaunch; // red
-        Pose red = cell == Hive.RIGHT ? right : new Pose(right.x(), 144 - right.y(), -right.heading());
-        return MatchState.alliance.apply(red);
-    }
-
-    /** From wherever the robot is, in straight lines, around flowers and hive feet in the way (FieldRoutes). */
-    private Command driveTo(Pose target) {
-        List<Command> legs = new ArrayList<>();
-        Pose from = follower.pose();
-        for (double[] p : FieldRoutes.between(from, target)) {
-            Pose via = new Pose(p[0], p[1], target.heading());
-            legs.add(follow(follower, line(from, via).linear(from, via)));
-            from = via;
-        }
-        legs.add(follow(follower, line(from, target).linear(from, target)));
-        return sequential(legs.toArray(new Command[0]));
+        return new FieldPoses(PoseFactory.degrees().map(MatchState.alliance::apply)).launch(cell);
     }
 
     @Override

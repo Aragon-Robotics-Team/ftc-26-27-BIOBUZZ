@@ -11,7 +11,8 @@ import org.psilynx.psikit.core.wpi.math.Pose3d;
  * Geometry (Competition Manual 9.6 / 9.9, as in BiobuzzSim's Config.Hive): the arm pivots 43.95 in up, tilted 30°
  * toward the up cell. Each cell has four 3.25 in tag36h11 tags in a row across its floor's underside, centered
  * 14.27 in along the arm from the pivot and 1.6 in below the arm axis (that offset puts them at the 49.7 / 35.5 in
- * HiveReader expects). The floor tips with the arm, so every tag faces down 60° toward the up cell's side.
+ * HiveReader expects at 30°). The floor tips with the arm, so every tag faces down toward the up cell's side, 60° at
+ * 30°. The tags go wherever the arm's angle puts them (BiobuzzRobotSim moves them as a tray turns).
  */
 final class SimHives {
     static final double PIVOT_HEIGHT = 43.95;
@@ -26,37 +27,41 @@ final class SimHives {
 
     private SimHives() {}
 
-    /** Both hives, each with the given cell up as seen from that alliance's own driver station. */
+    /** Both hives, each with the given cell up as seen from that alliance's own driver station, arms at 30°. */
     static AprilTagLayout layout(Hive redUp, Hive blueUp) {
+        boolean redRearUp = redUp == Hive.LEFT, blueRearUp = blueUp == Hive.RIGHT;
+        return layout(redRearUp ? ARM_TILT : -ARM_TILT, blueRearUp ? ARM_TILT : -ARM_TILT);
+    }
+
+    /** Both hives with their arms at these angles (SimHiveTrays' tray angles: positive raises the rear cell). */
+    static AprilTagLayout layout(double redArm, double blueArm) {
         AprilTagLayout.Builder tags = AprilTagLayout.builder();
         // Red: LEFT is the rear cell (+y), 30-33; RIGHT the audience cell, 34-37 (HiveReader.cellOf)
-        addHive(tags, redUp == Hive.LEFT, 30, 34, false);
-        // Blue sees the field rotated 180° (Alliance.apply): its LEFT is the audience cell, 38-41; RIGHT the rear, 42-45
-        addHive(tags, blueUp == Hive.LEFT, 38, 42, true);
+        addHive(tags, redArm, 30, 34, false);
+        // Blue sees the field rotated 180° (Alliance.apply): its LEFT is the audience cell, 38-41; RIGHT the rear, 42-45.
+        // Worked out as red's, so the arm turns the other way: red's +y cell is blue's audience one
+        addHive(tags, -blueArm, 38, 42, true);
         return tags.build();
     }
 
     /**
      * One hive, worked out as the red one and turned 180° about the field center for blue.
      *
-     * @param leftUp  whether the alliance's LEFT cell is up
-     * @param leftIds first id on the LEFT cell (four in a row); rightIds likewise
+     * @param arm      radians the arm is turned, red frame: positive raises the +y cell
+     * @param plusYIds first id on the cell toward +y in the red frame (four in a row); minusYIds likewise
      */
-    private static void addHive(AprilTagLayout.Builder tags, boolean leftUp, int leftIds, int rightIds, boolean blue) {
-        double s = leftUp ? 1 : -1; // +1: the up cell is the red-frame +y one
-        double alongUp = TAGS_ALONG_ARM * Math.cos(ARM_TILT) + TAGS_BELOW_ARM * Math.sin(ARM_TILT);
-        double alongDown = TAGS_ALONG_ARM * Math.cos(ARM_TILT) - TAGS_BELOW_ARM * Math.sin(ARM_TILT);
-        double rise = TAGS_ALONG_ARM * Math.sin(ARM_TILT);
-        double drop = TAGS_BELOW_ARM * Math.cos(ARM_TILT);
-        // y offset from the pivot (red frame) and height of each cell's tags
-        double leftY = leftUp ? alongUp : alongDown, leftZ = PIVOT_HEIGHT + (leftUp ? rise : -rise) - drop;
-        double rightY = -(leftUp ? alongDown : alongUp), rightZ = PIVOT_HEIGHT + (leftUp ? -rise : rise) - drop;
-        double facing = s > 0 ? Math.PI / 2 : -Math.PI / 2; // toward the up cell's side
-        double tiltUp = -(Math.PI / 2 - ARM_TILT);          // face pointing 60° below horizontal
-        for (int i = 0; i < 4; i++) {
-            double across = (i - 1.5) * TAG_PITCH;
-            add(tags, leftIds + i, RED_HIVE_X + across, RED_HIVE_Y + leftY, leftZ, facing, tiltUp, blue);
-            add(tags, rightIds + i, RED_HIVE_X + across, RED_HIVE_Y + rightY, rightZ, facing, tiltUp, blue);
+    private static void addHive(AprilTagLayout.Builder tags, double arm, int plusYIds, int minusYIds, boolean blue) {
+        double c = Math.cos(arm), sn = Math.sin(arm);
+        // The floor's underside faces down, turned with the arm: toward the raised cell's side
+        double facing = arm >= 0 ? Math.PI / 2 : -Math.PI / 2;
+        double tiltUp = -(Math.PI / 2 - Math.abs(arm));
+        for (int side = 1; side >= -1; side -= 2) {
+            double along = side * TAGS_ALONG_ARM;
+            double y = along * c + TAGS_BELOW_ARM * sn, z = PIVOT_HEIGHT + along * sn - TAGS_BELOW_ARM * c;
+            for (int i = 0; i < 4; i++) {
+                add(tags, (side > 0 ? plusYIds : minusYIds) + i, RED_HIVE_X + (i - 1.5) * TAG_PITCH, RED_HIVE_Y + y, z,
+                        facing, tiltUp, blue);
+            }
         }
     }
 
