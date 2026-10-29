@@ -46,17 +46,29 @@ repositories {
     // Leave this out and the build fails with "Could not find org.psilynx.psikit:core", which looks like
     // SimLoop is broken and is not.
     maven { url = 'https://repo.dairy.foundation/releases' }
+
+    // A SimLoop you built yourself (see simloopCoordinate below).
+    mavenLocal()
 }
+
+// Build against a local SimLoop instead of the JitPack tag: in the SimLoop clone run
+// `./gradlew :SimLoop:publishToMavenLocal`, then run the tests here with `-PsimloopLocal`. That build is
+// published as org.horizon36596:SimLoop:<the version in SimLoop/build.gradle>, a different coordinate from
+// JitPack's, so it never shadows the pinned release. `-PsimloopLocal=<version>` picks another version.
+def simloopLocal = project.findProperty('simloopLocal')
+def simloopCoordinate = simloopLocal == null
+        ? "com.github.Horizon-36596:simloop:${simloopVersion}"
+        : "org.horizon36596:SimLoop:${simloopLocal in ['', 'true'] ? simloopVersion.substring(1) : simloopLocal}"
 
 dependencies {
     // `testImplementation`, never `implementation`. SimLoop is for the tests that run on your laptop;
     // none of it belongs in the APK that goes to the Control Hub, and this scope is what keeps it out.
-    testImplementation "com.github.Horizon-36596:simloop:${simloopVersion}"
+    testImplementation simloopCoordinate
 
     // The keyboard window, for driving the sim live from your laptop's keyboard. Same coordinate, with the
     // `desktop` classifier: a separate jar because it uses the desktop JDK's window toolkit, which Android
     // code cannot see. Nothing opens a window unless a test you write asks for one, so CI is unaffected.
-    testImplementation "com.github.Horizon-36596:simloop:${simloopVersion}:desktop"
+    testImplementation "${simloopCoordinate}:desktop"
 
     // JUnit 5. SimLoop's assertions and the example are written in it.
     testImplementation 'org.junit.jupiter:junit-jupiter-api:5.11.3'
@@ -95,6 +107,10 @@ android {
     testOptions {
         unitTests.all {
             useJUnitPlatform()
+            // Choices for the sim tests from the command line, e.g. -PsimRoutine=one_cycle_garden_park -PsimAlliance=blue
+            ['simRoutine', 'simAlliance'].each { name ->
+                if (project.hasProperty(name)) systemProperty name, project.property(name)
+            }
         }
         // Android calls return 0, null or false in unit tests instead of throwing "not mocked". FakeImu
         // needs it: `new RevHubOrientationOnRobot(logo, usb)` builds an OpenGLMatrix, whose constructor

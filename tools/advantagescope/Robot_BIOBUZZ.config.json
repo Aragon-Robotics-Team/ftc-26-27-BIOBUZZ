@@ -1,0 +1,64 @@
+{
+  "name": "BIOBUZZ",
+  "isFTC": true,
+  "rotations": [],
+  "position": [
+    0,
+    0,
+    0
+  ],
+  "cameras": [
+    {
+      "name": "Webcam (ball camera)",
+      "rotations": [
+        {
+          "axis": "y",
+          "degrees": 30
+        },
+        {
+          "axis": "z",
+          "degrees": 20
+        }
+      ],
+      "position": [
+        0.1567,
+        -0.126,
+        0.2268
+      ],
+      "resolution": [
+        1280,
+        800
+      ],
+      "fov": 70.3
+    },
+    {
+      "name": "Limelight (turret centered)",
+      "rotations": [
+        {
+          "axis": "y",
+          "degrees": -45
+        }
+      ],
+      "position": [
+        0.1478,
+        0,
+        0.3099
+      ],
+      "resolution": [
+        640,
+        480
+      ],
+      "fov": 54.5
+    }
+  ],
+  "components": [
+    {
+      "zeroedRotations": [],
+      "zeroedPosition": [
+        -0.0252,
+        0,
+        0
+      ]
+    }
+  ]
+}

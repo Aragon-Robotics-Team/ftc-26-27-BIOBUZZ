@@ -1,0 +1,73 @@
+# SimLoop sim: feature parity with the reference AdvantageScope setup
+
+What our SimLoop sim (`TeamCode/src/test/java/org/firstinspires/ftc/teamcode/sim/`) shows in AdvantageScope,
+compared with a reference BIOBUZZ setup built on the same library: a screenshot and a 32 s screen recording of a
+`four-tip-auto.rlog` (585 fields, 37 s) with tabs Match, Shot arcs, Shot arcs — robot camera, Match numbers and
+Shot arcs — flywheel, on a custom field "BIOBUZZ (sim, tilting hives)".
+
+Everything is built, on SimLoop's building blocks (`GamePieceTracker` with hinged
+bodies, `ShotArcRecorder`, `StaticRobot`) and our own field assets. The sim's classes:
+
+- `BiobuzzRobotSim`: the robot (devices, drive, turret, flywheel, Limelight) and everything below, logged each tick.
+- `SimField`: the world (perimeter, trays, flowers, hive feet, ball masses, air drag), the match's staged balls, the
+  zones. `SimHiveTrays`: the tipping trays. `SimLauncher`: intake, storage, feeding, launching, shot arcs.
+  `SimMatch`: clock and score. `SimPartner`: the scripted alliance partner. `SimShapes`: convex solids.
+- Robot code: `util/MatchLog` and `Robot.log()` log the robot's own state (off on the robot until
+  `RobotConstants.Logging.ENABLED`; always in the sim).
+- Tests: `AutoSimTest` (every Auto with the partner; the two preloads tip our hive), `BallChaseSimTest` (Ball Chase Test for 30 s on the real ball vision: `SimWebcam` draws the camera's frames; balls scattered over the tiles with `scatter()`), `LauncherSimTest` (TeleOp shoots
+  its preload and picks a ball up), `HiveTippingSimTest`, `HiveVisionSimTest`, `BallVisionSimTest`, `TeleOpSimTest`.
+  Logs land in `TeamCode/build/sim/*.rlog`.
+
+Status: ✅ done, 🟡 partly, ❌ not yet. Updated as each item is built.
+
+| Feature in the reference | Ours | What it takes | Size |
+|---|---|---|---|
+| Robot CAD model on the field | ✅ `Robot_BIOBUZZ` AdvantageScope asset from the CAD master assembly | done | |
+| Articulated robot (`RobotModel/components3d`) | ✅ turret: `Robot_BIOBUZZ` has the `04 - Launcher` subassembly as component 0 (`model_0.glb`), turning about the turret axis; `BiobuzzRobotSim` logs its pose from the simulated turret angle. Theirs has 41 components, including the drive wheels spinning (four at (±0.094, ±0.161, 0.052) m, pitch changing as they roll) | done (turret); wheels and intake rollers not split out | Medium |
+| Game pieces on the field (`GamePieces/kinds/*/positions3d`) | ✅ the match's staging (`SimField.stage`): 4 pollen stacked in each flower (a tube open underneath, so the bottom one can be taken), 4 in a row in each garden, 3 nectar in each up cell; 4 preload pollen in the robot. The intake takes balls that reach its mouth while it runs (up to 4); the robot pushes the others; balls roll, collide and spill from a tipped cell | Not staged: the 5 nectar in each alliance area (no human player). Storage 4, intake and feed rates are PLACEHOLDERS | |
+| Shot arcs, intended vs flown (`Shots`) | ✅ with the gate open and the intake running, stored balls feed one every 0.25 s and leave the turret at `HOOD_ANGLE`, as fast as the flywheel really spins (`FLYWHEEL_TICKS_PER_EXIT_SPEED`), with the robot's motion. Last 3 shots kept: flown (orange) beside the arc that would have gone through the middle of the up cell's opening from the same launch (green), and `Shots/missInches/*` | SimLoop flies balls with gravity and drag and no lift, as `ShotSolver` now does (`LIFT_COEFFICIENT` 0: the counter-rollers leave no spin); fit the drag to real shots. In `AutoSimTest` the Autos shoot their preload into the up cell (with the partner's, 11 balls, and it tips) | |
+| Tilting hives (`Hive/red/trayPose3d`, `Hive/blue/trayPose3d`; field "BIOBUZZ (sim, tilting hives)") | ✅ trays tip from the weight in their up cell: each is a SimLoop `KinematicBody` with `HingeDynamics` (`SimHiveTrays`), logged at its real angle; balls in the cell that comes down roll out. `HiveTippingSimTest`: 7 pollen hold, 8 tip (1.6 s after the 8th lands), 3 pollen + 3 nectar tip, a TeleOp run tips red twice. Drawn on our field "BIOBUZZ Sim (tilting hives)" with "BIOBUZZ Hive Red/Blue" tray models (`tools/advantagescope/build_sim_field.py`) | The tray's mass, inertia and damping are PLACEHOLDERS tuned to the Field Setup Guide's counts. The Limelight's AprilTags stay where they started when a tray tips | |
+| Simulated alliance partner (`Sim/partner/pose2d`) | ✅ `SimPartner` (opt in with `withPartner()`): an 18 in robot that drives from its wall to a spot in front of the up cell, shoots its 4 preload pollen in, and parks in the loading zone; balls bounce off it. In `AutoSimTest` its 4 pollen and ours land on the 3 staged nectar and tip our hive | Scripted, not reactive: it doesn't intake, and it drives through our robot | |
+| Zone outlines on the field | ✅ `Field/zones/*` (loading zones, gardens, alliance areas) as trajectories; also taped on our field model | Not outlined: the AUTO halves (the center line) | |
+| "Robot camera" tab (view from the robot) | ✅ `Robot_BIOBUZZ` config has the webcam (70.3° from its calibration, by the intake) and the Limelight as AdvantageScope cameras (copy in `tools/advantagescope/Robot_BIOBUZZ.config.json`); `Sim/Camera/webcam` and `Sim/Camera/limelight` log both as poses, the Limelight turning with the turret | AdvantageScope's robot cameras are fixed to the chassis, so its Limelight view is the turret centered | |
+| Match tab / "Match numbers" tab (timer, score) | ✅ `SimMatch`, `Match/*`: period and time left (an Auto run is the 30 s AUTO, anything else the 2:00 TELEOP; the clock starts with the OpMode), and per alliance tips (20), balls in the up cell (2), in the garden (1), robots that left the wall (3, AUTO) and parked in the loading zone (5), and the score as if the match ended now | Not counted: flowers, fouls, ranking points | |
+| "Shot arcs — flywheel" tab | ✅ "Flywheel" tab: the robot code's `Launcher/flywheelTarget` against `Launcher/flywheelActual`, `Sim/ShotsFired` and `Sim/BallsHeld`, with `Launcher/status` and `Gate/open` as stripes | | |
+| Robot-side logs (`Auto`, `BallVision`, `Drive`, `Intake`, `Launcher`, `Loop`, `Planner`, `Shot`, `Turret`, `Vision`, …) | ✅ `Robot.log()` records `Drive/*`, `Launcher/*`, `Turret/*`, `Shot/*`, `Intake/*`, `Gate/open`, `Vision/*`, `BallVision/balls`, `Robot/alliance`, `Robot/hive` and `Loop/ms` each loop of TeleOp and Auto (`util/MatchLog` runs PsiKit). Always in the sim's logs. On the robot only with `RobotConstants.Logging.ENABLED` (off for now), which writes `FIRST/data/logs/<OpMode>-<time>.rlog` | PsiKit is now an `implementation` dependency, so it ships in the APK even while off. Not logged: the Auto routine's steps and the path planner (`Auto`, `Planner` in theirs) | |
+| Saved multi-tab layout | ✅ `tools/advantagescope/sim-layout.json` (File → Import Layout): Match, Shot arcs, Robot camera (webcam), Match numbers, Flywheel | | |
+| `FlowerArm` | n/a | That robot has one; BIOBUZZ doesn't | |
+
+## Reference frames
+
+From the screen recording, in `doc/media/`.
+
+| | |
+|---|---|
+| ![Match tab: whole field, both hives, robot by the red wall, partner robot](media/sim-parity-ref-match-overview.jpg) | ![Shot arcs tab: intended (green) and flown (orange) arcs into the red hive's up cell](media/sim-parity-ref-shot-arcs.jpg) |
+| Match tab, 2 s: both hive trays tilted, flower columns stacked with pollen, zone outlines | Shot arcs, 10 s: the last shots' intended and flown arcs into the red hive |
+| ![Robot camera tab: pollen on the tiles just ahead of the intake](media/sim-parity-ref-robot-camera-near.jpg) | ![Robot camera tab: looking across the field at the hive legs, a garden row and loose balls](media/sim-parity-ref-robot-camera-wide.jpg) |
+| Robot camera, 18 s: pollen just ahead of the intake | Robot camera, 20 s: across the field, garden row and loose balls |
+| ![Match tab later: hives tipped, balls spilled across the field](media/sim-parity-ref-hives-tipped.jpg) | ![Our sim field: the A-frame without trays, both tray models logged at the pivots](media/sim-hives-trays.jpg) |
+| Match tab, 30 s: after several tips, balls spilled across the field | Ours: the sim field with both trays, rear cells up (`hive-vision.rlog`) |
+
+## Our AdvantageScope assets
+
+- The sim's flywheel reaches 1 / `FLYWHEEL_KV` ticks/s at full power, the speed the flywheel tuner measured, so
+  `FlywheelController` drives it as it drives the real one. The battery is a fixed 12 V (`FakeVoltageSensor`).
+- `Robot_BIOBUZZ`: the robot, from the CAD master assembly (STEP to GLB); the turret is component 0.
+- `Field3d_BIOBUZZSim`, `Robot_BIOBUZZ Hive Red`, `Robot_BIOBUZZ Hive Blue`: from `tools/advantagescope/build_sim_field.py`,
+  simple shapes to the Competition Manual's dimensions (as BiobuzzSim, the Roblox sim, has them), not the field CAD.
+  The field also carries Pollen and Nectar models for `GamePieceTracker`'s positions. Rebuild with
+  `python3 tools/advantagescope/build_sim_field.py` (numpy and trimesh); it writes into AdvantageScope's userAssets.
+- `tools/advantagescope/sim-layout.json` sets up every tab (File → Import Layout in AdvantageScope); it replaces the
+  open layout.
+- Replay an Auto in one step: `python3 tools/advantagescope/replay_auto.py one_cycle_garden_park` runs it in the sim,
+  sets up AdvantageScope's tabs (`sim-layout.json`) and opens the log; with no routine it runs every Auto and puts
+  them on one field (`merge_autos.py`: a colored ghost and route per routine); `--blue` for blue, `--no-sim` to reopen
+  the last run. It closes AdvantageScope first and replaces its open tabs (the old ones are kept in
+  `state-*.json.before-replay`).
+
+## Left
+
+1. Turn on `RobotConstants.Logging.ENABLED` once TeleOp testing starts, and check the loop time it costs.
+2. Calibration: tray mass and tip time, storage and feed rates, shot drag, against the real robot and field.
+3. Optional: split the wheels and intake rollers out of the robot model to spin them.
