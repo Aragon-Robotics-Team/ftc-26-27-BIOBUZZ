@@ -50,6 +50,10 @@ class ChaseAndShootSimTest {
                 + "robot at x %.1f y %.1f%n", stage, chase, sim.shotsFired(), sim.field.getHeldCount(),
                 sim.match.tips(Alliance.RED), sim.match.cellBalls(Alliance.RED), sim.x(), sim.y());
 
-        assertTrue(sim.match.tips(Alliance.RED) >= 2, "after a tip it should shoot into the new up cell: " + stage);
+        // A tip, then pollen in the cell that came up (it starts empty): it switched to the new up cell. Two tips
+        // used to be asked, when the sim's intake took any ball its mouth's box touched
+        int tips = sim.match.tips(Alliance.RED);
+        assertTrue(tips >= 2 || (tips == 1 && sim.match.cellBalls(Alliance.RED) >= 3),
+                "after a tip it should shoot into the new up cell: " + stage);
     }
 }

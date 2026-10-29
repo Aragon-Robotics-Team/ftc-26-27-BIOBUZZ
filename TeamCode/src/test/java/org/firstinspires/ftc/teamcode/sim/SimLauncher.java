@@ -45,7 +45,7 @@ final class SimLauncher {
 
     private double intakeWait, feedWait;
     private java.util.Random spread;              // null: every shot exactly as the flywheel and turret send it
-    private double speedSpread, headingSpread;
+    private double speedSpread, headingSpread, speedBias;
     private int flying = -1;                       // id of the newest shot while it's in the air
     private final List<double[]> flown = new ArrayList<>();
     private int shotsFired;
@@ -55,9 +55,13 @@ final class SimLauncher {
         this.intake = intake;
         this.gate = gate;
         this.flywheel = flywheel;
+        // Where a pollen's center has to be for the rollers to take it: between the side plates with room for the
+        // ball, from just inside the bumper out to the mouth (INTAKE_REACH, plus the ball's radius: one touching it).
+        // SimLoop's trigger counts any ball that overlaps the box, so the box is that region less a radius all round
+        double r = Ball.Type.POLLEN.diameter / 2;
         double front = RobotConstants.Field.ROBOT_LENGTH / 2, reach = RobotConstants.BallVision.INTAKE_REACH;
-        double back = front - 1, out = reach + 1.5; // a ball against the bumper has its center 1.4 in past it
-        mouth = new TriggerVolume("intake", (back + out) / 2, 0, out - back, RobotConstants.BallVision.INTAKE_WIDTH);
+        double back = front - 1 + r, out = reach, halfWidth = RobotConstants.BallVision.INTAKE_WIDTH / 2 - 2 * r;
+        mouth = new TriggerVolume("intake", (back + out) / 2, 0, out - back, 2 * halfWidth);
     }
 
     /** Balls the robot starts holding (the match's preload). */
@@ -70,6 +74,11 @@ final class SimLauncher {
         spread = new java.util.Random(seed);
         speedSpread = speedFraction;
         headingSpread = headingRadians;
+    }
+
+    /** Every shot's exit speed off by this fraction: a flywheel calibration or drag the solver doesn't know about. */
+    void bias(double speedFraction) {
+        speedBias = speedFraction;
     }
 
     int shotsFired() {
@@ -105,6 +114,7 @@ final class SimLauncher {
         double ex = x + r * Math.cos(heading), ey = y + r * Math.sin(heading);
         double ez = RobotConstants.Launcher.EXIT_HEIGHT;
         double speed = Math.abs(flywheel.getVelocity()) / RobotConstants.Launcher.FLYWHEEL_TICKS_PER_EXIT_SPEED;
+        speed *= 1 + speedBias;
         if (spread != null) {
             speed *= 1 + speedSpread * spread.nextGaussian();
             heading += headingSpread * spread.nextGaussian();

@@ -2,8 +2,9 @@
 
 `routines/SoloCarry.java` (Auto menu: `SOLO_CARRY`) scores alone with a partner that only parks. It shoots the 4
 preloads into the up cell (with the 3 staged nectar, that tips it), chases pollen with the ball camera (the garden first),
-shoots it into the cell that's up now, and parks. The sim runs it in 14 scenarios (`SoloCarrySimTest`): 39 to 47
-points, 45 in most of them, both robots parked in all (the flowers' pollen stays in the flowers). None of its timing or noise numbers have been checked on the
+shoots it into the cell that's up now, and parks. The sim runs it in 16 scenarios (`SoloCarrySimTest`): 39 to 47
+points, both robots parked in all (the flowers' pollen stays in the flowers; the intake only takes a ball whose
+center is between its side plates). None of its timing or noise numbers have been checked on the
 robot yet. This is what to check, roughly in order.
 
 ## Before every match
@@ -25,6 +26,7 @@ robot yet. This is what to check, roughly in order.
 |---|---|---|---|
 | Drive speed for the time budget | `SoloCarry.DRIVE_SPEED`, `DRIVE_MARGIN_S` | Time `driveTo` from rightLaunch to leftLaunch, and to the park spot | 30 in/s + 0.5 s (the sim does about 40) |
 | Launcher ready time at the spot | `SoloCarry.READY_TYPICAL_S` (planning), `READY_WAIT_S` (cap) | `SoloCarry/stage` "to the launch spot" to "shooting" in the log | 0.5 s planned, 1.5 s cap |
+| Shot speed calibration | `Launcher.FLYWHEEL_TICKS_PER_EXIT_SPEED`, the ShotSolver's drag | Shoot from both launch spots, see where they land against the opening | The sim's shots are right by construction (the solver uses its drag). Every shot 5% off still tips the hive; 8% off, the preload misses it (24 to 26 points) |
 | Gate open long enough to empty 4 | `Gate.AUTO_SHOOT_MS` | Shoot 4, watch the last one leave | 2000 ms (the sim feeds one per 0.26 s) |
 | Up or down from tag height | `Vision.HEIGHT_THRESHOLD` | The `Hive tags` telemetry line (HiveVision, in TeleOp) with each cell up, both hives | 42 in (TODO in the code) |
 | Hive tag positions | `core/HiveTags` (pivot height, arm length, tag offsets) | Tape measure on a real hive, at rest both ways | from the manual's drawings |

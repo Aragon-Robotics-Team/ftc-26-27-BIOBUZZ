@@ -275,6 +275,15 @@ public final class BiobuzzRobotSim {
         return this;
     }
 
+    /**
+     * Every shot off by the same fraction of its speed (+ fast, - slow): the ShotSolver aims with the sim's own drag,
+     * so without this its aim is right by construction.
+     */
+    public BiobuzzRobotSim shotBias(double speedFraction) {
+        launcher.bias(speedFraction);
+        return this;
+    }
+
     /** The Limelight sees no tags (unplugged, or the pipeline wrong): hive vision and the tag fusion get nothing. */
     public BiobuzzRobotSim blindLimelight() {
         return blindLimelight(0);
