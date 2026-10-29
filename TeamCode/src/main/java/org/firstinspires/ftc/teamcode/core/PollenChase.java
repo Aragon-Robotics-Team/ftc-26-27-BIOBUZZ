@@ -94,7 +94,7 @@ public class PollenChase {
     private final List<double[]> seenPollen = new java.util.ArrayList<>();
     private int swept, refusals;
     private double lastSweptFrame = Double.NaN, sweptFullAt = Double.NaN;
-    private double moreS = Double.POSITIVE_INFINITY, lastPickupAt; // see endingAfter
+    private double moreS = Double.POSITIVE_INFINITY, lastPickupAt; // see endingAfter; the last confirmed pickup
 
     public PollenChase(Robot robot, int maxBalls, double timeoutS) {
         this.robot = robot;
@@ -115,7 +115,7 @@ public class PollenChase {
     }
 
     /**
-     * Ends the chase once it has something and hasn't picked up more for this long: what it has is worth more than a
+     * Ends the chase once it has confirmed a pickup and hasn't confirmed another for this long: what it has is worth more than a
      * long hunt for the last one. Before command().
      */
     public PollenChase endingAfter(double seconds) {
@@ -164,7 +164,7 @@ public class PollenChase {
         if (getPickedUp() < maxBalls) sweptFullAt = Double.NaN;
         else if (Double.isNaN(sweptFullAt)) sweptFullAt = t;
         return pickedUp >= maxBalls || t - sweptFullAt >= CONFIRM_S || t - startTime > timeoutS
-                || searched(t) >= SEARCH_TURN || (getPickedUp() > 0 && t - lastPickupAt > moreS);
+                || searched(t) >= SEARCH_TURN || (pickedUp > 0 && t - lastPickupAt > moreS);
     }
 
     private void execute() {
@@ -473,7 +473,6 @@ public class PollenChase {
             double ahead = dx * c + dy * s, side = -dx * s + dy * c;
             if (ahead > ROBOT_LENGTH / 2 - 1 && ahead < INTAKE_REACH + r && Math.abs(side) < INTAKE_WIDTH / 2) {
                 swept++;
-                lastPickupAt = t;
                 it.remove();
             }
         }

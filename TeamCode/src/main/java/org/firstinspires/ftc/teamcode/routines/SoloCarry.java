@@ -32,9 +32,10 @@ import org.psilynx.psikit.core.Logger;
  * up; with nothing in sight it tries the next lookout.
  *
  * Which cell is up: the hive's tags face the up cell's side, so at a cell's launch spot (on its side) the Limelight
- * sees them while that cell is up and loses them once it tips. Arriving to shoot and after shooting, it goes by that
- * once it has seen tags at all this match; with none ever seen (Limelight down), by a count of what it has put into
- * the up cell: 8 pollen tip a hive (Field Setup Guide 12.3). Hive vision also sets the up cell whenever it can tell.
+ * sees them while that cell is up and loses them once it tips. After a shot the count says should tip it, it goes by
+ * that; with no tags at the launch spot (none ever, or the Limelight's stopped seeing), by a count of what it has put
+ * into the up cell: 8 pollen tip a hive (Field Setup Guide 12.3). Tags missing on arriving to shoot only send it to
+ * the other cell when the count is near a tip. Hive vision also sets the up cell whenever it can tell.
  *
  * Time: each chase is given what's left after driving to the launch spot, shooting and parking from there; a load
  * it can't shoot and still park in time stays in the robot. It parks whatever it's doing when the drive there would
@@ -53,11 +54,14 @@ public class SoloCarry extends AutoRoutine {
     // At the launch spot: up to READY_WAIT_S for the launcher (READY_TYPICAL_S planned for: it spins up and aims on
     // the way), AUTO_SHOOT_MS with the gate open, up to TIP_CHECK_S after for the tags to show a tip. Parking is
     // planned with PARK_MARGIN_S to spare, and starts when that's all that's left
-    private static final double READY_WAIT_S = 1.5, READY_TYPICAL_S = 0.5, TIP_CHECK_S = 0.8, PARK_MARGIN_S = 1;
-    // The shortest chase worth starting; tags seen within TAGS_FRESH_S count as in view now
-    private static final double MIN_CHASE_S = 2, TAGS_FRESH_S = 0.4;
+    private static final double READY_WAIT_S = 1.5, READY_TYPICAL_S = 0.5, TIP_CHECK_S = 1, PARK_MARGIN_S = 1;
+    // The shortest chase worth starting, and the slack each chase leaves on top of its plan to shoot and park. Tags
+    // seen within TAGS_FRESH_S count as in view now; arriving at a launch spot, it looks for them LOOK_S at least;
+    // out of view TAGS_GONE_S after a shot that should tip the hive, it has
+    private static final double MIN_CHASE_S = 2, CHASE_SLACK_S = 1.5;
+    private static final double TAGS_FRESH_S = 0.4, LOOK_S = 0.7, TAGS_GONE_S = 0.6;
     // A chase with something in hand that's found no more for this long goes to shoot it
-    private static final double MORE_S = 4;
+    private static final double MORE_S = 2;
 
     private final ElapsedTime clock = new ElapsedTime();
     private final Pose[] lookouts;
@@ -70,6 +74,7 @@ public class SoloCarry extends AutoRoutine {
     private int held = RobotConstants.Intake.CAPACITY; // the preload
     private double load = START_LOAD;                 // pollen's worth in the up cell, as far as it knows
     private int tips = 0;
+    private boolean flippedByTags; // this load has already gone to the other cell's spot on the tags' say-so
     private String stage = "start";
 
     public SoloCarry(Robot robot, Alliance alliance) {
@@ -122,9 +127,9 @@ public class SoloCarry extends AutoRoutine {
             if (spare < 0) return instant(() -> stage("no time to shoot " + held));
             return sequential(lazy(this::driveAndShoot), lazy(this::cycle));
         }
-        if (spare < MIN_CHASE_S) return instant(() -> stage("no time for more"));
+        if (spare - CHASE_SLACK_S < MIN_CHASE_S) return instant(() -> stage("no time for more"));
         int room = RobotConstants.Intake.CAPACITY - held;
-        PollenChase chase = new PollenChase(robot, room, spare).endingAfter(MORE_S);
+        PollenChase chase = new PollenChase(robot, room, spare - CHASE_SLACK_S).endingAfter(MORE_S);
         stage("chasing for " + room);
         return sequential(
                 chase.command(),
@@ -140,21 +145,32 @@ public class SoloCarry extends AutoRoutine {
     }
 
     /**
-     * To the launch spot for the up cell; if the tags say that cell's down, to the other one's. Then everything into
-     * it, if the launcher has a shot with the turret on it, and a check for a tip.
+     * To the launch spot for the up cell, and a look for its tags there (LOOK_S at least, if they don't show sooner).
+     * Gone, when they've been seen this match and the count has it within 2 of a tip, means it tipped unseen, so on to
+     * the other one's, once a load (a Limelight that's stopped seeing would otherwise send it back and forth). Then
+     * everything into it, if the launcher has a shot with the turret on it, and a check for a tip.
      */
     private Command driveAndShoot() {
         Hive cell = MatchState.hive;
         stage("to the launch spot for " + cell);
         boolean[] wasReady = {false};
+        double[] arrived = {0};
         return sequential(
                 drive(poses.launch(cell)),
-                waitUntil(() -> wasReady[0] = robot.launcher.isReady()).raceWith(waitMs((long) (READY_WAIT_S * 1000))),
+                instant(() -> arrived[0] = FusedLocalizer.now()),
+                waitUntil(() -> {
+                    wasReady[0] |= robot.launcher.isReady();
+                    boolean looked = tagsSince(arrived[0] - TAGS_FRESH_S) || !tagsEverSeen()
+                            || FusedLocalizer.now() - arrived[0] >= LOOK_S;
+                    return wasReady[0] && looked;
+                }).raceWith(waitMs((long) (READY_WAIT_S * 1000))),
                 lazy(() -> {
-                    Hive up = upFromTags(cell, READY_WAIT_S);
-                    if (up != null && up != cell) {
+                    // A tip it missed is only likely near a tip by the count; otherwise the Limelight has lost them
+                    if (tagsEverSeen() && !tagsSince(arrived[0] - TAGS_FRESH_S) && !flippedByTags
+                            && load >= TIP_LOAD - 2) {
+                        flippedByTags = true;
                         stage(cell + " is down by the tags");
-                        return sequential(robot.setHive(up), lazy(this::driveAndShoot));
+                        return sequential(robot.setHive(cell.flipped()), lazy(this::driveAndShoot));
                     }
                     if (MatchState.hive != cell) return driveAndShoot(); // hive vision changed it on the way
                     // Ready at some point in the wait (it wobbles as the robot settles), or a shot with the turret on it
@@ -165,25 +181,32 @@ public class SoloCarry extends AutoRoutine {
                     stage("shooting " + held + " into " + cell);
                     int shot = held;
                     held = 0;
-                    double shotAt = FusedLocalizer.now();
+                    flippedByTags = false;
+                    boolean tagsHere = tagsSince(arrived[0] - TAGS_FRESH_S);
                     return sequential(robot.startShooting(), waitMs(RobotConstants.Gate.AUTO_SHOOT_MS),
-                            robot.stopShooting(), lazy(() -> scored(cell, shot, shotAt)));
+                            robot.stopShooting(), lazy(() -> scored(cell, shot, tagsHere)));
                 }));
     }
 
     /**
-     * n pollen went into the cell, shot from shotAt. Did it tip? With the tags in view when it shot: whether they're
-     * gone or the arm went over, within TIP_CHECK_S (only waited for when the count says it should have tipped).
-     * Without them, by the count.
+     * n pollen went into the cell. Did it tip? With the tags in view at the launch spot, and the count saying it should
+     * have: whether they're gone for TAGS_GONE_S (it faces away once tipped) within TIP_CHECK_S, or hive vision says
+     * so. Short of that count, only hive vision (a gap in the tags is more likely a ball or the arm bouncing). Without
+     * tags, by the count.
      */
-    private Command scored(Hive cell, int n, double shotAt) {
+    private Command scored(Hive cell, int n, boolean tagsHere) {
         double expected = load + n;
-        if (!tagsSince(shotAt - READY_WAIT_S - 1)) return countScored(cell, expected);
+        if (!tagsHere) return countScored(cell, expected);
+        if (expected < TIP_LOAD) {
+            if (MatchState.hive != cell) return tipped(cell);
+            load = expected;
+            return instant(() -> {});
+        }
         return sequential(
-                waitUntil(() -> tippedByTags(cell)).raceWith(waitMs(expected >= TIP_LOAD ? (long) (TIP_CHECK_S * 1000) : 0)),
+                waitUntil(() -> tippedByTags(cell)).raceWith(waitMs((long) (TIP_CHECK_S * 1000))),
                 lazy(() -> {
                     if (tippedByTags(cell)) return tipped(cell);
-                    load = Math.min(expected, TIP_LOAD - 1); // still up: whatever the count says, it's short of a tip
+                    load = TIP_LOAD - 1; // still up: whatever the count says, it's short of a tip
                     return instant(() -> {});
                 }));
     }
@@ -203,23 +226,13 @@ public class SoloCarry extends AutoRoutine {
         return MatchState.hive == cell ? robot.setHive(cell.flipped()) : instant(() -> {});
     }
 
-    /** At cell's launch spot: hive vision or the arm says the other cell's up, or our tags have gone from view. */
+    /** At cell's launch spot: hive vision says the other cell's up, or our tags have been out of view TAGS_GONE_S. */
     private boolean tippedByTags(Hive cell) {
-        return MatchState.hive != cell || armUp() != cell || !tagsSince(FusedLocalizer.now() - TAGS_FRESH_S);
+        return MatchState.hive != cell || !tagsSince(FusedLocalizer.now() - TAGS_GONE_S);
     }
 
-    /**
-     * Which cell the tags say is up, at cell's launch spot, after looking for within seconds: by the arm if ours are
-     * in view, the other cell if they've been seen this match but aren't now; null if never (the Limelight's down).
-     */
-    private Hive upFromTags(Hive cell, double within) {
-        if (filter().lastSeen(ourHive) == Double.NEGATIVE_INFINITY) return null;
-        if (tagsSince(FusedLocalizer.now() - within)) return armUp();
-        return cell.flipped();
-    }
-
-    private Hive armUp() {
-        return HiveTags.up(alliance, filter().arm(ourHive));
+    private boolean tagsEverSeen() {
+        return filter().lastSeen(ourHive) > Double.NEGATIVE_INFINITY;
     }
 
     private boolean tagsSince(double time) {

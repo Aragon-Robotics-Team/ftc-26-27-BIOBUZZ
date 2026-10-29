@@ -57,7 +57,12 @@ final class SimMatch {
         running = true;
     }
 
-    double timeLeft() {
+    /** Seconds since the OpMode started (0 before). */
+    double elapsed() {
+        return time;
+    }
+
+        double timeLeft() {
         return Math.max(0, (auto ? AUTO_SECONDS : TELEOP_SECONDS) - time);
     }
 

@@ -86,6 +86,10 @@ class SoloCarrySimTest {
                 // Loaded with 1 where it counts 4 (dropped, or jammed): the count says the preload tipped it; it didn't
                 scenario("preload-short", Alliance.RED, 13, sim -> sim.preload(1), 0, 0, 0),
                 scenario("no-tags", Alliance.RED, 33, sim -> sim.blindLimelight(), 0, 0, 0),
+                // The Limelight stops seeing partway: after it's seen tags on the way to the first launch spot, and
+                // after the first cycle
+                scenario("limelight-dies-early", Alliance.RED, 33, sim -> sim.blindLimelight(2), 0, 0, 0),
+                scenario("limelight-dies-later", Alliance.RED, 33, sim -> sim.blindLimelight(10), 0, 0, 0),
                 scenario("no-tags-drifting", Alliance.RED, 33, 1, sim -> sim.blindLimelight().imuDrift(IMU_DRIFT), 1, 1, 2),
                 scenario("blue", Alliance.BLUE, 33, sim -> sim.imuDrift(IMU_DRIFT), 0, 0, 0),
                 scenario("everything", Alliance.BLUE, 13,
