@@ -296,9 +296,11 @@ public class RobotConstants {
         public static double EXIT_RADIUS = 0;   // inches from the turret axis to where the ball leaves. TODO: set from CAD
         // Flywheel ticks/sec per inch/sec of ball exit speed. Depends on wheel size and grip, so it has to be measured:
         // stand still, nudge the flywheel until shots go through the middle of the opening, and read "Calibration" in
-        // the TeleOp details. Average it over a few distances. Starting value ≈ a 72 mm wheel at 80% grip.
-        // TODO: calibrate
-        public static double FLYWHEEL_TICKS_PER_EXIT_SPEED = 8.0;
+        // the TeleOp details. Average it over a few distances. Starting estimate: the 72 mm Rhino wheel at 1:1 on the
+        // 28-tick motor, the ball leaving at 80% of rim speed (counter-rollers: both surfaces move, so the full rim
+        // speed, not the half a single wheel on a fixed hood gives): 28 / (π × 2.835 in × 0.8) ≈ 3.9 (Oct 29).
+        // TODO: calibrate (grip 0.7 to 0.9 makes it 4.5 to 3.5)
+        public static double FLYWHEEL_TICKS_PER_EXIT_SPEED = 3.9;
         // The ball keeps the robot's velocity when it leaves; false simulates every shot from a standstill
         public static boolean SHOOT_ON_THE_MOVE = true;
         // Pollen, from the AndyMark product page. Nectar is bigger and heavier in proportion, so it flies the same.
