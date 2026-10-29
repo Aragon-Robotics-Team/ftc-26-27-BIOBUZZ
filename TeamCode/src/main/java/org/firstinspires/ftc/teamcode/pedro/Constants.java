@@ -45,33 +45,29 @@ public class Constants {
         c.offsetUnits.set(DistanceUnit.INCH);
     });
 
-    // TODO: paste the Foresight Tuner output over this. Placeholders until then (Oct 26), estimated for 312 RPM motors
-    // on 104 mm mecanum wheels with the tuner's own formulas, from: about 57 in/s forward and 46 in/s strafe flat out,
-    // a 0.2 s speed-up time constant, 45 / 60 in/s² coasting to a stop, and turning about a point ~12 in from the
-    // wheels. The kP values are half what those numbers give, so a wrong guess is sluggish rather than shaky.
     public static ForesightConfig foresightConfig = new ForesightConfig(
             c -> {
-                Controller primaryTranslationalForward = Controller.proportional(0.18);
-                Controller secondaryTranslationalForward = Controller.proportional(0.067);
-                Controller primaryTranslationalLateral = Controller.proportional(0.23);
-                Controller secondaryTranslationalLateral = Controller.proportional(0.084);
+                Controller primaryTranslationalForward = Controller.proportional(0.27232908107134046);
+                Controller secondaryTranslationalForward = Controller.proportional(0.10061831868879594);
+                Controller primaryTranslationalLateral = Controller.proportional(0.4593751113521609);
+                Controller secondaryTranslationalLateral = Controller.proportional(0.1697268289155812);
 
                 c.forwardTranslational.set(Controller.piecewise(secondaryTranslationalForward).put(2.5, primaryTranslationalForward));
                 c.strafeTranslational.set(Controller.piecewise(secondaryTranslationalLateral).put(2.5, primaryTranslationalLateral));
 
-                c.coast.set(Controller.proportionalFeedforward(0.0175));
-                c.brake.set(Controller.proportionalFeedforward(0.0149));
+                c.coast.set(Controller.proportionalFeedforward(0.010290518588093182));
+                c.brake.set(Controller.proportionalFeedforward(0.008746940799879204));
 
-                c.headingFeedback.set(Controller.proportional(5.0));
-                c.headingBrakeCoefficients.set(Vector2D.cartesian(0.03, 0.13));
+                c.headingFeedback.set(Controller.proportional(4.008601635578677));
+                c.headingBrakeCoefficients.set(Vector2D.cartesian(0.05119995476703657, 0.005495822160256111));
 
-                c.linearBrakeCoefficients.set(Matrix.diag(0.03, 0.03));
-                c.quadraticBrakeCoefficients.set(Matrix.diag(0.011, 0.0083));
+                c.linearBrakeCoefficients.set(Matrix.diag(0.09240553278662739, 0.08164467944008973));
+                c.quadraticBrakeCoefficients.set(Matrix.diag(0.0015046844948928347, 0.0015172981998579245));
 
-                c.maxAchievableForwardVelocity.set(57.0);
-                c.maxAchievableStrafeVelocity.set(46.0);
-                c.naturalForwardDeceleration.set(45.0);
-                c.naturalStrafeDeceleration.set(60.0);
+                c.maxAchievableForwardVelocity.set(90.74333815072183);
+                c.maxAchievableStrafeVelocity.set(75.81656408044174);
+                c.naturalForwardDeceleration.set(31.90180721580304);
+                c.naturalStrafeDeceleration.set(67.51615368616619);
             }
     );
 
@@ -87,7 +83,11 @@ public class Constants {
         return new Foresight(foresightConfig);
     }
 
-    public static Follower create(HardwareMap hardwareMap) {
-        return new Follower(localizer(hardwareMap), drivetrain(hardwareMap), foresight());
+    public static Follower create(HardwareMap h) {
+        return new Follower(
+                new PinpointLocalizer(h, localizerConfig),
+                new Mecanum(h, drivetrainConfig),
+                new Foresight(foresightConfig)
+        );
     }
 }

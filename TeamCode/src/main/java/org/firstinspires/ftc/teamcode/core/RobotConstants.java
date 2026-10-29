@@ -2,7 +2,6 @@ package org.firstinspires.ftc.teamcode.core;
 
 import com.pedropathing.math.Pose;
 import com.qualcomm.robotcore.hardware.DcMotorSimple;
-import com.qualcomm.robotcore.hardware.PIDFCoefficients;
 
 /** Every robot tunable and hardware name in one place. Drivetrain / localizer config lives in pedro.Constants. */
 public class RobotConstants {
@@ -35,6 +34,8 @@ public class RobotConstants {
 
         public static double INTAKE_POWER = 1.0;
         public static double OUTTAKE_POWER = -1.0;
+        // While shooting. The intake drives the transfer, so this sets how fast balls go into the flywheel (Oct 28)
+        public static double FEED_POWER = 0.7;
         public static double FLOWER_INTAKE_MS = 300; // how long Auto waits at a flower with the intake on TODO tune
     }
 
@@ -162,19 +163,31 @@ public class RobotConstants {
         public static String FLYWHEEL_MOTOR_NAME = "flywheel";
         public static String TURRET_MOTOR_NAME = "turret";
 
-        // TODO: set directions (+ power = shoot / turret CCW)
         public static DcMotorSimple.Direction FLYWHEEL_DIRECTION = DcMotorSimple.Direction.FORWARD;
         public static DcMotorSimple.Direction TURRET_DIRECTION = DcMotorSimple.Direction.FORWARD;
 
         // ---- Flywheel ----
         // goBILDA 6000 RPM: 28 ticks/rev, about 2800 ticks/sec flat out. The counter-rollers are geared off this motor.
-        public static double FLYWHEEL_MAX_VELOCITY = 1709; // ticks/sec (Oct 26)
+        public static double FLYWHEEL_MAX_VELOCITY = 2100; // ticks/sec (Oct 26)
         // Fixed speed for spinUp() and the Flywheel Tuner
         public static double TARGET_VELOCITY = 1609;  // ticks/sec (Oct 26)
         public static double VELOCITY_TOLERANCE = 50; // ticks/sec, when not aiming with ShotSolver. TODO: tune
         public static double VELOCITY_NUDGE = 25;     // ticks/sec per operator press. TODO: tune
-        // Velocity PIDF on the hub: F ≈ 32767 / 2800 max ticks/sec, P ≈ F / 10
-        public static PIDFCoefficients FLYWHEEL_PIDF = new PIDFCoefficients(1.2, 0, 0, 17.26); // Oct 26. TODO: retune wednesday
+        /** How the flywheel holds its speed. Both run in our own loop (subsystems.FlywheelController), not the hub's. */
+        public enum FlywheelControl {
+            PIDF,     // battery-compensated feedforward plus PID on the speed error
+            BANG_BANG // full power below target, the feedforward at or above it
+        }
+        public static FlywheelControl FLYWHEEL_CONTROL = FlywheelControl.PIDF;
+        // Feedforward: power at 12 V to hold a speed, scaled by 12 / battery volts so it holds the same on a tired battery.
+        // The Flywheel Auto Tuner prints KV. A little low is fine; too high and the flywheel settles above target.
+        public static double FLYWHEEL_KV = 0.000541; // power per tick/sec (Oct 28)
+        public static double FLYWHEEL_KS = 0;        // power to overcome friction
+        // PID on the speed error. KP = KV is about the hub PIDF that rapid-fired well on Oct 28 (P = F = 16.84 in the
+        // hub's units). The Flywheel Auto Tuner finds KP.
+        public static double FLYWHEEL_KP = 0.000541; // power per tick/sec of error
+        public static double FLYWHEEL_KI = 0;        // power per tick of accumulated error
+        public static double FLYWHEEL_KD = 0;        // power per tick/sec²; leave 0: the speed reading is too noisy to differentiate
 
         // ---- Turret ----
         // Angles are robot-relative radians: 0 = facing the front of the robot, positive = counter-clockwise.
@@ -210,8 +223,8 @@ public class RobotConstants {
         // ---- Shot model (ShotSolver) ----
         // Every shot is simulated (gravity, drag, backspin lift) to find the exit speed and turret angle that put the
         // ball through the middle of the opening, allowing for the robot's motion.
-        public static double HOOD_ANGLE = Math.toRadians(67.608); // fixed hood, above horizontal
-        public static double EXIT_HEIGHT = 10.3543;  // inches above the tiles where the ball leaves (Oct 26). TODO: set from CAD
+        public static double HOOD_ANGLE = Math.toRadians(74); // fixed hood, above horizontal (Oct 28)
+        public static double EXIT_HEIGHT = 10.3543;  // inches above the tiles where the ball leaves (CAD, Oct 26)
         public static double EXIT_RADIUS = 0;   // inches from the turret axis to where the ball leaves. TODO: set from CAD
         // Flywheel ticks/sec per inch/sec of ball exit speed. Depends on wheel size and grip, so it has to be measured:
         // stand still, nudge the flywheel until shots go through the middle of the opening, and read "Calibration" in
@@ -236,7 +249,7 @@ public class RobotConstants {
     public static class Field {
         // Center of each cell's opening, from the red driver station's point of view, with the heading pointing out of
         // the opening. The hive is 12.75 in from field center toward our wall, and the up cell's
-        // opening is centered 15.7 in out from the hive center. TODO: double check
+        // opening is centered 15.7 in out from the hive center. Checked Oct 28
         public static Pose RED_HIVE_LEFT_CELL = new Pose(59.25, 87.7, Math.toRadians(90));   // rear cell
         public static Pose RED_HIVE_RIGHT_CELL = new Pose(59.25, 56.3, Math.toRadians(-90)); // audience cell
         // The up cell's opening (Competition Manual 9.6): 20 in wide, 14 in tall, centered 59.6 in

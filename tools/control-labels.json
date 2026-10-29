@@ -108,6 +108,31 @@
   "Flywheel Tuner": {
     "gamepad1.cross": "Toggle flywheel on / off"  },
 
+  "Shot Calibration": {
+    "gamepad1": "Driver",
+    "gamepad2": "Calibrator",
+
+    "gamepad1.left_stick": "Drive (field-centric: forward = away from our driver station)",
+    "gamepad1.right_stick": "Turn (x)",
+    "gamepad1.left_trigger": "Hold: slow mode",
+    "gamepad1.right_trigger": "Hold: open gate and feed the shooter",
+    "gamepad1.right_bumper": "Flywheel on (standing-shot speed for this spot)",
+    "gamepad1.left_bumper": "Flywheel off",
+    "gamepad1.triangle": "Toggle intake",
+    "gamepad1.cross": "Toggle outtake",
+
+    "gamepad2.dpad_up": "Flywheel speed up",
+    "gamepad2.dpad_down": "Flywheel speed down",
+    "gamepad2.dpad_left": "Nudge turret left",
+    "gamepad2.dpad_right": "Nudge turret right",
+    "gamepad2.cross": "Save this spot (shots going through the middle)",
+    "gamepad2.triangle": "Delete the last saved spot",
+    "gamepad2.square": "Aim at hive LEFT cell",
+    "gamepad2.circle": "Aim at hive RIGHT cell",
+    "gamepad2.share": "Reset pose: pushed into our LEFT corner, back to alliance wall",
+    "gamepad2.options": "Reset pose: pushed into our RIGHT corner, back to alliance wall"
+  },
+
   "Motor Tester": {
     "gamepad1.dpad_left": "Previous device",
     "gamepad1.dpad_right": "Next device",
