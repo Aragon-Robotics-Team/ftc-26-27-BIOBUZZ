@@ -269,6 +269,11 @@ public class SoloCarry extends AutoRoutine {
         return driveTime(from, approach) + driveTime(approach, park) + PARK_MARGIN_S;
     }
 
+    @Override
+    public String status() {
+        return String.format("%s  (held %d, load %.0f, tips %d)", stage, held, load, tips);
+    }
+
     private boolean timeToPark() {
         return timeLeft() < parkTime(follower.pose());
     }

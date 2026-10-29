@@ -244,6 +244,11 @@ public class BallVision implements Subsystem {
         return new double[]{best[1], best[2], best[3]};
     }
 
+    /** Before the match: the camera's exposure and gain set once it's streaming, so the first frames after START use them. */
+    public void prepare() {
+        if (portal != null && portal.getCameraState() == VisionPortal.CameraState.STREAMING) applyCameraSettings();
+    }
+
     /** Manual exposure and gain from RobotConstants, again whenever they change. */
     private void applyCameraSettings() {
         if (EXPOSURE_MS == appliedExposure && GAIN == appliedGain) return;

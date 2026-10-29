@@ -50,6 +50,11 @@ public abstract class AutoRoutine {
     /** Called once at the start, before the robot starts and autoRoutine() runs: e.g. to enable hive vision. */
     public void setUp() {}
 
+    /** What it's doing, for the driver station during the match; null shows nothing. */
+    public String status() {
+        return null;
+    }
+
     /**
      * Waits until the follower has driven past a marker of a planned path, e.g. to start the intake partway along it:
      * {@code deadline(follow(follower, path), sequential(passed(path, GARDEN_CYCLE_INTAKE_ON), robot.intake.intake()))}.

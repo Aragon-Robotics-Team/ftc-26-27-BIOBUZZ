@@ -15,11 +15,17 @@ drifting. All tip and park, 42 to 45.
 
 - **Start pose:** back against the alliance wall on tile A2, facing the field (`FieldPoses.allianceWallStart`; the init
   screen shows the numbers). Set down within an inch or two: the sim's off-by-1.5 in, 5° runs still scored 49.
-- **Turret zeroed** (the init screen asks). A turret zero error goes straight into the fused heading.
-- **Limelight:** the init screen says how many hive tags it sees. If it says none, turn the turret toward the hive by
-  hand: still none means it's unplugged, booting, or on the wrong pipeline (it retries the switch to
-  `Vision.PIPELINE` once a second). Without tags Solo Carry still runs on its count, but a drifting IMU then goes
-  uncorrected (the sim's worst case: 16 in off by the end).
+- **Turret facing forward at INIT, and not touched after:** INIT zeroes it where it is, and a zero error goes
+  straight into the aim and the fused heading. The init screen shows its angle, red if it's more than 2° off: face
+  it forward and INIT again.
+- **Robot still when INIT is pressed:** the Pinpoint's IMU calibrates then.
+- **Limelight powered early** (it takes a while to boot). The init screen says how many hive tags it sees with a 3D
+  pose. Red "no 3D pose" means its pipeline's Full 3D is off or the tag size is wrong: the routine would run on
+  none. None at all can be fine (the hive out of its view from the start); none in practice from where it does see
+  the hive means it's unplugged, booting, or on the wrong pipeline (it retries the switch to `Vision.PIPELINE` once a
+  second). Without tags Solo Carry still runs on its count, but a drifting IMU then goes uncorrected.
+- **Field:** both hives with the RIGHT cell up and its 3 nectar in (the routine assumes it and never checks).
+- **Preload:** all 4 in, none past the gate (the gate only closes at START, and the flywheel spins up then).
 - **Partner:** starts in our LEFT corner (back to the alliance wall by the loading zone) and parks **flush at the rear
   end of the loading zone**. We park at its audience end, nose 2 in into the zone, which leaves about 3 in between
   us and an 18 in partner parked flush at the rear. Every inch short of flush comes off that gap; 3 short and we touch.
@@ -30,7 +36,9 @@ drifting. All tip and park, 42 to 45.
 |---|---|---|---|
 | Drive speed for the time budget | `SoloCarry.DRIVE_SPEED`, `DRIVE_MARGIN_S` | Time `driveTo` from rightLaunch to leftLaunch, and to the park spot | 30 in/s + 0.5 s (the sim does about 40) |
 | Launcher ready time at the spot | `SoloCarry.READY_TYPICAL_S` (planning), `READY_WAIT_S` (cap) | `SoloCarry/stage` "to the launch spot" to "shooting" in the log | 0.5 s planned, 1.5 s cap |
-| Shot speed calibration | `Launcher.FLYWHEEL_TICKS_PER_EXIT_SPEED`, the ShotSolver's drag | Shoot from both launch spots, see where they land against the opening | The sim's shots are right by construction (the solver uses its drag). Every shot 5% off still tips the hive; 8% off, the preload misses it (24 to 26 points) |
+| Shot speed calibration | `Launcher.FLYWHEEL_TICKS_PER_EXIT_SPEED`, the ShotSolver's drag | Shoot from both launch spots, see where they land against the opening. Both are the same distance, so calibrating there absorbs drag error too | The sim's shots are right by construction (the solver uses its drag). Every shot 5% off still tips the hive; 8% off, the preload misses it (24 to 26 points) |
+| Flywheel headroom | the flywheel's power at the launch spot | Telemetry while it holds speed there, on a match battery | The spot needs about 93% of free speed: over about 0.9 power, balls 2 to 4 of a burst come out slow (the sim's battery never sags and its balls don't slow the wheel). Past free speed the solver finds no shot and it shoots nothing |
+| Ready wait at the spot | `Launcher.READY_WINDOW_FRACTION` | "to the launch spot" to "shooting" in the log | If the speed reading's noise is as wide as the window, it waits the full 1.5 s cap at every spot |
 | Gate open long enough to empty 4 | `Gate.AUTO_SHOOT_MS` | Shoot 4, watch the last one leave | 2000 ms (the sim feeds one per 0.26 s) |
 | Up or down from tag height | `Vision.HEIGHT_THRESHOLD` | The `Hive tags` telemetry line (HiveVision, in TeleOp) with each cell up, both hives | 42 in (TODO in the code) |
 | Hive tag positions | `core/HiveTags` (pivot height, arm length, tag offsets) | Tape measure on a real hive, at rest both ways | from the manual's drawings |
@@ -40,7 +48,8 @@ drifting. All tip and park, 42 to 45.
 | Ball pickup counting | `PollenChase` (`CONFIRM_S`, the mouth window, `FULL_REFUSALS`) | Run the Ball Chase Test over a row of 3; compare `Chase/status` "picked up" with what's inside | sim-tuned |
 | Hunt for one more | `SoloCarry.MORE_S` | How long the 4th ball takes after the 3rd | 5 s (sim: no gain past 5) |
 
-After a practice run, open the log in AdvantageScope and compare `Drive/pose` (fused) against `Drive/odometryPose`
+The driver station's "Doing" line shows its stage, what it holds and its count. For the log, turn on
+`Logging.ENABLED` (off by default for loop time) for practice. After a practice run, open the log in AdvantageScope and compare `Drive/pose` (fused) against `Drive/odometryPose`
 (the Pinpoint alone), especially while turning fast in front of the hive. A fused heading that jumps there means the
 tags are being applied at the wrong moment: the SDK re-reads a frame every 10 ms and stamps it from the latest read,
 so frames can be up to about 20 ms older than they say.

@@ -204,6 +204,11 @@ public class Launcher implements Subsystem {
         return turretAngle;
     }
 
+    /** The turret's angle read from its encoder now, radians: for init, when update() (which drives it) doesn't run. */
+    public double readTurretAngle() {
+        return turret.getCurrentPosition() / turretTicksPerRadian + turretAngleOffset;
+    }
+
     public double getTurretTargetAngle() {
         return turretTargetAngle;
     }

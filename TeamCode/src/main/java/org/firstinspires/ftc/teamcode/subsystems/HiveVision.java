@@ -63,6 +63,7 @@ public class HiveVision implements Subsystem {
     private boolean enabled = false;
     private boolean running = false, checking = false; // checking: started by tagsInView, before start()
     private double lastSwitchTry = Double.NEGATIVE_INFINITY;
+    private int flat; // tagsInView(): hive tags seen without a 3D pose
 
     private List<Seen> lastSeen = Collections.emptyList();
     private HiveReader.Frame lastFrame = null;
@@ -107,8 +108,9 @@ public class HiveVision implements Subsystem {
     }
 
     /**
-     * For a check before the match: how many hive tags the Limelight sees now (starting it if it isn't yet), or -1
-     * with no Limelight configured. A Limelight still booting when the robot was built missed the pipeline switch:
+     * For a check before the match: how many hive tags the Limelight sees now with a 3D pose, which is all that
+     * update() uses (starting it if it isn't yet), or -1 with no Limelight configured; tagsWithout3d() says how many
+     * it saw without one. A Limelight still booting when the robot was built missed the pipeline switch:
      * this asks again, once a second, until its results say it's on PIPELINE.
      */
     public int tagsInView() {
@@ -122,12 +124,20 @@ public class HiveVision implements Subsystem {
             lastSwitchTry = now();
             limelight.pipelineSwitch(PIPELINE);
         }
+        flat = 0;
         if (result == null || !result.isValid()) return 0;
         int n = 0;
         for (LLResultTypes.FiducialResult f : result.getFiducialResults()) {
-            if (HiveTags.hiveOf(f.getFiducialId()) >= 0) n++;
+            if (HiveTags.hiveOf(f.getFiducialId()) < 0) continue;
+            if (f.getTargetPoseCameraSpace().getPosition().toUnit(DistanceUnit.INCH).z > 0) n++;
+            else flat++; // no 3D pose: the pipeline's Full 3D is off, or its tag size is wrong
         }
         return n;
+    }
+
+    /** Hive tags the last tagsInView() saw without a 3D pose, which update() throws away. */
+    public int tagsWithout3d() {
+        return flat;
     }
 
     // ---- Operator ----
