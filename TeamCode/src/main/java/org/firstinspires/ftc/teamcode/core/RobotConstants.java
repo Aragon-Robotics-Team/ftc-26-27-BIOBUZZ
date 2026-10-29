@@ -210,8 +210,8 @@ public class RobotConstants {
         // ---- Shot model (ShotSolver) ----
         // Every shot is simulated (gravity, drag, backspin lift) to find the exit speed and turret angle that put the
         // ball through the middle of the opening, allowing for the robot's motion.
-        public static double HOOD_ANGLE = Math.toRadians(67.608); // fixed hood, above horizontal
-        public static double EXIT_HEIGHT = 10.3543;  // inches above the tiles where the ball leaves (Oct 26). TODO: set from CAD
+        public static double HOOD_ANGLE = Math.toRadians(74); // fixed hood, above horizontal (Oct 28)
+        public static double EXIT_HEIGHT = 10.3543;  // inches above the tiles where the ball leaves (CAD, Oct 26)
         public static double EXIT_RADIUS = 0;   // inches from the turret axis to where the ball leaves. TODO: set from CAD
         // Flywheel ticks/sec per inch/sec of ball exit speed. Depends on wheel size and grip, so it has to be measured:
         // stand still, nudge the flywheel until shots go through the middle of the opening, and read "Calibration" in
@@ -236,7 +236,7 @@ public class RobotConstants {
     public static class Field {
         // Center of each cell's opening, from the red driver station's point of view, with the heading pointing out of
         // the opening. The hive is 12.75 in from field center toward our wall, and the up cell's
-        // opening is centered 15.7 in out from the hive center. TODO: double check
+        // opening is centered 15.7 in out from the hive center. Checked Oct 28
         public static Pose RED_HIVE_LEFT_CELL = new Pose(59.25, 87.7, Math.toRadians(90));   // rear cell
         public static Pose RED_HIVE_RIGHT_CELL = new Pose(59.25, 56.3, Math.toRadians(-90)); // audience cell
         // The up cell's opening (Competition Manual 9.6): 20 in wide, 14 in tall, centered 59.6 in
