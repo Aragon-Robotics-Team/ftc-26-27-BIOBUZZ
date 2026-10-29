@@ -58,5 +58,7 @@ so frames can be up to about 20 ms older than they say.
   load of 3 or 4 in after the tip; the chase from the other launch spot then finds nothing to take.
 - The scoring, Park and Leave rules in the sim come from BiobuzzSim (the Roblox sim), not the manual: check them,
   and whether garden balls count at the end of AUTO (then taking them is +1 each) or only at the end of the match.
+- Also check whether robots may cross the center line in AUTO: the chase goes after any pollen on open floor
+  (`BallVision.onOpenFloor`), our half or not. If there's a rule, add the half there.
 - With no tags at all and the IMU drifting, nothing corrects the heading; the park can miss the zone.
 - It can't take pollen from the flowers.
