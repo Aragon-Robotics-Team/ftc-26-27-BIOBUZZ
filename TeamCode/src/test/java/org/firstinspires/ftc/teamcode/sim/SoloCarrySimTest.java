@@ -81,6 +81,10 @@ class SoloCarrySimTest {
                 scenario("set-down-off-other-way", Alliance.RED, 33, sim -> sim.imuDrift(-IMU_DRIFT), -1, 2, -5),
                 scenario("shots-scatter", Alliance.RED, 13, sim -> sim.shotSpread(1, 0.03, 1.5), 0, 0, 0),
                 scenario("shots-scatter-2", Alliance.RED, 13, sim -> sim.shotSpread(2, 0.03, 1.5), 0, 0, 0),
+                scenario("shots-wild", Alliance.RED, 13, sim -> sim.shotSpread(4, 0.08, 3), 0, 0, 0),
+                scenario("shots-wild-2", Alliance.RED, 13, sim -> sim.shotSpread(5, 0.08, 3), 0, 0, 0),
+                // Loaded with 1 where it counts 4 (dropped, or jammed): the count says the preload tipped it; it didn't
+                scenario("preload-short", Alliance.RED, 13, sim -> sim.preload(1), 0, 0, 0),
                 scenario("no-tags", Alliance.RED, 33, sim -> sim.blindLimelight(), 0, 0, 0),
                 scenario("no-tags-drifting", Alliance.RED, 33, 1, sim -> sim.blindLimelight().imuDrift(IMU_DRIFT), 1, 1, 2),
                 scenario("blue", Alliance.BLUE, 33, sim -> sim.imuDrift(IMU_DRIFT), 0, 0, 0),

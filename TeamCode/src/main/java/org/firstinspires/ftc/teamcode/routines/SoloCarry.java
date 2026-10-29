@@ -56,6 +56,8 @@ public class SoloCarry extends AutoRoutine {
     private static final double READY_WAIT_S = 1.5, READY_TYPICAL_S = 0.5, TIP_CHECK_S = 0.8, PARK_MARGIN_S = 1;
     // The shortest chase worth starting; tags seen within TAGS_FRESH_S count as in view now
     private static final double MIN_CHASE_S = 2, TAGS_FRESH_S = 0.4;
+    // A chase with something in hand that's found no more for this long goes to shoot it
+    private static final double MORE_S = 4;
 
     private final ElapsedTime clock = new ElapsedTime();
     private final Pose[] lookouts;
@@ -122,7 +124,7 @@ public class SoloCarry extends AutoRoutine {
         }
         if (spare < MIN_CHASE_S) return instant(() -> stage("no time for more"));
         int room = RobotConstants.Intake.CAPACITY - held;
-        PollenChase chase = new PollenChase(robot, room, spare);
+        PollenChase chase = new PollenChase(robot, room, spare).endingAfter(MORE_S);
         stage("chasing for " + room);
         return sequential(
                 chase.command(),

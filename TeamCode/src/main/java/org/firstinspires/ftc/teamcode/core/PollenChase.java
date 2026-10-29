@@ -94,6 +94,7 @@ public class PollenChase {
     private final List<double[]> seenPollen = new java.util.ArrayList<>();
     private int swept, refusals;
     private double lastSweptFrame = Double.NaN, sweptFullAt = Double.NaN;
+    private double moreS = Double.POSITIVE_INFINITY, lastPickupAt; // see endingAfter
 
     public PollenChase(Robot robot, int maxBalls, double timeoutS) {
         this.robot = robot;
@@ -111,6 +112,15 @@ public class PollenChase {
                 .setDone(this::done)
                 .setEnd(end -> follower.hold(follower.pose()))
                 .requiring(robot.drivebase));
+    }
+
+    /**
+     * Ends the chase once it has something and hasn't picked up more for this long: what it has is worth more than a
+     * long hunt for the last one. Before command().
+     */
+    public PollenChase endingAfter(double seconds) {
+        moreS = seconds;
+        return this;
     }
 
     /** Pollen taken in, as far as it can tell (it counts high rather than low). */
@@ -154,7 +164,7 @@ public class PollenChase {
         if (getPickedUp() < maxBalls) sweptFullAt = Double.NaN;
         else if (Double.isNaN(sweptFullAt)) sweptFullAt = t;
         return pickedUp >= maxBalls || t - sweptFullAt >= CONFIRM_S || t - startTime > timeoutS
-                || searched(t) >= SEARCH_TURN;
+                || searched(t) >= SEARCH_TURN || (getPickedUp() > 0 && t - lastPickupAt > moreS);
     }
 
     private void execute() {
@@ -240,6 +250,7 @@ public class PollenChase {
                     }
                 } else if (t - stateSince >= CONFIRM_S) {
                     pickedUp += Math.max(1, swept); // the target is among those swept, if the camera saw it go in
+                    lastPickupAt = t;
                     swept = 0;
                     refusals = 0;
                     tracker.drop();
@@ -462,6 +473,7 @@ public class PollenChase {
             double ahead = dx * c + dy * s, side = -dx * s + dy * c;
             if (ahead > ROBOT_LENGTH / 2 - 1 && ahead < INTAKE_REACH + r && Math.abs(side) < INTAKE_WIDTH / 2) {
                 swept++;
+                lastPickupAt = t;
                 it.remove();
             }
         }
