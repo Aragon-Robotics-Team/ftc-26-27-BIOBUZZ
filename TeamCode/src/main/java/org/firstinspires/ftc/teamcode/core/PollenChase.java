@@ -24,8 +24,9 @@ import org.firstinspires.ftc.teamcode.vision.PollenTracker;
  * path is done, the target has to stay out of sight for CONFIRM_S to count as picked up; if it shows up again (pushed
  * or bounced) the chase goes after it again, up to MAX_TRIES times.
  *
- * Ends after maxBalls pickups, when no pollen has been in view for GIVE_UP_S, or after timeoutS. The robot then holds
- * its position and the intake stays on.
+ * With nothing to chase it searches: turns in place at SEARCH_TURN_RATE, toward the side the camera looks, until pollen
+ * comes into view. Ends after maxBalls pickups, after a SEARCH_TURN without seeing any, or after timeoutS. The robot then
+ * holds its position and the intake stays on.
  */
 public class PollenChase {
     private static final int MAX_TRIES = 3;
@@ -44,7 +45,10 @@ public class PollenChase {
 
     private State state;
     private int pickedUp;
-    private double startTime, stateSince, lastTargetTime, seenBefore;
+    private double startTime, stateSince, seenBefore;
+    // The search: where it started turning, and when (NaN while there's a target)
+    private double searchStart = Double.NaN;
+    private Pose searchFrom;
     private PollenTracker.Target chasing;
     private int tries;
     private Pose goal;
@@ -84,7 +88,7 @@ public class PollenChase {
         state = State.APPROACH;
         pickedUp = 0;
         startTime = now();
-        lastTargetTime = startTime;
+        searchStart = Double.NaN;
         chasing = null;
         goal = null;
         vision.tracker().drop();
@@ -92,7 +96,7 @@ public class PollenChase {
 
     private boolean done() {
         double t = now();
-        return pickedUp >= maxBalls || t - startTime > timeoutS || t - lastTargetTime > GIVE_UP_S;
+        return pickedUp >= maxBalls || t - startTime > timeoutS || searched(t) >= SEARCH_TURN;
     }
 
     private void execute() {
@@ -106,10 +110,10 @@ public class PollenChase {
             state = State.APPROACH;
         }
         if (target == null) {
-            if (!follower.holding()) follower.hold(follower.pose());
+            search(t);
             return;
         }
-        lastTargetTime = t;
+        searchStart = Double.NaN;
         boolean inView = target.lastSeen == vision.getFrameTime();
 
         switch (state) {
@@ -142,6 +146,21 @@ public class PollenChase {
                 }
                 break;
         }
+    }
+
+    /** Turns in place from where the search started, SEARCH_TURN_RATE toward the camera's side, to find pollen. */
+    private void search(double t) {
+        if (Double.isNaN(searchStart)) {
+            searchStart = t;
+            searchFrom = follower.pose();
+        }
+        double turn = Math.min(searched(t), SEARCH_TURN) * (YAW >= 0 ? 1 : -1);
+        follower.hold(new Pose(searchFrom.x(), searchFrom.y(), searchFrom.heading() + turn));
+    }
+
+    /** How far the current search has turned, radians; 0 when not searching. */
+    private double searched(double t) {
+        return Double.isNaN(searchStart) ? 0 : (t - searchStart) * SEARCH_TURN_RATE;
     }
 
     private void enter(State next, PollenTracker.Target target, double t) {

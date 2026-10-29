@@ -17,6 +17,7 @@ import org.firstinspires.ftc.teamcode.core.Robot;
 import org.firstinspires.ftc.teamcode.routines.AutoRoutine;
 import org.firstinspires.ftc.teamcode.routines.Routines;
 import org.firstinspires.ftc.teamcode.util.Html;
+import org.firstinspires.ftc.teamcode.util.MatchLog;
 import org.firstinspires.ftc.teamcode.util.PanelsDisplay;
 import org.firstinspires.ftc.teamcode.util.PathLog;
 
@@ -39,6 +40,7 @@ public class Auto extends OpMode {
     public void init() {
         telemetry.setDisplayFormat(Telemetry.DisplayFormat.HTML);
         Scheduler.reset();
+        MatchLog.start("Auto");
 
         robot = new Robot(hardwareMap);
         follower = robot.drivebase.getFollower();
@@ -82,6 +84,7 @@ public class Auto extends OpMode {
 
     @Override
     public void loop() {
+        MatchLog.beginLoop();
         robot.update(); // updates the follower
         Scheduler.execute();
 
@@ -103,6 +106,8 @@ public class Auto extends OpMode {
         telemetry.update();
 
         panelsDisplay.update(robot, loopMs);
+        robot.log(loopMs);
+        MatchLog.endLoop();
     }
 
     @Override
@@ -110,5 +115,6 @@ public class Auto extends OpMode {
         Scheduler.reset();
         if (pathLog != null) pathLog.close();
         robot.stop();
+        MatchLog.stop();
     }
 }

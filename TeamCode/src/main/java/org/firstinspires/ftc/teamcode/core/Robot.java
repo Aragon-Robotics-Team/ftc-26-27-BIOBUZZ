@@ -10,6 +10,7 @@ import static org.firstinspires.ftc.teamcode.core.RobotConstants.Gate.AUTO_SHOOT
 
 import com.pedropathing.ivy.Command;
 import com.pedropathing.math.Pose;
+import com.pedropathing.math.Velocity;
 import com.qualcomm.hardware.lynx.LynxModule;
 import com.qualcomm.robotcore.hardware.HardwareMap;
 
@@ -22,6 +23,8 @@ import org.firstinspires.ftc.teamcode.subsystems.Intake;
 import org.firstinspires.ftc.teamcode.subsystems.Launcher;
 // import org.firstinspires.ftc.teamcode.subsystems.Led; // LED: commented out until it's on the robot
 import org.firstinspires.ftc.teamcode.subsystems.Subsystem;
+import org.firstinspires.ftc.teamcode.util.MatchLog;
+import org.psilynx.psikit.core.Logger;
 
 import java.util.List;
 
@@ -151,5 +154,49 @@ public class Robot {
 
     public void telemetry(Telemetry telemetry) {
         for (Subsystem subsystem : subsystems) subsystem.telemetry(telemetry);
+    }
+
+    /**
+     * Records the robot's state for AdvantageScope (util/MatchLog), once per loop after the commands have run. Does
+     * nothing on the robot unless RobotConstants.Logging.ENABLED. Poses are in AdvantageScope's frame (meters); angles
+     * in degrees.
+     */
+    public void log(double loopMs) {
+        if (!MatchLog.active()) return;
+        Logger.recordOutput("Loop/ms", loopMs);
+        Logger.recordOutput("Robot/alliance", MatchState.alliance);
+        Logger.recordOutput("Robot/hive", MatchState.hive);
+
+        Logger.recordOutput("Drive/pose", MatchLog.fieldPose(drivebase.getPose()));
+        Velocity velocity = drivebase.getVelocity();
+        Logger.recordOutput("Drive/speed", Math.hypot(velocity.vx, velocity.vy));
+        Logger.recordOutput("Drive/turnRateDeg", Math.toDegrees(velocity.omega));
+        Logger.recordOutput("Drive/targetHeadingDeg", Math.toDegrees(drivebase.getTargetHeading()));
+
+        Logger.recordOutput("Launcher/status", launcher.getStatus());
+        Logger.recordOutput("Launcher/flywheelTarget", launcher.getTargetVelocity());
+        Logger.recordOutput("Launcher/flywheelActual", launcher.getFlywheelVelocity());
+        Logger.recordOutput("Launcher/flywheelNudge", launcher.getVelocityNudge());
+        Logger.recordOutput("Launcher/ready", launcher.isReady());
+        Logger.recordOutput("Turret/targetDeg", Math.toDegrees(launcher.getTurretTargetAngle()));
+        Logger.recordOutput("Turret/actualDeg", Math.toDegrees(launcher.getTurretAngle()));
+        Logger.recordOutput("Turret/onTarget", launcher.isTurretOnTarget());
+        ShotSolver.Shot shot = launcher.getShot();
+        Logger.recordOutput("Shot/feasible", shot != null && shot.feasible);
+        if (shot != null && shot.feasible) {
+            Logger.recordOutput("Shot/exitSpeed", shot.exitSpeed);
+            Logger.recordOutput("Shot/timeOfFlight", shot.timeOfFlight);
+            Logger.recordOutput("Shot/distance", shot.distance);
+            Logger.recordOutput("Shot/leadDeg", Math.toDegrees(shot.leadAngle));
+            Logger.recordOutput("Shot/speedMarginPct", shot.speedTolerance / shot.exitSpeed * 100);
+            Logger.recordOutput("Shot/aimMarginDeg", Math.toDegrees(shot.angleTolerance));
+        }
+
+        Logger.recordOutput("Intake/mode", intake.getMode());
+        Logger.recordOutput("Intake/feeding", intake.isFeeding());
+        Logger.recordOutput("Gate/open", gate.isOpen());
+        Logger.recordOutput("Vision/available", hiveVision.isAvailable());
+        Logger.recordOutput("Vision/locked", hiveVision.isLocked());
+        Logger.recordOutput("BallVision/balls", ballVision.getBalls().size());
     }
 }

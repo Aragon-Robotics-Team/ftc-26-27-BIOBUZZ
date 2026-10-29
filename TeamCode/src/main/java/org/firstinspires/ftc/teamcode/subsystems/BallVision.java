@@ -17,11 +17,13 @@ import org.firstinspires.ftc.teamcode.vision.BallPipeline;
 import org.firstinspires.ftc.teamcode.vision.BallVisionProcessor;
 import org.firstinspires.ftc.teamcode.vision.PollenTracker;
 import org.firstinspires.ftc.vision.VisionPortal;
+import org.firstinspires.ftc.vision.VisionProcessor;
 
 import java.util.ArrayDeque;
 import java.util.Collections;
 import java.util.List;
 import java.util.concurrent.TimeUnit;
+import java.util.function.Consumer;
 import java.util.function.Supplier;
 
 /**
@@ -42,6 +44,8 @@ public class BallVision implements Subsystem {
     private final BallVisionProcessor processor;
     private final PollenTracker tracker;
     private VisionPortal portal;
+    // A camera that runs the processor itself instead of through a VisionPortal: the sim's webcam (BallChaseSimTest)
+    private boolean framesFromCamera = false;
     private boolean preview = false;
 
     // Robot poses from recent loops ({seconds, x, y, heading}), to place a frame by when it was taken
@@ -123,8 +127,14 @@ public class BallVision implements Subsystem {
      * Opens the camera (call during init: it takes a moment). With preview, frames are also drawn for the Driver
      * Station and the Panels camera stream, which costs CPU.
      */
+    @SuppressWarnings("unchecked")
     public void enable(boolean preview) {
-        if (webcam == null || portal != null) return;
+        if (webcam == null || portal != null || framesFromCamera) return;
+        if (webcam instanceof Consumer) {
+            ((Consumer<VisionProcessor>) webcam).accept(processor);
+            framesFromCamera = true;
+            return;
+        }
         portal = new VisionPortal.Builder()
                 .setCamera(webcam)
                 .setCameraResolution(new android.util.Size(CAPTURE_WIDTH, CAPTURE_HEIGHT))
@@ -172,13 +182,13 @@ public class BallVision implements Subsystem {
 
     @Override
     public void update() {
-        if (portal == null) return;
+        if (portal == null && !framesFromCamera) return;
         double now = System.nanoTime() / 1e9;
         Pose p = pose.get();
         poses.addLast(new double[]{now, p.x(), p.y(), p.heading()});
         while (poses.size() > 2 && poses.peekFirst()[0] < now - POSE_HISTORY_S) poses.removeFirst();
 
-        if (portal.getCameraState() == VisionPortal.CameraState.STREAMING) applyCameraSettings();
+        if (portal != null && portal.getCameraState() == VisionPortal.CameraState.STREAMING) applyCameraSettings();
 
         BallVisionProcessor.Result result = processor.latest();
         if (result == null || result == lastResult) return;
@@ -235,8 +245,9 @@ public class BallVision implements Subsystem {
     /** One phrase for telemetry: what the camera is doing. */
     public String status() {
         if (webcam == null) return "no webcam (\"" + WEBCAM_NAME + "\" not in the configuration)";
-        if (portal == null) return "off";
+        if (portal == null && !framesFromCamera) return "off";
         if (processor.problem() != null) return processor.problem();
+        if (framesFromCamera) return String.format("sim camera, pipeline %.0f ms", lastResult == null ? 0 : lastResult.detectMs);
         if (portal.getCameraState() != VisionPortal.CameraState.STREAMING) return "starting (" + portal.getCameraState() + ")";
         return String.format("%.0f fps, pipeline %.0f ms", portal.getFps(), lastResult == null ? 0 : lastResult.detectMs);
     }
@@ -244,7 +255,7 @@ public class BallVision implements Subsystem {
     @Override
     public void telemetry(Telemetry telemetry) {
         telemetry.addData("Ball vision", status());
-        if (portal == null) return;
+        if (portal == null && !framesFromCamera) return;
         int pollen = 0;
         for (Ball ball : lastBalls) if (ball.type == Ball.Type.POLLEN) pollen++;
         telemetry.addData("Balls", "%d (%d pollen, %d chaseable)", lastBalls.size(), pollen, tracker.chaseable().size());

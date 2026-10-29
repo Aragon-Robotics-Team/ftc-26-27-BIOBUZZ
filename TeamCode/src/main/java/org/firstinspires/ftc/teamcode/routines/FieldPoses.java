@@ -34,7 +34,7 @@ public class FieldPoses {
 
 
 
-    FieldPoses(PoseFactory poseFactory) {
+    public FieldPoses(PoseFactory poseFactory) {
         start = poseFactory.of(56, 8, 90);
         startLaunch = poseFactory.of(56, 20.219975, 90);
         gardenBorder = poseFactory.of(28.4, 9.3, 180);

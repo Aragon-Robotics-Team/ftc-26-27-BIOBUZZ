@@ -53,6 +53,13 @@ public class RobotConstants {
         public static double FLASH_MS = 300;
     }
 
+    /** PsiKit logging of the robot's state for AdvantageScope (util/MatchLog). */
+    public static class Logging {
+        // Write an .rlog of every TeleOp and Auto run to the Control Hub (FIRST/data/logs). Off until TeleOp testing:
+        // it costs loop time and nothing reads the logs yet. The sim logs the robot's state whatever this says.
+        public static boolean ENABLED = false;
+    }
+
     /** Hive state from the Limelight 3A on the turret (HiveVision). */
     public static class Vision {
         public static String LIMELIGHT_NAME = "limelight";
@@ -156,7 +163,9 @@ public class RobotConstants {
         public static double REPLAN_DISTANCE = 2;   // inches the target has to move before the path is redone
         public static double LOST_S = 0.5;          // a target out of view this long (not at the intake) is given up
         public static double CONFIRM_S = 0.4;       // after driving over it, how long it has to stay gone to count
-        public static double GIVE_UP_S = 2;         // with no pollen in view this long, the chase ends
+        // With no pollen to chase the robot turns in place to look for more: left, the way the camera already looks
+        public static double SEARCH_TURN_RATE = Math.toRadians(90); // rad/s. TODO: tune, slow enough not to blur frames
+        public static double SEARCH_TURN = Math.toRadians(360);     // turned this far without seeing pollen, the chase ends
     }
 
     public static class Launcher {
@@ -221,7 +230,7 @@ public class RobotConstants {
         public static double AIM_LOOKAHEAD = 0.05;
 
         // ---- Shot model (ShotSolver) ----
-        // Every shot is simulated (gravity, drag, backspin lift) to find the exit speed and turret angle that put the
+        // Every shot is simulated (gravity, drag, and lift if the ball spins) to find the exit speed and turret angle that put the
         // ball through the middle of the opening, allowing for the robot's motion.
         public static double HOOD_ANGLE = Math.toRadians(74); // fixed hood, above horizontal (Oct 28)
         public static double EXIT_HEIGHT = 10.3543;  // inches above the tiles where the ball leaves (CAD, Oct 26)
@@ -236,9 +245,11 @@ public class RobotConstants {
         // Pollen, from the AndyMark product page. Nectar is bigger and heavier in proportion, so it flies the same.
         public static double BALL_DIAMETER = 2.8; // inches
         public static double BALL_MASS = 0.0249;  // kg
-        // Air: drag 0.4-0.6 for a smooth sphere; lift from the hood's backspin 0-0.45. TODO: fit to real shots
+        // Air: drag 0.4-0.6 for a smooth sphere. TODO: fit to real shots
         public static double DRAG_COEFFICIENT = 0.5;
-        public static double LIFT_COEFFICIENT = 0.3;
+        // No lift: the counter-rollers send the ball out with essentially no spin (Oct 28). A launcher that left
+        // backspin on it would give lift of about 0-0.45
+        public static double LIFT_COEFFICIENT = 0;
         public static double AIR_DENSITY = 1.2;   // kg/m³
         public static double SCORING_MARGIN = 0.5; // inches the ball's edge must clear each side of the opening by
         // Ready to shoot once flywheel and turret errors are within this fraction of what the shot can take

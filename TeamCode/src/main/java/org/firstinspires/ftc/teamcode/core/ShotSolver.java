@@ -11,8 +11,8 @@ import com.pedropathing.math.Velocity;
 import com.pedropathing.utils.Angle;
 
 /**
- * Finds the shot into a hive cell by simulating the ball's flight: gravity, air drag and lift from the hood's
- * backspin, launched with the turret pivot's velocity (the ball keeps the robot's motion; the air stays still).
+ * Finds the shot into a hive cell by simulating the ball's flight: gravity, air drag and lift from backspin (none
+ * while LIFT_COEFFICIENT is 0, as for our counter-rollered launcher), launched with the turret pivot's velocity (the ball keeps the robot's motion; the air stays still).
  * The hood is fixed, so the unknowns are exit speed and turret heading:
  * 1. Newton's method adjusts both until the simulated ball crosses the middle of the opening.
  * 2. The speed is then moved to the middle of the range of speeds that still score. With a fixed hood that is the most

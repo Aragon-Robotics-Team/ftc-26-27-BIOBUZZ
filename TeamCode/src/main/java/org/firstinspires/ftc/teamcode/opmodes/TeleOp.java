@@ -28,6 +28,7 @@ import org.firstinspires.ftc.teamcode.subsystems.Launcher;
 import org.firstinspires.ftc.teamcode.util.FieldDiagram;
 import org.firstinspires.ftc.teamcode.util.HoldButton;
 import org.firstinspires.ftc.teamcode.util.Html;
+import org.firstinspires.ftc.teamcode.util.MatchLog;
 import org.firstinspires.ftc.teamcode.util.PanelsDisplay;
 
 /**
@@ -62,6 +63,7 @@ public class TeleOp extends OpMode {
     public void init() {
         telemetry.setDisplayFormat(Telemetry.DisplayFormat.HTML);
         Scheduler.reset();
+        MatchLog.start("TeleOp");
 
         robot = new Robot(hardwareMap);
         robot.hiveVision.setEnabled(true);
@@ -120,18 +122,21 @@ public class TeleOp extends OpMode {
 
     @Override
     public void loop() {
+        MatchLog.beginLoop();
         bindControls();
 
         robot.update();
         Scheduler.execute();
 
         showTelemetry();
+        MatchLog.endLoop();
     }
 
     @Override
     public void stop() {
         Scheduler.reset();
         robot.stop();
+        MatchLog.stop();
         // This match's Auto pose is used up; a later TeleOp without Auto must not start from it.
         // Not after an init-only stop: re-initializing TeleOp still needs it.
         if (started) {
@@ -229,6 +234,7 @@ public class TeleOp extends OpMode {
         telemetry.update();
 
         panelsDisplay.update(robot, loopMs);
+        robot.log(loopMs);
     }
 
     private static String nudge(double value, String unit) {

@@ -29,7 +29,6 @@ import java.util.function.Consumer;
  * The columns are described in tools/path-planner/src/core/logs.ts; keep both in step.
  */
 public class PathLog implements Consumer<FollowerLog> {
-    public static final File DIR = new File(AppUtil.ROBOT_DATA_DIR, "pathlogs");
     private static final long VOLTAGE_EVERY_NS = 250_000_000L; // reading the battery takes a hub round trip
 
     private final Follower follower;
@@ -50,21 +49,30 @@ public class PathLog implements Consumer<FollowerLog> {
     }
 
     /**
+     * The log folder. A method rather than a constant: AppUtil loads a native library that only the robot has, so on a
+     * laptop (SimLoop tests) touching it throws, and as a static field that would have stopped the class loading.
+     */
+    public static File dir() {
+        return new File(AppUtil.ROBOT_DATA_DIR, "pathlogs");
+    }
+
+    /**
      * Starts logging a run and hooks into the follower so every update writes a row. Returns null (after noting why in
      * the robot log) if the file can't be created: a missing log must never stop an Auto.
      */
     public static PathLog start(HardwareMap hardwareMap, Follower follower, String routine, Alliance alliance) {
         try {
-            if (!DIR.isDirectory() && !DIR.mkdirs()) throw new IOException("can't create " + DIR);
-            String stamp = new SimpleDateFormat("yyyy-MM-dd_HH-mm-ss", Locale.US).format(new Date());
-            File file = new File(DIR, stamp + "_" + routine + "_" + alliance + ".csv");
+            File dir = dir();
+            if (!dir.isDirectory() && !dir.mkdirs()) throw new IOException("can't create " + dir);
+            String stamp = new SimpleDateFormat("yyyy-MM-dd_HH-mm-ss", Locale.US).format(new Date(System.currentTimeMillis()));
+            File file = new File(dir, stamp + "_" + routine + "_" + alliance + ".csv");
             BufferedWriter out = new BufferedWriter(new FileWriter(file), 1 << 16);
             out.write("# path-planner log v1\n# routine=" + routine + "\n# alliance=" + alliance + "\n");
             out.write("t,voltage,x,y,heading,mode,busy,path,segment,tparam\n");
             PathLog log = new PathLog(follower, hardwareMap, file, out);
             follower.withLogger(log);
             return log;
-        } catch (IOException | RuntimeException e) {
+        } catch (IOException | RuntimeException | LinkageError e) { // LinkageError: no AppUtil off the robot
             RobotLog.ee("PathLog", e, "Not logging this run");
             return null;
         }

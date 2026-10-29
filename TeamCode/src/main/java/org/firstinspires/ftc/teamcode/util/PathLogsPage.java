@@ -33,7 +33,7 @@ public final class PathLogsPage {
         manager.register(DOWNLOAD, session -> {
             List<String> names = session.getParameters().get("name");
             String name = names == null || names.isEmpty() ? "" : names.get(0);
-            File file = new File(PathLog.DIR, name);
+            File file = new File(PathLog.dir(), name);
             // Only plain file names inside the log folder.
             if (!name.matches("[A-Za-z0-9_.\\-]+\\.csv") || !file.isFile()) {
                 return NanoHTTPD.newFixedLengthResponse(NanoHTTPD.Response.Status.NOT_FOUND, NanoHTTPD.MIME_PLAINTEXT, "No such log");
@@ -50,7 +50,7 @@ public final class PathLogsPage {
     }
 
     private static String page() {
-        File[] files = PathLog.DIR.listFiles((dir, name) -> name.endsWith(".csv"));
+        File[] files = PathLog.dir().listFiles((dir, name) -> name.endsWith(".csv"));
         List<File> logs = files == null ? Collections.<File>emptyList() : Arrays.asList(files);
         Collections.sort(logs, (a, b) -> b.getName().compareTo(a.getName())); // newest first (names start with the time)
         StringBuilder html = new StringBuilder();
