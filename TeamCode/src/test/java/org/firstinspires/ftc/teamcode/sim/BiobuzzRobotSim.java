@@ -104,19 +104,34 @@ public final class BiobuzzRobotSim {
     private int scatterPollen = -1, scatterNectar;
     private List<double[]> scattered = Collections.emptyList();
 
-    private static final DrivetrainSimConfig DRIVETRAIN = new DrivetrainSimConfig() {
+    // A drive like a real mecanum's (BiobuzzRobotSim(true)): the motors at this share of free speed (battery, gearbox
+    // and wheel losses), strafing at this share of forward, and the tiles' grip capping acceleration (in/s²).
+    // PLACEHOLDERS, typical figures until the robot's own are measured (Pedro's velocity and deceleration tuners)
+    private static final double REAL_SPEED = 0.85, REAL_STRAFE = 0.8, REAL_FORWARD_GRIP = 150, REAL_SIDE_GRIP = 120;
+
+    private static DrivetrainSimConfig drivetrain(boolean real) {
+        double top = DRIVE_MAX_TICKS_PER_SECOND * (real ? REAL_SPEED : 1);
+        return new DrivetrainSimConfig() {
         @Override public double trackWidth() { return TRACK_WIDTH; }
         @Override public double wheelBase() { return WHEEL_BASE; }
         @Override public double wheelRadius() { return WHEEL_RADIUS; }
         @Override public double ticksPerInch() { return DRIVE_TICKS_PER_INCH; }
-        @Override public double maxVelocityTicksPerSecond() { return DRIVE_MAX_TICKS_PER_SECOND; }
+        @Override public double maxVelocityTicksPerSecond() { return top; }
+        @Override public double maxLateralVelocityTicksPerSecond() { return real ? top * REAL_STRAFE : top; }
+        @Override public double maxForwardAccelerationInchesPerSecondSquared() {
+            return real ? REAL_FORWARD_GRIP : Double.POSITIVE_INFINITY;
+        }
+        @Override public double maxLateralAccelerationInchesPerSecondSquared() {
+            return real ? REAL_SIDE_GRIP : Double.POSITIVE_INFINITY;
+        }
         @Override public double maxAccel() { return DRIVE_RATE; }
         // How the motors are bolted in, [FL, FR, BL, BR]: the left pair is mirrored, which is why pedro/Constants
         // reverses it in software. If the two disagree, the sim robot spins instead of driving, like the real one would.
         @Override public double[] wheelMountingSigns() { return new double[] {-1, 1, -1, 1}; }
         @Override public double fieldHalfWidth() { return 72; }
         @Override public double fieldHalfHeight() { return 72; }
-    };
+        };
+    }
 
     private static final MechanismSimConfig TURRET = new MechanismSimConfig() {
         @Override public double timeConstant() { return TURRET_TIME_CONSTANT; }
@@ -130,7 +145,7 @@ public final class BiobuzzRobotSim {
     public static final SimRobotConfig ROBOT_CONFIG = new SimRobotConfig() {
         @Override public String[] driveMotorNames() { return DRIVE_MOTOR_NAMES; }
         @Override public String odometryName() { return Constants.localizerConfig.name.get(); }
-        @Override public DrivetrainSimConfig drivetrain() { return DRIVETRAIN; }
+        @Override public DrivetrainSimConfig drivetrain() { return BiobuzzRobotSim.drivetrain(false); }
     };
 
     /** [FL, FR, BL, BR], the order the drive plant reads them. */
@@ -191,11 +206,20 @@ public final class BiobuzzRobotSim {
 
     /** Both hives with the RIGHT cell up, as every match starts. */
     public BiobuzzRobotSim() {
-        this(Hive.RIGHT, Hive.RIGHT);
+        this(false);
+    }
+
+    /** @param realDrive slower, strafing less well and gripping the tiles less than the ideal default (drivetrain) */
+    public BiobuzzRobotSim(boolean realDrive) {
+        this(Hive.RIGHT, Hive.RIGHT, realDrive);
     }
 
     /** Which cell of each hive is really up, each as seen from that alliance's driver station. Fixed for the run. */
     public BiobuzzRobotSim(Hive redHiveUp, Hive blueHiveUp) {
+        this(redHiveUp, blueHiveUp, false);
+    }
+
+    private BiobuzzRobotSim(Hive redHiveUp, Hive blueHiveUp, boolean realDrive) {
         field.setBodyMotion(SimHiveTrays.RED, SimHiveTrays.angle(false, redHiveUp), 0);
         field.setBodyMotion(SimHiveTrays.BLUE, SimHiveTrays.angle(true, blueHiveUp), 0);
         tagsAt[0] = SimHiveTrays.angle(false, redHiveUp);
@@ -209,7 +233,8 @@ public final class BiobuzzRobotSim {
         solid.addAll(field.getWorld().getObstacles());
         for (int i = 0; i < RobotConstants.Field.FLOWERS.length; i++) solid.add(SimField.flowerColumn(i));
         for (int i = 0; i < 4; i++) {
-            driveMotors[i] = new FakeMotor(DRIVE_MAX_TICKS_PER_SECOND, DRIVE_RATE, DRIVE_TICKS_PER_REV);
+            driveMotors[i] = new FakeMotor(DRIVE_MAX_TICKS_PER_SECOND * (realDrive ? REAL_SPEED : 1), DRIVE_RATE,
+                    DRIVE_TICKS_PER_REV);
             hardwareMap.register(DRIVE_MOTOR_NAMES[i], driveMotors[i]);
         }
 
@@ -236,7 +261,7 @@ public final class BiobuzzRobotSim {
                 LIMELIGHT_V_FOV).frameRateHz(LIMELIGHT_FPS).latencyMs(LIMELIGHT_CAPTURE_MS, LIMELIGHT_TARGETING_MS).build();
         hardwareMap.register(RobotConstants.Vision.LIMELIGHT_NAME, limelight);
 
-        drivePlant = new MecanumDrivePlant(driveMotors, DRIVETRAIN);
+        drivePlant = new MecanumDrivePlant(driveMotors, drivetrain(realDrive));
         turretPlant = new Mechanism1DofPlant(turret, TURRET);
         placeAt(72, 72, 0);
         reportTurret(); // the turret port reads the turret from the start, so the OpMode's encoder reset zeroes it here

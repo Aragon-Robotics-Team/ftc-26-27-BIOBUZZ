@@ -96,6 +96,11 @@ class SoloCarrySimTest {
                 scenario("no-tags-drifting", Alliance.RED, 33, 1, sim -> sim.blindLimelight().imuDrift(IMU_DRIFT), 1, 1, 2),
                 // The ball camera as a Control Hub runs it: 10 frames a second, 100 ms late, 30% of balls missed
                 scenario("slow-ball-camera", Alliance.RED, 33, sim -> sim.ballCamera(10, 100, 6, 0.3), 0, 0, 0),
+                // A drive like a real mecanum's (85% speed, strafing 80%, 150 in/s² of grip), and that with the slow
+                // ball camera and the IMU drifting
+                scenario("real-drive", Alliance.RED, 33, sim -> sim, 0, 0, 0),
+                scenario("real-drive-slow-camera", Alliance.RED, 33,
+                        sim -> sim.ballCamera(10, 100, 7, 0.3).imuDrift(IMU_DRIFT), 0, 0, 0),
                 scenario("blue", Alliance.BLUE, 33, sim -> sim.imuDrift(IMU_DRIFT), 0, 0, 0),
                 scenario("everything", Alliance.BLUE, 13,
                         sim -> sim.imuDrift(-IMU_DRIFT).shotSpread(3, 0.03, 1.5), 1.5, 1.5, -4));
@@ -109,7 +114,8 @@ class SoloCarrySimTest {
     private DynamicTest scenario(String name, Alliance alliance, int floor, int parked,
                                  UnaryOperator<BiobuzzRobotSim> setUp, double dx, double dy, double dhDegrees) {
         return DynamicTest.dynamicTest(name, () -> {
-            BiobuzzRobotSim sim = setUp.apply(new BiobuzzRobotSim().alliance(alliance).withParkingPartner());
+            boolean realDrive = name.startsWith("real-drive");
+            BiobuzzRobotSim sim = setUp.apply(new BiobuzzRobotSim(realDrive).alliance(alliance).withParkingPartner());
             Outcome run = run("solo-carry-" + name, alliance, sim, dx, dy, dhDegrees);
             assertTrue(run.parked >= parked, name + ": " + run.parked + " robots parked, should be " + parked);
             if (parked == 2) assertTrue(run.apart > 0.5, name + ": it should park clear of the partner, " + run.apart + " in apart");
