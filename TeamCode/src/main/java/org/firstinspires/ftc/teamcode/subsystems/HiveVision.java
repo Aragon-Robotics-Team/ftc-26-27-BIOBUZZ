@@ -62,6 +62,7 @@ public class HiveVision implements Subsystem {
     private final HiveTracker tracker = new HiveTracker(FRAMES_TO_SWITCH, MANUAL_HOLDOFF_S, MANUAL_DISAGREE_S);
     private boolean enabled = false;
     private boolean running = false, checking = false; // checking: started by tagsInView, before start()
+    private double lastSwitchTry = Double.NEGATIVE_INFINITY;
 
     private List<Seen> lastSeen = Collections.emptyList();
     private HiveReader.Frame lastFrame = null;
@@ -107,7 +108,8 @@ public class HiveVision implements Subsystem {
 
     /**
      * For a check before the match: how many hive tags the Limelight sees now (starting it if it isn't yet), or -1
-     * with no Limelight configured.
+     * with no Limelight configured. A Limelight still booting when the robot was built missed the pipeline switch:
+     * this asks again, once a second, until its results say it's on PIPELINE.
      */
     public int tagsInView() {
         if (limelight == null) return -1;
@@ -116,6 +118,10 @@ public class HiveVision implements Subsystem {
             checking = true;
         }
         LLResult result = limelight.getLatestResult();
+        if (result != null && result.getPipelineIndex() != PIPELINE && now() - lastSwitchTry > 1) {
+            lastSwitchTry = now();
+            limelight.pipelineSwitch(PIPELINE);
+        }
         if (result == null || !result.isValid()) return 0;
         int n = 0;
         for (LLResultTypes.FiducialResult f : result.getFiducialResults()) {
