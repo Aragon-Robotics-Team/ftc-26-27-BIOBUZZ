@@ -61,7 +61,7 @@ public class SoloCarry extends AutoRoutine {
     private static final double MIN_CHASE_S = 2, CHASE_SLACK_S = 1.5;
     private static final double TAGS_FRESH_S = 0.4, LOOK_S = 0.7, TAGS_GONE_S = 0.6;
     // A chase with something in hand that's found no more for this long goes to shoot it
-    private static final double MORE_S = 2;
+    private static final double MORE_S = 5;
 
     private final ElapsedTime clock = new ElapsedTime();
     private final Pose[] lookouts;

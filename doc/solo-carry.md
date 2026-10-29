@@ -2,8 +2,8 @@
 
 `routines/SoloCarry.java` (Auto menu: `SOLO_CARRY`) scores alone with a partner that only parks. It shoots the 4
 preloads into the up cell (with the 3 staged nectar, that tips it), chases pollen with the ball camera (the garden first),
-shoots it into the cell that's up now, and parks. The sim runs it in 14 scenarios (`SoloCarrySimTest`): 37 to 49
-points, 49 in nine of them, both robots parked in all. None of its timing or noise numbers have been checked on the
+shoots it into the cell that's up now, and parks. The sim runs it in 14 scenarios (`SoloCarrySimTest`): 39 to 47
+points, 45 in most of them, both robots parked in all (the flowers' pollen stays in the flowers). None of its timing or noise numbers have been checked on the
 robot yet. This is what to check, roughly in order.
 
 ## Before every match
@@ -32,7 +32,7 @@ robot yet. This is what to check, roughly in order.
 | Tag noise | `Localization.TAG_ANGLE_SIGMA`, `TAG_RANGE_FRACTION` | Robot still, log `getTargetPoseCameraSpace` for 10 s at 3 distances | placeholders |
 | Limelight latency | the fake's 20 + 20 ms in `BiobuzzRobotSim` | `getCaptureLatency()`, `getTargetingLatency()` on the robot | sim only |
 | Ball pickup counting | `PollenChase` (`CONFIRM_S`, the mouth window, `FULL_REFUSALS`) | Run the Ball Chase Test over a row of 3; compare `Chase/status` "picked up" with what's inside | sim-tuned |
-| Hunt for one more | `SoloCarry.MORE_S` | How often the 4th ball comes within 2 s | 2 s |
+| Hunt for one more | `SoloCarry.MORE_S` | How long the 4th ball takes after the 3rd | 5 s (sim: no gain past 5) |
 
 After a practice run, open the log in AdvantageScope and compare `Drive/pose` (fused) against `Drive/odometryPose`
 (the Pinpoint alone), especially while turning fast in front of the hive. A fused heading that jumps there means the
@@ -53,7 +53,10 @@ so frames can be up to about 20 ms older than they say.
 
 ## Known limits
 
-- One tip in 30 s is what it reliably gets: a second needs two full loads of 4, and each load tends to come in at 3
-  (one garden ball sits in the corner, one spill ball at the base of a flower).
+- One tip in 30 s is all there is to get: a second needs 8 more pollen in the new up cell, and our side only has the
+  4 garden balls and whatever of our 4 preloads spills our way (some crosses the center line). In the sim it gets one
+  load of 3 or 4 in after the tip; the chase from the other launch spot then finds nothing to take.
+- The scoring, Park and Leave rules in the sim come from BiobuzzSim (the Roblox sim), not the manual: check them,
+  and whether garden balls count at the end of AUTO (then taking them is +1 each) or only at the end of the match.
 - With no tags at all and the IMU drifting, nothing corrects the heading; the park can miss the zone.
 - It can't take pollen from the flowers.
