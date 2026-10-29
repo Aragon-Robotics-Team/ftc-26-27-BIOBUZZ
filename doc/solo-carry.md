@@ -2,7 +2,7 @@
 
 `routines/SoloCarry.java` (Auto menu: `SOLO_CARRY`) scores alone with a partner that only parks. It shoots the 4
 preloads into the up cell (with the 3 staged nectar, that tips it), chases pollen with the ball camera (the garden first),
-shoots it into the cell that's up now, and parks. The sim runs it in 23 scenarios (`SoloCarrySimTest`): 38 to 47
+shoots it into the cell that's up now, and parks. The sim runs it in 25 scenarios (`SoloCarrySimTest`): 38 to 47
 points, both robots parked in all but the no-tags, drifting one, (the flowers' pollen stays in the flowers; the intake only takes a ball whose
 center is between its side plates). None of its timing or noise numbers have been checked on the
 robot yet. This is what to check, roughly in order.
@@ -50,7 +50,7 @@ The sim takes these from the same constants as the code, so it can't catch them:
 | Drive speed for the time budget | `SoloCarry.DRIVE_SPEED`, `DRIVE_MARGIN_S` | Time `driveTo` from rightLaunch to leftLaunch, and to the park spot | 30 in/s + 0.5 s (the sim does about 40) |
 | Launcher ready time at the spot | `SoloCarry.READY_TYPICAL_S` (planning), `READY_WAIT_S` (cap) | `SoloCarry/stage` "to the launch spot" to "shooting" in the log | 0.5 s planned, 1.5 s cap |
 | Shot speed calibration | `Launcher.FLYWHEEL_TICKS_PER_EXIT_SPEED`, the ShotSolver's drag | Shoot from both launch spots, see where they land against the opening. Both are the same distance, so calibrating there absorbs drag error too | The sim's shots are right by construction (the solver uses its drag). Every shot 5% off still tips the hive; 8% off, the preload misses it (24 to 26 points) |
-| Flywheel headroom | the flywheel's power at the launch spot | Telemetry while it holds speed there, on a match battery | The spot needs about 93% of free speed: over about 0.9 power, balls 2 to 4 of a burst come out slow (the sim's battery never sags and its balls don't slow the wheel). Past free speed the solver finds no shot and it shoots nothing |
+| Flywheel headroom | the flywheel's power at the launch spot | Telemetry while it holds speed there, on a match battery; `Launcher/flywheelActual` through a burst of 4 for how much each ball takes | The spot needs about 93% of free speed. The sim's `flywheel-sags-hard` (11.2 V, each ball taking about 7%) has balls 2 to 4 leaving 6 to 9% slow and still tips; worse than that, a burst needs a pause per ball. Past free speed the solver finds no shot and it shoots nothing |
 | Ready wait at the spot | `Launcher.READY_WINDOW_FRACTION` | "to the launch spot" to "shooting" in the log | If the speed reading's noise is as wide as the window, it waits the full 1.5 s cap at every spot |
 | Gate open long enough to empty 4 | `Gate.AUTO_SHOOT_MS` | Shoot 4, watch the last one leave | 2000 ms (the sim feeds one per 0.26 s) |
 | Up or down from tag height | `Vision.HEIGHT_THRESHOLD` | The `Hive tags` telemetry line (HiveVision, in TeleOp) with each cell up, both hives | 42 in (TODO in the code) |

@@ -96,6 +96,10 @@ class SoloCarrySimTest {
                 scenario("shots-scatter-2", Alliance.RED, 13, sim -> sim.shotSpread(2, 0.03, 1.5), 0, 0, 0),
                 scenario("shots-wild", Alliance.RED, 13, sim -> sim.shotSpread(4, 0.08, 3), 0, 0, 0),
                 scenario("shots-wild-2", Alliance.RED, 13, sim -> sim.shotSpread(5, 0.08, 3), 0, 0, 0),
+                // A match battery and balls that take speed off the flywheel (about 5% each): the spot needs about
+                // 93% of its free speed
+                scenario("flywheel-sags", Alliance.RED, 13, sim -> sim.flywheelLoad(11.8, 1), 0, 0, 0),
+                scenario("flywheel-sags-hard", Alliance.RED, 13, sim -> sim.flywheelLoad(11.2, 1.5), 0, 0, 0),
                 // Every shot 5% slow or fast (the flywheel's calibration, or drag the solver gets wrong)
                 scenario("shots-slow", Alliance.RED, 13, sim -> sim.shotBias(-0.05), 0, 0, 0),
                 scenario("shots-fast", Alliance.RED, 13, sim -> sim.shotBias(0.05), 0, 0, 0),

@@ -338,6 +338,17 @@ public final class BiobuzzRobotSim {
         return this;
     }
 
+    /**
+     * The flywheel as a match battery and real balls load it: the battery at this voltage (the sensor reads it, so
+     * the Launcher's compensation answers as it would), and each ball taking about 5% of its speed per unit of
+     * ballLoad (PLACEHOLDER: the real drop isn't measured). Default: 12 V, balls take nothing.
+     */
+    public BiobuzzRobotSim flywheelLoad(double batteryVolts, double ballLoad) {
+        battery.setVoltage(batteryVolts);
+        launcher.load(Math.max(0, 1 - batteryVolts / 12), ballLoad);
+        return this;
+    }
+
     /** The Limelight sees no tags (unplugged, or the pipeline wrong): hive vision and the tag fusion get nothing. */
     public BiobuzzRobotSim blindLimelight() {
         return blindLimelight(0);

@@ -46,6 +46,10 @@ final class SimLauncher {
     private double intakeWait, feedWait;
     private java.util.Random spread;              // null: every shot exactly as the flywheel and turret send it
     private double speedSpread, headingSpread, speedBias;
+    // load(): a constant drag on the flywheel (a battery below 12 V) and a kick for one tick as each ball goes
+    // through, fractions of stall torque
+    private double baseLoad, ballLoad;
+    private boolean kicked;
     private int flying = -1;                       // id of the newest shot while it's in the air
     private final List<double[]> flown = new ArrayList<>();
     private int shotsFired;
@@ -76,6 +80,16 @@ final class SimLauncher {
         headingSpread = headingRadians;
     }
 
+    /**
+     * The flywheel loaded as a real one is: baseLoad of stall torque all the time (the motor model has no voltage,
+     * so a battery at V is a load of 1 - V/12 at full power), and ballLoad more for one tick as a ball goes through
+     * (1 takes about 5% off its speed).
+     */
+    void load(double baseLoad, double ballLoad) {
+        this.baseLoad = baseLoad;
+        this.ballLoad = ballLoad;
+    }
+
     /** Every shot's exit speed off by this fraction: a flywheel calibration or drag the solver doesn't know about. */
     void bias(double speedFraction) {
         speedBias = speedFraction;
@@ -96,6 +110,11 @@ final class SimLauncher {
                 > (RobotConstants.Gate.CLOSED_POSITION + RobotConstants.Gate.OPEN_POSITION) / 2;
         intakeWait -= deltaTime;
         feedWait -= deltaTime;
+        if (baseLoad > 0 || ballLoad > 0) {
+            double load = Math.min(1, baseLoad + (kicked ? ballLoad : 0));
+            kicked = false;
+            flywheel.setExternalTorqueFraction(-Math.signum(flywheel.getPhysicalVelocityTicksPerSecond()) * load);
+        }
 
         boolean room = field.getHeldCount() < CAPACITY;
         if (intakeWait <= 0 && field.tryAcquire(mouth, intakeRunning && room, POLLEN_ONLY, 1) > 0) intakeWait = INTAKE_INTERVAL;
@@ -123,6 +142,7 @@ final class SimLauncher {
         field.launch(id, "launcher", ex, ey, ez, horizontal * Math.cos(heading) + vx,
                 horizontal * Math.sin(heading) + vy, speed * Math.sin(hood));
         shotsFired++;
+        kicked = true;
 
         // The arc that would have scored from here: same launch point and direction, the speed that reaches the aim
         ShotArc.Launch ideal = new ShotArc.Launch(ex, ey, ez, speedToReach(ex, ey, ez, heading, hood, aim), heading,
