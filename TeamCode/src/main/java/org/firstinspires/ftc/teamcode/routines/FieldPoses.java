@@ -45,10 +45,6 @@ public class FieldPoses {
     public final Pose allianceWallStart;
     /** Out from our garden corner, the ball camera on the garden's row of pollen. */
     public final Pose gardenLook;
-    /** On the audience side of the hive, the ball camera on where an audience cell's balls roll when it tips. */
-    public final Pose audienceSpillLook;
-    /** On the rear side, likewise for the rear cell. */
-    public final Pose rearSpillLook;
 
 
 
@@ -73,8 +69,6 @@ public class FieldPoses {
         // The camera looks 20° left of the intake (RobotConstants.BallVision.YAW): heading = where to look - 20°
         allianceWallStart = poseFactory.of(RobotConstants.Field.ROBOT_LENGTH / 2, 36, 0);
         gardenLook = poseFactory.of(30, 16, 190);
-        audienceSpillLook = poseFactory.of(34, 22, 40);
-        rearSpillLook = poseFactory.of(34, 122, -80);
 
 
     }

@@ -28,14 +28,14 @@ import org.psilynx.psikit.core.Logger;
  * the alliance wall, by the loading zone) and parks. Starts back against the alliance wall on tile A2 (allianceWallStart).
  *
  * The up cell starts with 3 nectar in it (5 pollen's worth), so the 4 preloads tip it. After that it's cycles of the
- * pollen chase on the ball camera from a lookout (the garden first), shooting whatever it got into the cell that's
- * up; with nothing in sight it tries the next lookout.
+ * pollen chase on the ball camera from where it can see the garden, shooting whatever it got into the cell that's
+ * up; with nothing in sight it parks (a chase that's found nothing has used the time a second look would need).
  *
  * Which cell is up: the hive's tags face the up cell's side, so at a cell's launch spot (on its side) the Limelight
  * sees them while that cell is up and loses them once it tips. After a shot the count says should tip it, it goes by
  * that; with no tags at the launch spot (none ever, or the Limelight's stopped seeing), by a count of what it has put
- * into the up cell: 8 pollen tip a hive (Field Setup Guide 12.3). Tags missing on arriving to shoot only send it to
- * the other cell when the count is near a tip. Hive vision also sets the up cell whenever it can tell.
+ * into the up cell: 8 pollen tip a hive (Field Setup Guide 12.3). Hive vision also sets the up cell whenever it can
+ * tell.
  *
  * Time: each chase is given what's left after driving to the launch spot, shooting and parking from there; a load
  * it can't shoot and still park in time stays in the robot. It parks whatever it's doing when the drive there would
@@ -64,23 +64,19 @@ public class SoloCarry extends AutoRoutine {
     private static final double MORE_S = 5;
 
     private final ElapsedTime clock = new ElapsedTime();
-    private final Pose[] lookouts;
-    // The audience end of the loading zone, facing along the wall, the front 2 in into the zone, which leaves the
-    // partner the rear 22 in of it (park it there). Reached from approach, out from the zone's audience end, so the
+    // The audience end of the loading zone, facing along the wall, the front 1.5 in into the zone (the sim's park ends
+    // within about 0.6 in of the spot), which leaves the partner the rear 22.5 in of it (park it there). Reached from approach, out from the zone's audience end, so the
     // drive in doesn't cut across the partner
     private final Pose park, approach;
     private final int ourHive;
-    private int nextLookout = 0;
     private int held = RobotConstants.Intake.CAPACITY; // the preload
     private double load = START_LOAD;                 // pollen's worth in the up cell, as far as it knows
     private int tips = 0;
-    private boolean flippedByTags; // this load has already gone to the other cell's spot on the tags' say-so
     private String stage = "start";
 
     public SoloCarry(Robot robot, Alliance alliance) {
         super(robot, alliance);
-        lookouts = new Pose[] {poses.gardenLook, poses.audienceSpillLook, poses.rearSpillLook};
-        park = poseFactory.of(9, 96 + 2 - RobotConstants.Field.ROBOT_LENGTH / 2, 90);
+        park = poseFactory.of(9, 96 + 1.5 - RobotConstants.Field.ROBOT_LENGTH / 2, 90);
         approach = poseFactory.of(20, 80, 90);
         ourHive = alliance == Alliance.RED ? HiveTags.RED : HiveTags.BLUE;
     }
@@ -105,7 +101,8 @@ public class SoloCarry extends AutoRoutine {
     public Command autoRoutine() {
         Command carry = sequential(
                 lazy(this::driveAndShoot), // the preloads
-                lazy(() -> sequential(drive(lookouts[nextLookout++]), lazy(this::cycle))));
+                drive(poses.gardenLook),
+                lazy(this::cycle));
         return sequential(
                 deadline(carry.raceWith(waitUntil(this::timeToPark)), robot.aimAtHive(), robot.enableFlywheel()),
                 robot.stopShooting(),
@@ -118,8 +115,8 @@ public class SoloCarry extends AutoRoutine {
     }
 
     /**
-     * Chase from here, leaving time to shoot what it gets and park; with nothing found, the next lookout and chase
-     * again. Anything picked up gets shot (a chase only ends short of full when it can't find more). No time for a
+     * Chase from here, leaving time to shoot what it gets and park; with nothing found, it's done. Anything picked up
+     * gets shot (a chase only ends short of full when it can't find more). No time for a
      * chase: shoot what it has if that still leaves time to park, and stop.
      */
     private Command cycle() {
@@ -139,17 +136,15 @@ public class SoloCarry extends AutoRoutine {
                     // The chase counts high rather than low (it can't see inside); shooting empties the robot anyway
                     held = Math.min(RobotConstants.Intake.CAPACITY, held + chase.getPickedUp());
                     if (held > 0) return sequential(lazy(this::driveAndShoot), lazy(this::cycle)); // full, or no more found
-                    Pose lookout = lookouts[nextLookout++ % lookouts.length];
-                    stage("nothing in sight: to a lookout");
-                    return sequential(drive(lookout), lazy(this::cycle));
+                    stage("nothing in sight");
+                    return instant(() -> {});
                 }));
     }
 
     /**
-     * To the launch spot for the up cell, and a look for its tags there (LOOK_S at least, if they don't show sooner).
-     * Gone, when they've been seen this match and the count has it within 2 of a tip, means it tipped unseen, so on to
-     * the other one's, once a load (a Limelight that's stopped seeing would otherwise send it back and forth). Then
-     * everything into it, if the launcher has a shot with the turret on it, and a check for a tip.
+     * To the launch spot for the up cell, and a look for its tags there (LOOK_S at least, if they don't show sooner),
+     * whether this cell is still up comes back in scored(). Then everything into it, if the launcher has a shot with
+     * the turret on it, and a check for a tip.
      */
     private Command driveAndShoot() {
         Hive cell = MatchState.hive;
@@ -166,13 +161,6 @@ public class SoloCarry extends AutoRoutine {
                     return wasReady[0] && looked;
                 }).raceWith(waitMs((long) (READY_WAIT_S * 1000))),
                 lazy(() -> {
-                    // A tip it missed is only likely near a tip by the count; otherwise the Limelight has lost them
-                    if (tagsEverSeen() && !tagsSince(arrived[0] - TAGS_FRESH_S) && !flippedByTags
-                            && load >= TIP_LOAD - 2) {
-                        flippedByTags = true;
-                        stage(cell + " is down by the tags");
-                        return sequential(robot.setHive(cell.flipped()), lazy(this::driveAndShoot));
-                    }
                     if (MatchState.hive != cell) return driveAndShoot(); // hive vision changed it on the way
                     // Ready at some point in the wait (it wobbles as the robot settles), or a shot with the turret on it
                     if (!wasReady[0] && !(robot.launcher.hasShot() && robot.launcher.isTurretOnTarget())) {
@@ -182,7 +170,6 @@ public class SoloCarry extends AutoRoutine {
                     stage("shooting " + held + " into " + cell);
                     int shot = held;
                     held = 0;
-                    flippedByTags = false;
                     boolean tagsHere = tagsSince(arrived[0] - TAGS_FRESH_S);
                     return sequential(robot.startShooting(), waitMs(RobotConstants.Gate.AUTO_SHOOT_MS),
                             robot.stopShooting(), lazy(() -> scored(cell, shot, tagsHere)));

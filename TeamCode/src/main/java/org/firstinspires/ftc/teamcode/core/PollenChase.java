@@ -443,16 +443,19 @@ public class PollenChase {
 
     /**
      * Notes the pollen in this frame (once per frame), forgets what hasn't been seen for REMEMBER_S, and counts as
-     * swept in any the mouth is now over: just inside the bumper to past INTAKE_REACH, between the side plates.
+     * swept in any the mouth is now over: just inside the bumper to past INTAKE_REACH, its center far enough inside the
+     * side plates to fit between them (one nearer a plate hits it instead). Each ball counts once: it's remembered,
+     * counted, for as long as it's still seen (one pushed along ahead of the mouth rather than taken).
      */
     private void sweep(List<double[]> pollen, double t) {
         double frame = vision.getFrameTime();
         if (frame != lastSweptFrame) {
             lastSweptFrame = frame;
+            double diameter = Ball.Type.POLLEN.diameter; // two balls are never closer than this
             for (double[] p : pollen) {
                 double[] known = null;
-                for (double[] q : seenPollen) if (Math.hypot(p[0] - q[0], p[1] - q[1]) < 1.5) known = q;
-                if (known == null) seenPollen.add(new double[] {p[0], p[1], t});
+                for (double[] q : seenPollen) if (Math.hypot(p[0] - q[0], p[1] - q[1]) < diameter) known = q;
+                if (known == null) seenPollen.add(new double[] {p[0], p[1], t, 0}); // {x, y, last seen, counted}
                 else {
                     known[0] = p[0];
                     known[1] = p[1];
@@ -469,11 +472,12 @@ public class PollenChase {
                 it.remove();
                 continue;
             }
+            if (p[3] != 0) continue;
             double dx = p[0] - pose.x(), dy = p[1] - pose.y();
             double ahead = dx * c + dy * s, side = -dx * s + dy * c;
-            if (ahead > ROBOT_LENGTH / 2 - 1 && ahead < INTAKE_REACH + r && Math.abs(side) < INTAKE_WIDTH / 2) {
+            if (ahead > ROBOT_LENGTH / 2 - 1 && ahead < INTAKE_REACH + r && Math.abs(side) < INTAKE_WIDTH / 2 - r) {
                 swept++;
-                it.remove();
+                p[3] = 1;
             }
         }
     }

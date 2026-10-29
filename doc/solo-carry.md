@@ -27,8 +27,9 @@ drifting. All tip and park, 42 to 45.
 - **Field:** both hives with the RIGHT cell up and its 3 nectar in (the routine assumes it and never checks).
 - **Preload:** all 4 in, none past the gate (the gate only closes at START, and the flywheel spins up then).
 - **Partner:** starts in our LEFT corner (back to the alliance wall by the loading zone) and parks **flush at the rear
-  end of the loading zone**. We park at its audience end, nose 2 in into the zone, which leaves about 3 in between
-  us and an 18 in partner parked flush at the rear. Every inch short of flush comes off that gap; 3 short and we touch.
+  end of the loading zone**. We park at its audience end, nose 1.5 in into the zone, which leaves about 3.5 in between
+  us and an 18 in partner parked flush at the rear (the sim's park ends within about 0.6 in of the spot). Every inch
+  short of flush comes off that gap.
 
 ## Once, before the first run
 
@@ -71,11 +72,10 @@ so frames can be up to about 20 ms older than they say.
 
 - **Which cell is up:** at a cell's launch spot the tags face it only while that cell is up. After a shot the count says
   should tip it, tags gone for 0.6 s means tipped. A burst of lost tags can fake that (glare, a robot in front); hive
-  vision seeing the old cell still up then sends it back (the sim's `tags-flicker-false-tip`). Tags missing on arrival only send it to the other cell when the
-  count is within 2 of a tip, once a load (so a Limelight that stops seeing can't send it back and forth). With no
-  tags at the spot, it goes by the count, which errs high.
-- **Balls held:** counted from the camera, erring high (every pollen the mouth passes over, and two that won't go in
-  mean full). Shooting holds the gate open long enough to empty the robot whatever the count.
+  vision seeing the old cell still up then sends it back (the sim's `tags-flicker-false-tip`). With no tags at the
+  spot, it goes by the count, which errs high.
+- **Balls held:** counted from the camera: each pollen whose center the mouth passes over (between the side plates,
+  a radius in from each), once even if it's pushed rather than taken, and two that won't go in mean full. Shooting holds the gate open long enough to empty the robot whatever the count.
 - **Time:** it counts 29 s. Each chase leaves time to drive to the launch spot, shoot, and park from there, plus
   1.5 s. Parking starts when the drive there (by an approach point on the audience side, clear of the partner) is all
   that's left, plus 1 s. Every drive gives up after twice its estimate and holds where it is.
