@@ -202,7 +202,9 @@ public class RobotConstants {
         public static double LOST_S = 0.5;          // a target out of view this long (not at the intake) is given up
         public static double CONFIRM_S = 0.4;       // after driving over it, how long it has to stay gone to count
         // With no pollen to chase the robot turns in place to look for more: left, the way the camera already looks
-        public static double SEARCH_TURN_RATE = Math.toRadians(90); // rad/s. TODO: tune, slow enough not to blur frames
+        // rad/s. At 6 ms exposure a frame smears about 1° (under a pollen's width at 40 in), and a ball stays in the
+        // 70° view about 10 frames at 25 a second. TODO: tune on the robot, slower if frames blur
+        public static double SEARCH_TURN_RATE = Math.toRadians(180);
         public static double SEARCH_TURN = Math.toRadians(360);     // turned this far without seeing pollen, the chase ends
         // A search turns from a spot with room to turn (the robot's half diagonal plus KEEP_OUT_MARGIN clear of the
         // walls, the hive's feet and the flowers), driving there first, for up to SEARCH_MOVE_S

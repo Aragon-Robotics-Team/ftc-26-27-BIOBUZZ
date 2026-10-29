@@ -8,10 +8,12 @@ import org.psilynx.psikit.core.Logger;
 import java.util.List;
 
 /**
- * The match clock and the score, as the Competition Manual counts it (point values as BiobuzzSim has them): 20 per
- * tip, 2 per ball in the alliance's up cell, 1 per ball in its garden, 3 for leaving the wall in AUTO, 5 for parking in
- * the loading zone (at the end of AUTO, and again at the end of TELEOP). Logged every tick under Match/ as if the
- * match ended then, so a line graph shows the score building.
+ * The match clock and the score, as the Competition Manual counts it (Table 10-2, 10.5): 20 per tip, 3 for leaving
+ * the wall in AUTO, 5 for parking in the loading zone (at the end of AUTO, and again at the end of the match), and at
+ * the end of the match only, 2 per ball in the alliance's up cell and 1 per ball in its garden. So an Auto run scores
+ * tips, LEAVE and PARK; its balls in the cell and the garden are logged (Match/.../cellBalls, gardenBalls) as what
+ * TELEOP starts from. Logged every tick under Match/ as if the period ended then, so a line graph shows the score
+ * building.
  *
  * Not counted: flowers (the sim has no nectar placement), fouls, and ranking points. One OpMode run is one period: an
  * Auto run is the 30 s AUTO, anything else the 2:00 TELEOP; the clock starts when the OpMode does.
@@ -71,9 +73,9 @@ final class SimMatch {
     }
 
     int score(Alliance alliance) {
-        return tips(alliance) * TIP + cellBalls(alliance) * CELL_BALL
-                + SimField.ballsIn(field, SimField.garden(alliance)) * GARDEN_BALL
-                + (auto ? count(alliance, true) * LEAVE : 0) + count(alliance, false) * PARK;
+        int score = tips(alliance) * TIP + count(alliance, false) * PARK;
+        if (auto) return score + count(alliance, true) * LEAVE;
+        return score + cellBalls(alliance) * CELL_BALL + SimField.ballsIn(field, SimField.garden(alliance)) * GARDEN_BALL;
     }
 
     /** After the field has advanced this tick. */

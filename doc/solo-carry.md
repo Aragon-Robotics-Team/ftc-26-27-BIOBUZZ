@@ -2,14 +2,15 @@
 
 `routines/SoloCarry.java` (Auto menu: `SOLO_CARRY`) scores alone with a partner that only parks. It shoots the 4
 preloads into the up cell (with the 3 staged nectar, that tips it), chases pollen with the ball camera (the garden first),
-shoots it into the cell that's up now, and parks. The sim runs it in 25 scenarios (`SoloCarrySimTest`): 38 to 47
-points, both robots parked in all but the no-tags, drifting one, (the flowers' pollen stays in the flowers; the intake only takes a ball whose
-center is between its side plates). None of its timing or noise numbers have been checked on the
+shoots it into the cell that's up now, and parks. The sim runs it in 25 scenarios (`SoloCarrySimTest`), scored as
+the manual scores AUTO (tips, LEAVE, PARK): 36 points (the tip, both robots leaving and parked) in all but the one
+built to miss the tip, with 0 to 4 pollen left in the new up cell for TELEOP (2.5 on average). The flowers' pollen
+stays in the flowers, and the intake only takes a ball whose center is between its side plates. None of its timing or noise numbers have been checked on the
 robot yet. This is what to check, roughly in order.
 
 Ten more (`variedMatches`) vary the match as it would really: gardens laid by hand, the partner parking up to 2 in
 short, the robot set down up to 1 in and 2° off, the camera missing a tenth of balls, shots scattering, the IMU
-drifting. All tip and park, 42 to 45.
+drifting. All tip and park: 36 points, 2 to 4 pollen in the up cell.
 
 ## Before every match
 
@@ -96,8 +97,8 @@ so frames can be up to about 20 ms older than they say.
   nectar in a cell (2 each) and in the garden (1 each) count only at the end of the match. So Solo Carry's AUTO is
   28 points of ours (36 with the partner's leave and park); the load it shoots in after the tip is a start on the
   next tip in TELEOP, and each garden ball it takes is one fewer in the garden at the end. LEAVE plus PARK of 16 for
-  the alliance is the SWARM ranking point: both robots leaving and parking in AUTO makes it. The sim's score
-  (SimMatch) still counts cells and the garden in AUTO.
+  the alliance is the SWARM ranking point: both robots leaving and parking in AUTO makes it. The sim scores it so
+  (SimMatch).
 - With no tags at all and the IMU drifting, nothing corrects the heading; the park can miss the zone (in the sim it
-  drives into the partner and stops short: 35 points).
+  drives into the partner and stops short, though in its last runs it got in).
 - It can't take pollen from the flowers.

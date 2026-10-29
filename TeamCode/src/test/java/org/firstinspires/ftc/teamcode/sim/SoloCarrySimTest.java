@@ -32,7 +32,8 @@ import java.util.stream.Stream;
  *
  * The scenarios run it again with what goes wrong on a real field: the robot set down off its start, shots that
  * scatter (some miss, so its count of what's in the cell is wrong), no tags at all, blue. Each has to end with both
- * robots parked apart and score at least its floor. Logged to solo-carry-<scenario>.rlog.
+ * robots parked apart and score at least its floor, in AUTO points (tips, LEAVE, PARK): 26 is a tip and both robots
+ * leaving, 13 doesn't need the tip. Logged to solo-carry-<scenario>.rlog.
  */
 class SoloCarrySimTest {
     private static final double IMU_DRIFT = 0.5; // degrees a second: 15° over the 30 s
@@ -83,15 +84,15 @@ class SoloCarrySimTest {
         return java.util.stream.LongStream.rangeClosed(1, 10).mapToObj(seed -> {
             java.util.Random set = new java.util.Random(1000 + seed);
             double dx = set.nextDouble() * 2 - 1, dy = set.nextDouble() * 2 - 1, dh = set.nextDouble() * 4 - 2;
-            return scenario("varied-" + seed, Alliance.RED, 33, sim -> sim.vary(seed).imuDrift(IMU_DRIFT), dx, dy, dh);
+            return scenario("varied-" + seed, Alliance.RED, 26, sim -> sim.vary(seed).imuDrift(IMU_DRIFT), dx, dy, dh);
         });
     }
 
     @TestFactory
     Stream<DynamicTest> scenarios() {
         return Stream.of(
-                scenario("set-down-off", Alliance.RED, 33, sim -> sim.imuDrift(IMU_DRIFT), 1.5, -1.5, 4),
-                scenario("set-down-off-other-way", Alliance.RED, 33, sim -> sim.imuDrift(-IMU_DRIFT), -1, 2, -5),
+                scenario("set-down-off", Alliance.RED, 26, sim -> sim.imuDrift(IMU_DRIFT), 1.5, -1.5, 4),
+                scenario("set-down-off-other-way", Alliance.RED, 26, sim -> sim.imuDrift(-IMU_DRIFT), -1, 2, -5),
                 scenario("shots-scatter", Alliance.RED, 13, sim -> sim.shotSpread(1, 0.03, 1.5), 0, 0, 0),
                 scenario("shots-scatter-2", Alliance.RED, 13, sim -> sim.shotSpread(2, 0.03, 1.5), 0, 0, 0),
                 scenario("shots-wild", Alliance.RED, 13, sim -> sim.shotSpread(4, 0.08, 3), 0, 0, 0),
@@ -105,28 +106,28 @@ class SoloCarrySimTest {
                 scenario("shots-fast", Alliance.RED, 13, sim -> sim.shotBias(0.05), 0, 0, 0),
                 // Loaded with 1 where it counts 4 (dropped, or jammed): the count says the preload tipped it; it didn't
                 scenario("preload-short", Alliance.RED, 13, sim -> sim.preload(1), 0, 0, 0),
-                scenario("no-tags", Alliance.RED, 33, sim -> sim.blindLimelight(), 0, 0, 0),
+                scenario("no-tags", Alliance.RED, 26, sim -> sim.blindLimelight(), 0, 0, 0),
                 // The Limelight stops seeing partway: after it's seen tags on the way to the first launch spot, and
                 // after the first cycle
-                scenario("limelight-dies-early", Alliance.RED, 33, sim -> sim.blindLimelight(2), 0, 0, 0),
-                scenario("limelight-dies-later", Alliance.RED, 33, sim -> sim.blindLimelight(10), 0, 0, 0),
-                scenario("no-tags-drifting", Alliance.RED, 33, 1, sim -> sim.blindLimelight().imuDrift(IMU_DRIFT), 1, 1, 2),
+                scenario("limelight-dies-early", Alliance.RED, 26, sim -> sim.blindLimelight(2), 0, 0, 0),
+                scenario("limelight-dies-later", Alliance.RED, 26, sim -> sim.blindLimelight(10), 0, 0, 0),
+                scenario("no-tags-drifting", Alliance.RED, 26, 1, sim -> sim.blindLimelight().imuDrift(IMU_DRIFT), 1, 1, 2),
                 // The ball camera as a Control Hub runs it: 10 frames a second, 100 ms late, 30% of balls missed
-                scenario("slow-ball-camera", Alliance.RED, 33, sim -> sim.ballCamera(10, 100, 6, 0.3), 0, 0, 0),
+                scenario("slow-ball-camera", Alliance.RED, 26, sim -> sim.ballCamera(10, 100, 6, 0.3), 0, 0, 0),
                 // Tags lost in bursts of up to 1 s, a fifth of the time: longer than "tags gone 0.6 s means tipped"
-                scenario("tags-flicker", Alliance.RED, 33, sim -> sim.flickerLimelight(1, 0.2, 1), 0, 0, 0),
-                scenario("tags-flicker-2", Alliance.RED, 33, sim -> sim.flickerLimelight(2, 0.2, 1), 0, 0, 0),
-                scenario("tags-flicker-3", Alliance.RED, 33, sim -> sim.flickerLimelight(3, 0.2, 1), 0, 0, 0),
+                scenario("tags-flicker", Alliance.RED, 26, sim -> sim.flickerLimelight(1, 0.2, 1), 0, 0, 0),
+                scenario("tags-flicker-2", Alliance.RED, 26, sim -> sim.flickerLimelight(2, 0.2, 1), 0, 0, 0),
+                scenario("tags-flicker-3", Alliance.RED, 26, sim -> sim.flickerLimelight(3, 0.2, 1), 0, 0, 0),
                 // The preload misses the tip (every shot 8% slow) and a burst fakes "tipped" right after it: hive
                 // vision has to see the RIGHT cell still up and send the next load there
-                scenario("tags-flicker-false-tip", Alliance.RED, 20,
+                scenario("tags-flicker-false-tip", Alliance.RED, 13,
                         sim -> sim.shotBias(-0.08).flickerLimelight(4, 0.2, 1), 0, 0, 0),
                 // A drive like a real mecanum's (85% speed, strafing 80%, 150 in/s² of grip), and that with the slow
                 // ball camera and the IMU drifting
-                scenario("real-drive", Alliance.RED, 33, sim -> sim, 0, 0, 0),
-                scenario("real-drive-slow-camera", Alliance.RED, 33,
+                scenario("real-drive", Alliance.RED, 26, sim -> sim, 0, 0, 0),
+                scenario("real-drive-slow-camera", Alliance.RED, 26,
                         sim -> sim.ballCamera(10, 100, 7, 0.3).imuDrift(IMU_DRIFT), 0, 0, 0),
-                scenario("blue", Alliance.BLUE, 33, sim -> sim.imuDrift(IMU_DRIFT), 0, 0, 0),
+                scenario("blue", Alliance.BLUE, 26, sim -> sim.imuDrift(IMU_DRIFT), 0, 0, 0),
                 scenario("everything", Alliance.BLUE, 13,
                         sim -> sim.imuDrift(-IMU_DRIFT).shotSpread(3, 0.03, 1.5), 1.5, 1.5, -4));
     }
