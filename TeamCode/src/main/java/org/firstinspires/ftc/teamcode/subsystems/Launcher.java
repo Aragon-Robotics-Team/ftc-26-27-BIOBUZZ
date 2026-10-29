@@ -12,20 +12,19 @@ import com.pedropathing.utils.Angle;
 import com.qualcomm.robotcore.hardware.DcMotor;
 import com.qualcomm.robotcore.hardware.DcMotorEx;
 import com.qualcomm.robotcore.hardware.HardwareMap;
-import com.qualcomm.robotcore.hardware.PIDFCoefficients;
 import com.qualcomm.robotcore.hardware.VoltageSensor;
 import com.qualcomm.robotcore.util.ElapsedTime;
 import com.qualcomm.robotcore.util.Range;
 
 import org.firstinspires.ftc.robotcore.external.Telemetry;
-import org.firstinspires.ftc.teamcode.core.RobotConstants.Launcher.FlywheelControl;
 import org.firstinspires.ftc.teamcode.core.ShotSolver;
 import org.firstinspires.ftc.teamcode.core.ShotSolver.Shot;
 
 import java.util.function.Supplier;
 
 /**
- * Turreted flywheel shooter. The flywheel holds its speed by bang-bang (or the hub's PIDF, see FLYWHEEL_CONTROL); the turret runs a PID loop on its encoder angle,
+ * Turreted flywheel shooter. The flywheel holds its speed with our own loop ({@link FlywheelController}, PIDF or
+ * bang-bang, see FLYWHEEL_CONTROL), not the hub's; the turret runs a PID loop on its encoder angle,
  * plus a velocity feedforward so it can track a target while the robot moves.
  * Aiming simulates every shot ({@link ShotSolver}): the turret heading and flywheel speed come from a flight model
  * with drag that allows for the robot's motion, and "ready" means both are within the error that shot can take.
@@ -51,7 +50,9 @@ public class Launcher implements Subsystem {
     private double targetVelocity = 0;
     private double flywheelVelocity = 0;
     private double flywheelPower = 0;
-    // Battery voltage for the bang-bang hold power. Read a few times a second: it's a separate hub read, not bulk
+    private final FlywheelController flywheelController = new FlywheelController();
+    private final ElapsedTime flywheelTimer = new ElapsedTime();
+    // Battery voltage for the flywheel feedforward. Read a few times a second: it's a separate hub read, not bulk
     private double batteryVolts = 12;
     private final ElapsedTime batteryTimer = new ElapsedTime();
     private double turretTargetAngle = 0;
@@ -79,10 +80,8 @@ public class Launcher implements Subsystem {
         flywheel = hardwareMap.get(DcMotorEx.class, FLYWHEEL_MOTOR_NAME);
         flywheel.setDirection(FLYWHEEL_DIRECTION);
         flywheel.setZeroPowerBehavior(DcMotor.ZeroPowerBehavior.FLOAT); // coast down, don't brake the flywheel
-        // Bang-bang sets the power itself; the encoder still counts, so getVelocity() works either way
-        flywheel.setMode(FLYWHEEL_CONTROL == FlywheelControl.HUB_PIDF
-                ? DcMotor.RunMode.RUN_USING_ENCODER : DcMotor.RunMode.RUN_WITHOUT_ENCODER);
-        flywheel.setPIDFCoefficients(DcMotor.RunMode.RUN_USING_ENCODER, FLYWHEEL_PIDF);
+        // FlywheelController sets the power; the encoder still counts, so getVelocity() works
+        flywheel.setMode(DcMotor.RunMode.RUN_WITHOUT_ENCODER);
         battery = hardwareMap.voltageSensor.iterator().next();
 
         turret = hardwareMap.get(DcMotorEx.class, TURRET_MOTOR_NAME);
@@ -187,7 +186,7 @@ public class Launcher implements Subsystem {
         return flywheelVelocity;
     }
 
-    /** Power the bang-bang control set this loop, 0 when off, NaN with HUB_PIDF. */
+    /** Power the flywheel control set this loop, 0 when off. */
     public double getFlywheelPower() {
         return flywheelPower;
     }
@@ -250,11 +249,6 @@ public class Launcher implements Subsystem {
 
     // ---- Setup ----
 
-    /** Push new velocity PIDF to the motor controller. Used by the tuning OpMode. */
-    public void setFlywheelPIDF(PIDFCoefficients pidf) {
-        flywheel.setPIDFCoefficients(DcMotor.RunMode.RUN_USING_ENCODER, pidf);
-    }
-
     /** Tell the launcher where the turret is right now, e.g. the angle Auto left it at. */
     public void setCurrentTurretAngle(double angle) {
         turretAngleOffset = angle - turret.getCurrentPosition() / turretTicksPerRadian;
@@ -276,6 +270,8 @@ public class Launcher implements Subsystem {
 
     @Override
     public void start() {
+        flywheelTimer.reset();
+        flywheelController.reset();
         turretTimer.reset();
         turretIntegral = 0;
         lastTurretError = 0;
@@ -291,23 +287,15 @@ public class Launcher implements Subsystem {
     }
 
     private void updateFlywheel() {
-        if (!isSpinning()) {
-            flywheelPower = 0;
-            flywheel.setPower(0);
-        } else if (FLYWHEEL_CONTROL == FlywheelControl.HUB_PIDF) {
-            flywheelPower = Double.NaN; // the hub decides
-            flywheel.setVelocity(targetVelocity);
-        } else {
-            if (batteryTimer.seconds() > 0.25) {
-                batteryTimer.reset();
-                double volts = battery.getVoltage();
-                if (volts > 6) batteryVolts = volts; // ignore a bad read
-            }
-            // Below target: full power, the fastest the motor can recover after a shot. At or above: hold power
-            flywheelPower = flywheelVelocity < targetVelocity
-                    ? 1.0 : Range.clip(FLYWHEEL_KV * targetVelocity * 12 / batteryVolts, 0, 1);
-            flywheel.setPower(flywheelPower);
+        double dt = flywheelTimer.seconds();
+        flywheelTimer.reset();
+        if (isSpinning() && batteryTimer.seconds() > 0.25) {
+            batteryTimer.reset();
+            double volts = battery.getVoltage();
+            if (volts > 6) batteryVolts = volts; // ignore a bad read
         }
+        flywheelPower = flywheelController.power(targetVelocity, flywheelVelocity, batteryVolts, dt);
+        flywheel.setPower(flywheelPower);
     }
 
     private void updateTurret() {
@@ -343,9 +331,7 @@ public class Launcher implements Subsystem {
     public void telemetry(Telemetry telemetry) {
         telemetry.addData("Launcher ready", isReady());
         telemetry.addData("Flywheel target / actual", "%.0f / %.0f", targetVelocity, flywheelVelocity);
-        if (FLYWHEEL_CONTROL == FlywheelControl.BANG_BANG) {
-            telemetry.addData("Flywheel power (bang-bang)", "%.2f at %.1f V", flywheelPower, batteryVolts);
-        }
+        telemetry.addData("Flywheel power (" + FLYWHEEL_CONTROL + ")", "%.2f at %.1f V", flywheelPower, batteryVolts);
         telemetry.addData("Turret target / actual (deg)", "%.1f / %.1f",
                 Math.toDegrees(turretTargetAngle), Math.toDegrees(getTurretAngle()));
         telemetry.addData("Turret turn speed target / actual (deg/s)", "%.0f / %.0f",

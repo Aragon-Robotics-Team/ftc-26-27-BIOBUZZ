@@ -2,7 +2,6 @@ package org.firstinspires.ftc.teamcode.core;
 
 import com.pedropathing.math.Pose;
 import com.qualcomm.robotcore.hardware.DcMotorSimple;
-import com.qualcomm.robotcore.hardware.PIDFCoefficients;
 
 /** Every robot tunable and hardware name in one place. Drivetrain / localizer config lives in pedro.Constants. */
 public class RobotConstants {
@@ -172,18 +171,21 @@ public class RobotConstants {
         public static double TARGET_VELOCITY = 1609;  // ticks/sec (Oct 26)
         public static double VELOCITY_TOLERANCE = 50; // ticks/sec, when not aiming with ShotSolver. TODO: tune
         public static double VELOCITY_NUDGE = 25;     // ticks/sec per operator press. TODO: tune
-        /** How the flywheel holds its speed. */
+        /** How the flywheel holds its speed. Both run in our own loop (subsystems.FlywheelController), not the hub's. */
         public enum FlywheelControl {
-            BANG_BANG, // our loop: full power below target, FLYWHEEL_KV hold power at or above it. Fastest recovery between shots
-            HUB_PIDF   // the hub's own velocity loop, with FLYWHEEL_PIDF
+            PIDF,     // battery-compensated feedforward plus PID on the speed error
+            BANG_BANG // full power below target, the feedforward at or above it
         }
-        public static FlywheelControl FLYWHEEL_CONTROL = FlywheelControl.BANG_BANG;
-        // Bang-bang hold power per tick/sec at 12 V; scaled by 12 / battery volts, so it holds the same on a tired battery.
-        // The Flywheel Auto Tuner prints it. A little low is fine (full power tops it up); too high and the flywheel
-        // settles above target. (Oct 28)
-        public static double FLYWHEEL_KV = 0.000541;
-        // Velocity PIDF on the hub, for HUB_PIDF: F ≈ 32767 / max ticks/sec, P ≈ F / 10
-        public static PIDFCoefficients FLYWHEEL_PIDF = new PIDFCoefficients(16.84, 0, 0, 16.84); // Oct 28.
+        public static FlywheelControl FLYWHEEL_CONTROL = FlywheelControl.PIDF;
+        // Feedforward: power at 12 V to hold a speed, scaled by 12 / battery volts so it holds the same on a tired battery.
+        // The Flywheel Auto Tuner prints KV. A little low is fine; too high and the flywheel settles above target.
+        public static double FLYWHEEL_KV = 0.000541; // power per tick/sec (Oct 28)
+        public static double FLYWHEEL_KS = 0;        // power to overcome friction
+        // PID on the speed error. KP = KV is about the hub PIDF that rapid-fired well on Oct 28 (P = F = 16.84 in the
+        // hub's units). The Flywheel Auto Tuner finds KP.
+        public static double FLYWHEEL_KP = 0.000541; // power per tick/sec of error
+        public static double FLYWHEEL_KI = 0;        // power per tick of accumulated error
+        public static double FLYWHEEL_KD = 0;        // power per tick/sec²; leave 0: the speed reading is too noisy to differentiate
 
         // ---- Turret ----
         // Angles are robot-relative radians: 0 = facing the front of the robot, positive = counter-clockwise.

@@ -12,29 +12,34 @@ import com.qualcomm.robotcore.eventloop.opmode.LinearOpMode;
 import com.qualcomm.robotcore.eventloop.opmode.TeleOp;
 import com.qualcomm.robotcore.hardware.DcMotor;
 import com.qualcomm.robotcore.hardware.DcMotorEx;
-import com.qualcomm.robotcore.hardware.PIDFCoefficients;
 import com.qualcomm.robotcore.hardware.VoltageSensor;
 import com.qualcomm.robotcore.util.ElapsedTime;
+
+import org.firstinspires.ftc.teamcode.core.RobotConstants;
+import org.firstinspires.ftc.teamcode.core.RobotConstants.Launcher.FlywheelControl;
+import org.firstinspires.ftc.teamcode.subsystems.FlywheelController;
 
 import java.util.ArrayList;
 import java.util.List;
 
 /**
- * Finds the flywheel velocity PIDF automatically. Run with a charged battery and nothing touching the flywheel.
+ * Finds the flywheel speed control gains (FlywheelController's PIDF mode) automatically. Run with a charged battery
+ * and nothing touching the flywheel.
  *
- * 1. Full power until the speed levels off: F = 32767 / top speed (the hub's feedforward scale).
- * 2. With that F, steps the target from 80% up to the test speed (like recovering after a shot) for a range of
- *    P values, and keeps the P that settles fastest without overshooting more than MAX_OVERSHOOT.
- * I and D stay 0 unless it can't reach the target, in which case it suggests a small I.
+ * 1. Full power until the speed levels off: FLYWHEEL_KV = battery volts / (12 × top speed). The voltage is measured at
+ *    full power, since it sags under load.
+ * 2. With that kV, steps the target from 80% up to the test speed (like recovering after a shot) for a range of kP
+ *    values, and keeps the kP that settles fastest without overshooting more than MAX_OVERSHOOT.
+ * kS, kI and kD stay 0; it says so if the speed settles off target.
  *
- * The hub's velocity reading is noisy (it's a difference of encoder counts), so every reading is averaged over
+ * The control runs in this OpMode's loop, as it does in TeleOp. TeleOp's loop is slower, which makes the control react
+ * later: set LOOP_MS to TeleOp's loop time (its "Loop" line) to tune for that.
+ *
+ * The velocity reading is noisy (it's a difference of encoder counts), so every reading is averaged over
  * SMOOTH_S before it's judged, and the noise left after that is measured while holding the low speed. The settle band
  * and the overshoot limit both widen to NOISE_BANDS times that noise, so noise isn't mistaken for overshoot.
  *
- * It also prints FLYWHEEL_KV, the hold power for bang-bang control, from the top speed and the battery voltage at full
- * power (the voltage sags under load, so it's measured then, not at rest).
- *
- * The result prints as a line to paste into RobotConstants.Launcher. Fine-tune it in the Flywheel Tuner,
+ * The result prints as lines to paste into RobotConstants.Launcher. Fine-tune them in the Flywheel Tuner,
  * and check recovery with real shots.
  */
 @Configurable
@@ -46,9 +51,10 @@ public class FlywheelAutoTuner extends LinearOpMode {
     public static double MAX_OVERSHOOT = 0.05;            // fraction of the step size, beyond the noise
     public static double SMOOTH_S = 0.1;                  // velocity readings are averaged over this long
     public static double NOISE_BANDS = 3;                 // noise allowance, in standard deviations of the smoothed speed
-    // P values to try, as multiples of F (the FTC rule of thumb is 0.1). The search stops early once P overshoots or
-    // rings, so the top of the range only runs if the lower ones were still clean. 0.35 was the best on Oct 28.
-    public static double[] P_MULTIPLIERS = {0.05, 0.1, 0.15, 0.2, 0.25, 0.3, 0.35, 0.45, 0.6, 0.8, 1.0};
+    public static double LOOP_MS = 0;                     // pad each loop to this long, e.g. TeleOp's loop time
+    // kP values to try, as multiples of kV. The search stops early once kP overshoots or rings, so the top of the
+    // range only runs if the lower ones were still clean. The hub PIDF that worked on Oct 28 was about 1.
+    public static double[] P_MULTIPLIERS = {0.25, 0.5, 1, 1.5, 2, 3, 4, 6, 8};
 
     private DcMotorEx flywheel;
     private TelemetryManager panels;
@@ -70,7 +76,7 @@ public class FlywheelAutoTuner extends LinearOpMode {
         }
     }
 
-    /** How one P value handled the step. */
+    /** How one kP value handled the step. */
     static class StepResult {
         double p;
         double settleSeconds = Double.NaN; // NaN = never settled inside the window
@@ -99,12 +105,11 @@ public class FlywheelAutoTuner extends LinearOpMode {
         panels.update(telemetry);
         waitForStart();
 
-        // ---- 1. Top speed -> F ----
-        double voltage = batteryVoltage();
+        // ---- 1. Top speed -> kV ----
         double maxVelocity = measureMaxVelocity();
         if (!opModeIsActive()) return;
         if (maxVelocity < -100) {
-            // The hub's velocity loop would push the wrong way and run away, so don't go on
+            // The control would push the wrong way and run away, so don't go on
             finish("The encoder counts backwards: + power gave " + Math.round(maxVelocity) + " ticks/sec. "
                     + "Swap the encoder, or the motor wires and FLYWHEEL_DIRECTION, so + power reads + velocity.");
             return;
@@ -114,45 +119,65 @@ public class FlywheelAutoTuner extends LinearOpMode {
                     + "wiring and encoder cable, and that FLYWHEEL_DIRECTION makes + power spin it.");
             return;
         }
-        double f = 32767 / maxVelocity;
+        double kV = fullPowerVolts / (12 * maxVelocity);
         double testVelocity = Math.min(TEST_VELOCITY, 0.85 * maxVelocity);
 
-        // ---- 2. Step tests over P ----
-        flywheel.setMode(DcMotor.RunMode.RUN_USING_ENCODER);
+        // ---- 2. Step tests over kP ----
+        // FlywheelController reads its gains from RobotConstants, so set them for the tests and put them back after
+        FlywheelControl savedControl = RobotConstants.Launcher.FLYWHEEL_CONTROL;
+        double savedKv = RobotConstants.Launcher.FLYWHEEL_KV, savedKs = RobotConstants.Launcher.FLYWHEEL_KS;
+        double savedKp = RobotConstants.Launcher.FLYWHEEL_KP, savedKi = RobotConstants.Launcher.FLYWHEEL_KI;
+        double savedKd = RobotConstants.Launcher.FLYWHEEL_KD;
         StepResult best = null;
         List<String> report = new ArrayList<>();
-        report.add(String.format("Top speed %.0f ticks/sec at %.1f V  ->  F = %.2f", maxVelocity, voltage, f));
-        report.add(String.format("Bang-bang: %.1f V at full power  ->  public static double FLYWHEEL_KV = %.6f;",
-                fullPowerVolts, fullPowerVolts / (12 * maxVelocity)));
+        report.add(String.format("Top speed %.0f ticks/sec at %.1f V under load  ->  kV = %.6f", maxVelocity, fullPowerVolts, kV));
         report.add("Step tests at " + Math.round(testVelocity) + " ticks/sec (noise = ± one standard deviation):");
-        for (double multiplier : P_MULTIPLIERS) {
-            if (!opModeIsActive()) return;
-            StepResult result = stepTest(multiplier * f, f, testVelocity);
-            report.add(String.format("P %.2f: settle %s, overshoot %.0f%%, oscillations %d, noise ±%.0f raw / ±%.0f smoothed",
-                    result.p, result.settled() ? String.format("%.2fs", result.settleSeconds) : "never",
-                    result.overshoot * 100, result.oscillations, result.rawNoise, result.noise));
+        try {
+            RobotConstants.Launcher.FLYWHEEL_CONTROL = FlywheelControl.PIDF;
+            RobotConstants.Launcher.FLYWHEEL_KV = kV;
+            RobotConstants.Launcher.FLYWHEEL_KS = 0;
+            RobotConstants.Launcher.FLYWHEEL_KI = 0;
+            RobotConstants.Launcher.FLYWHEEL_KD = 0;
+            for (double multiplier : P_MULTIPLIERS) {
+                if (!opModeIsActive()) return;
+                RobotConstants.Launcher.FLYWHEEL_KP = multiplier * kV;
+                StepResult result = stepTest(multiplier * kV, testVelocity);
+                report.add(String.format("kP %.2f × kV: settle %s, overshoot %.0f%%, oscillations %d, noise ±%.0f raw / ±%.0f smoothed",
+                        multiplier, result.settled() ? String.format("%.2fs", result.settleSeconds) : "never",
+                        result.overshoot * 100, result.oscillations, result.rawNoise, result.noise));
 
-            boolean good = result.settled() && result.overshoot <= MAX_OVERSHOOT && result.oscillations <= 1;
-            if (good && (best == null || result.settleSeconds < best.settleSeconds)) best = result;
-            // More P only gets worse once it overshoots or rings
-            if (result.overshoot > 3 * MAX_OVERSHOOT || result.oscillations >= 3) break;
+                boolean good = result.settled() && result.overshoot <= MAX_OVERSHOOT && result.oscillations <= 1;
+                if (good && (best == null || result.settleSeconds < best.settleSeconds)) best = result;
+                // More kP only gets worse once it overshoots or rings
+                if (result.overshoot > 3 * MAX_OVERSHOOT || result.oscillations >= 3) break;
+            }
+        } finally {
+            flywheel.setPower(0);
+            RobotConstants.Launcher.FLYWHEEL_CONTROL = savedControl;
+            RobotConstants.Launcher.FLYWHEEL_KV = savedKv;
+            RobotConstants.Launcher.FLYWHEEL_KS = savedKs;
+            RobotConstants.Launcher.FLYWHEEL_KP = savedKp;
+            RobotConstants.Launcher.FLYWHEEL_KI = savedKi;
+            RobotConstants.Launcher.FLYWHEEL_KD = savedKd;
         }
-        flywheel.setPower(0);
 
         // ---- Result ----
         if (best == null) {
-            report.add("No P settled without overshooting. If the noise is large, raise SMOOTH_S. Otherwise try "
-                    + "smaller P_MULTIPLIERS, or tune P by hand in the Flywheel Tuner.");
+            report.add("No kP settled without overshooting. If the noise is large, raise SMOOTH_S. Otherwise try "
+                    + "smaller P_MULTIPLIERS, or tune kP by hand in the Flywheel Tuner.");
+            report.add(String.format("kV is still good: public static double FLYWHEEL_KV = %.6f;", kV));
             finish(report.toArray(new String[0]));
             return;
         }
-        double i = 0;
         if (Math.abs(best.finalError) > best.band) {
-            i = 0.1 * best.p;
-            report.add(String.format("Settles %.0f ticks/sec off target, so I is set to 0.1 x P.", best.finalError));
+            report.add(String.format("Settles %.0f ticks/sec %s target: %s FLYWHEEL_KV a little, or add a small FLYWHEEL_KI.",
+                    Math.abs(best.finalError), best.finalError > 0 ? "below" : "above",
+                    best.finalError > 0 ? "raise" : "lower"));
         }
-        report.add(String.format("Best: P %.2f (settles in %.2fs). Paste into RobotConstants.Launcher:", best.p, best.settleSeconds));
-        report.add(String.format("public static PIDFCoefficients FLYWHEEL_PIDF = new PIDFCoefficients(%.3f, %.3f, 0, %.3f);", best.p, i, f));
+        report.add(String.format("Best: kP %.2f × kV (settles in %.2fs). Paste into RobotConstants.Launcher:",
+                best.p / kV, best.settleSeconds));
+        report.add(String.format("public static double FLYWHEEL_KV = %.6f;", kV));
+        report.add(String.format("public static double FLYWHEEL_KP = %.6f;", best.p));
         finish(report.toArray(new String[0]));
     }
 
@@ -188,26 +213,35 @@ public class FlywheelAutoTuner extends LinearOpMode {
         return samples > 0 ? sum / samples : 0;
     }
 
-    /** Settle at the low speed, then step up to the test speed and watch the response. */
-    private StepResult stepTest(double p, double f, double testVelocity) {
-        flywheel.setPIDFCoefficients(DcMotor.RunMode.RUN_USING_ENCODER, new PIDFCoefficients(p, 0, 0, f));
+    /** With FlywheelController at this kP: settle at the low speed, then step up to the test speed and watch. */
+    private StepResult stepTest(double kP, double testVelocity) {
+        FlywheelController controller = new FlywheelController();
         double low = STEP_FRACTION * testVelocity;
-
-        flywheel.setVelocity(low);
-        Trace hold = record("P " + fmt(p) + ": settling low", low);
-        flywheel.setVelocity(testVelocity);
-        Trace step = record("P " + fmt(p) + ": step up", testVelocity);
-        return analyze(p, hold, step, testVelocity);
+        String label = String.format("kP %.6f", kP);
+        Trace hold = record(controller, label + ": settling low", low);
+        Trace step = record(controller, label + ": step up", testVelocity);
+        return analyze(kP, hold, step, testVelocity);
     }
 
-    /** Readings for STEP_WINDOW_S at the current target. */
-    private Trace record(String phase, double target) {
+    /** Run the control at this target for STEP_WINDOW_S, recording the speed. */
+    private Trace record(FlywheelController controller, String phase, double target) {
         Trace trace = new Trace();
         ElapsedTime timer = new ElapsedTime();
+        ElapsedTime loopTimer = new ElapsedTime();
+        ElapsedTime voltsTimer = new ElapsedTime();
+        double volts = batteryVoltage();
         while (opModeIsActive() && timer.seconds() < STEP_WINDOW_S) {
+            double dt = loopTimer.seconds();
+            loopTimer.reset();
+            if (voltsTimer.seconds() > 0.25) {
+                voltsTimer.reset();
+                volts = batteryVoltage();
+            }
             double velocity = flywheel.getVelocity();
+            flywheel.setPower(controller.power(target, velocity, volts, dt));
             trace.add(timer.seconds(), velocity);
             show(phase, velocity, target);
+            while (opModeIsActive() && loopTimer.milliseconds() < LOOP_MS) idle();
         }
         return trace;
     }
