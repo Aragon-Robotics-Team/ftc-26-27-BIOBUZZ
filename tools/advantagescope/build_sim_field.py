@@ -361,9 +361,31 @@ def build_tray(alliance):
     return m
 
 
+# Wiffle holes, as on the real balls and in the sim's camera frames (WiffleHoles.java): HOLES round holes spread evenly
+# (a Fibonacci lattice), each HOLE_FRACTION of the diameter across. Hollow like the real ball: a shell with the holes
+# cut out, drawn from both sides, so you see through a hole to the inside and out the holes on the far side.
+HOLES, HOLE_FRACTION = 26, 0.19
+
+
+def hole_directions(n):
+    golden = math.pi * (3 - math.sqrt(5))
+    out = []
+    for i in range(n):
+        z = 1 - 2 * (i + 0.5) / n
+        r = math.sqrt(1 - z * z)
+        out.append((r * math.cos(golden * i), r * math.sin(golden * i), z))
+    return np.array(out)
+
+
 def build_piece(color, diameter):
     m = Model(np.eye(3))
-    m.add(color, trimesh.creation.icosphere(subdivisions=3, radius=diameter / 2))
+    shell = trimesh.creation.icosphere(subdivisions=5, radius=diameter / 2)
+    centers = shell.triangles_center / np.linalg.norm(shell.triangles_center, axis=1)[:, None]
+    # A face goes if its center is within the hole's angle (half its width over the radius) of a hole's middle
+    in_hole = (centers @ hole_directions(HOLES).T).max(axis=1) > math.cos(math.asin(HOLE_FRACTION))
+    shell.update_faces(~in_hole)
+    shell.remove_unreferenced_vertices()
+    m.add(color, shell)
     return m
 
 
