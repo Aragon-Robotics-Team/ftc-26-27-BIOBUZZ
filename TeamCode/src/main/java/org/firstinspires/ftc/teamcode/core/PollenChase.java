@@ -14,6 +14,7 @@ import com.pedropathing.math.Pose;
 import org.firstinspires.ftc.teamcode.pedro.Constants;
 import org.firstinspires.ftc.teamcode.subsystems.BallVision;
 import org.firstinspires.ftc.teamcode.util.MatchLog;
+import org.firstinspires.ftc.teamcode.vision.Ball;
 import org.firstinspires.ftc.teamcode.vision.PollenTracker;
 import org.psilynx.psikit.core.Logger;
 
@@ -30,7 +31,9 @@ import java.util.List;
  *
  * Paths are capped at CHASE_MAX_SPEED, and NEAR_BALL_SPEED within NEAR_BALL_DISTANCE of the target. A flower or hive
  * foot in the way is driven around (FieldRoutes): the path goes to the first waypoint, then on. A ball beside a wall,
- * a foot or a flower is lined up first: LINE_UP_OUT out from it on its open side, then straight in, square. A rolling
+ * a foot or a flower is lined up first: LINE_UP_OUT out from it on its open side, then straight in, square. One within
+ * WALL_RUN of the wall ahead (and not by a flower) is driven past to the wall, so balls in a row behind it (hidden behind the first) go in
+ * too. A rolling
  * target is waited for. A target the robot gets no closer to for STUCK_S (pinned against a wall, say), or that sits
  * within reach for IN_REACH_S without going in, is skipped for SKIP_S.
  *
@@ -38,9 +41,18 @@ import java.util.List;
  * comes into view. A frame up against a wall can't turn, so it first drives out to the nearest spot with room to turn.
  * Ends after maxBalls pickups, after a SEARCH_TURN without seeing any, or after timeoutS. The robot then holds its
  * position and the intake stays on.
+ *
+ * Nothing counts the balls inside, so pickups are counted from the camera, erring high: every pollen seen in the last
+ * REMEMBER_S that the intake's mouth then passes over went in (a row along a wall goes in together, and the ones behind
+ * the first are hidden from the camera by then), and a target confirmed gone counts at least one. A target at the
+ * mouth that won't go in, FULL_REFUSALS times in a row, means the robot is full.
  */
 public class PollenChase {
     private static final int MAX_TRIES = 3;
+    private static final int FULL_REFUSALS = 2;
+    private static final double REMEMBER_S = 2;
+    // A ball this close to the wall straight ahead is driven past all the way to the wall: a row of 4 along that line
+    private static final double WALL_RUN = 12;
 
     private enum State {
         APPROACH, // driving at a target in view
@@ -77,6 +89,11 @@ public class PollenChase {
     // The target's recent positions {t, x, y}, to tell a rolling ball; when it came within reach (NaN: it isn't)
     private final java.util.ArrayDeque<double[]> track = new java.util.ArrayDeque<>();
     private double inReachSince = Double.NaN;
+    // Pollen seen lately, field {x, y, last seen}; how many the mouth has passed over since the last confirmed pickup;
+    // targets in a row that wouldn't go in
+    private final List<double[]> seenPollen = new java.util.ArrayList<>();
+    private int swept, refusals;
+    private double lastSweptFrame = Double.NaN, sweptFullAt = Double.NaN;
 
     public PollenChase(Robot robot, int maxBalls, double timeoutS) {
         this.robot = robot;
@@ -96,8 +113,9 @@ public class PollenChase {
                 .requiring(robot.drivebase));
     }
 
+    /** Pollen taken in, as far as it can tell (it counts high rather than low). */
     public int getPickedUp() {
-        return pickedUp;
+        return pickedUp + swept;
     }
 
     /** What the chase is doing, for telemetry. */
@@ -124,19 +142,29 @@ public class PollenChase {
         detour = null;
         vision.tracker().drop();
         vision.clearSkips();
+        seenPollen.clear();
+        swept = 0;
+        sweptFullAt = Double.NaN;
+        refusals = 0;
     }
 
     private boolean done() {
         double t = now();
-        return pickedUp >= maxBalls || t - startTime > timeoutS || searched(t) >= SEARCH_TURN;
+        // Full by what the mouth passed over: CONFIRM_S more with the intake on, for it to take them in
+        if (getPickedUp() < maxBalls) sweptFullAt = Double.NaN;
+        else if (Double.isNaN(sweptFullAt)) sweptFullAt = t;
+        return pickedUp >= maxBalls || t - sweptFullAt >= CONFIRM_S || t - startTime > timeoutS
+                || searched(t) >= SEARCH_TURN;
     }
 
     private void execute() {
         double t = now();
         PollenTracker tracker = vision.tracker();
         PollenTracker.Target target = tracker.target();
+        sweep(tracker.chaseable(), t);
         if (MatchLog.active()) {
             Logger.recordOutput("Chase/status", status());
+            Logger.recordOutput("Chase/swept", swept);
             Logger.recordOutput("Chase/target", target == null ? "none"
                     : String.format("%.1f, %.1f%s%s", target.x, target.y, target.atIntake ? " at intake" : "",
                     linedUp ? " lined up" : ""));
@@ -160,8 +188,9 @@ public class PollenChase {
         searchFrom = null;
         turnStart = Double.NaN;
         boolean inView = target.lastSeen == vision.getFrameTime();
-        if ((state != State.CONFIRM && stuck(t)) || inReachTooLong(target, t)) {
-            vision.skip(target.x, target.y, SKIP_S);
+        boolean wontGoIn = inReachTooLong(target, t);
+        if (wontGoIn) refused();
+        if (wontGoIn || (state != State.CONFIRM && stuck(t))) {
             tracker.drop();
             detour = null;
             return;
@@ -199,6 +228,9 @@ public class PollenChase {
                 break;
             case CONFIRM:
                 if (target.lastSeen > seenBefore) {
+                    Pose pose = follower.pose();
+                    if (Math.hypot(target.x - pose.x(), target.y - pose.y()) < IN_REACH) refused();
+                    if (pickedUp >= maxBalls) break;
                     if (++tries >= MAX_TRIES) {
                         tracker.drop();
                     } else {
@@ -207,7 +239,9 @@ public class PollenChase {
                         progressPose = null;
                     }
                 } else if (t - stateSince >= CONFIRM_S) {
-                    pickedUp++;
+                    pickedUp += Math.max(1, swept); // the target is among those swept, if the camera saw it go in
+                    swept = 0;
+                    refusals = 0;
                     tracker.drop();
                 }
                 break;
@@ -327,8 +361,11 @@ public class PollenChase {
         if (open != null && !linedUp) {
             lineUp = new Pose(clamp(target.x + open[0] * LINE_UP_OUT), clamp(target.y + open[1] * LINE_UP_OUT), heading);
         }
-        double x = clamp(target.x + ux * (OVERSHOOT - INTAKE_REACH));
-        double y = clamp(target.y + uy * (OVERSHOOT - INTAKE_REACH));
+        // A wall close ahead of the ball: on to the wall (clamp stops it short), for any balls in a row behind this one
+        double past = wallAhead(target.x, target.y, ux, uy) < WALL_RUN && !flowerNear(target.x, target.y)
+                ? WALL_RUN : OVERSHOOT;
+        double x = clamp(target.x + ux * (past - INTAKE_REACH));
+        double y = clamp(target.y + uy * (past - INTAKE_REACH));
         double speed = distance < NEAR_BALL_DISTANCE ? NEAR_BALL_SPEED : CHASE_MAX_SPEED;
         if (detour != null) {
             if (follower.following()) return; // still on the way there
@@ -391,6 +428,66 @@ public class PollenChase {
             }
         }
         return open;
+    }
+
+    /**
+     * Notes the pollen in this frame (once per frame), forgets what hasn't been seen for REMEMBER_S, and counts as
+     * swept in any the mouth is now over: just inside the bumper to past INTAKE_REACH, between the side plates.
+     */
+    private void sweep(List<double[]> pollen, double t) {
+        double frame = vision.getFrameTime();
+        if (frame != lastSweptFrame) {
+            lastSweptFrame = frame;
+            for (double[] p : pollen) {
+                double[] known = null;
+                for (double[] q : seenPollen) if (Math.hypot(p[0] - q[0], p[1] - q[1]) < 1.5) known = q;
+                if (known == null) seenPollen.add(new double[] {p[0], p[1], t});
+                else {
+                    known[0] = p[0];
+                    known[1] = p[1];
+                    known[2] = t;
+                }
+            }
+        }
+        Pose pose = follower.pose();
+        double c = Math.cos(pose.heading() + INTAKE_HEADING_OFFSET), s = Math.sin(pose.heading() + INTAKE_HEADING_OFFSET);
+        double r = Ball.Type.POLLEN.diameter / 2;
+        for (java.util.Iterator<double[]> it = seenPollen.iterator(); it.hasNext(); ) {
+            double[] p = it.next();
+            if (t - p[2] > REMEMBER_S) {
+                it.remove();
+                continue;
+            }
+            double dx = p[0] - pose.x(), dy = p[1] - pose.y();
+            double ahead = dx * c + dy * s, side = -dx * s + dy * c;
+            if (ahead > ROBOT_LENGTH / 2 - 1 && ahead < INTAKE_REACH + r && Math.abs(side) < INTAKE_WIDTH / 2) {
+                swept++;
+                it.remove();
+            }
+        }
+    }
+
+    /** A target at the mouth didn't go in: after FULL_REFUSALS of those in a row, the robot is taken as full. */
+    private void refused() {
+        if (++refusals >= FULL_REFUSALS) pickedUp = Math.max(pickedUp, maxBalls);
+    }
+
+    /** Whether a flower is within WALL_RUN and half the robot's width of (x, y): no running on to the wall there. */
+    static boolean flowerNear(double x, double y) {
+        for (Pose flower : RobotConstants.Field.FLOWERS) {
+            if (Math.hypot(x - flower.x(), y - flower.y()) < WALL_RUN + ROBOT_WIDTH / 2) return true;
+        }
+        return false;
+    }
+
+    /** How far from (x, y), going (ux, uy), to the wall. */
+    static double wallAhead(double x, double y, double ux, double uy) {
+        double d = Double.POSITIVE_INFINITY;
+        if (ux > 1e-6) d = Math.min(d, (144 - x) / ux);
+        if (ux < -1e-6) d = Math.min(d, -x / ux);
+        if (uy > 1e-6) d = Math.min(d, (144 - y) / uy);
+        if (uy < -1e-6) d = Math.min(d, -y / uy);
+        return d;
     }
 
     /** Whether the target has rolled more than MOVING_SPEED, net, over the last MOVING_WINDOW_S. */

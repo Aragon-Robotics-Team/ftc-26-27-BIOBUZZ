@@ -112,7 +112,8 @@ public class SoloCarry extends AutoRoutine {
                 chase.command(),
                 robot.intake.off(),
                 lazy(() -> {
-                    held += chase.getPickedUp();
+                    // The chase counts high rather than low (it can't see inside); shooting empties the robot anyway
+                    held = Math.min(RobotConstants.Intake.CAPACITY, held + chase.getPickedUp());
                     if (chase.getPickedUp() > 0) return lazy(this::cycle); // keep chasing from here while there's room
                     if (held > 0) return sequential(lazy(this::driveAndShoot), lazy(this::cycle));
                     Pose lookout = lookouts[nextLookout++ % lookouts.length];
