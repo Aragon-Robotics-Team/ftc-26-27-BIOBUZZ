@@ -8,7 +8,7 @@ export interface PlannedSegment {
   heading: HeadingPieces;
   /** Which leg of the chain spec this segment belongs to. */
   leg: number;
-  /** Pedro's maxPathSpeed while on this segment, in/s (for shooting on the move). */
+  /** Pedro's maxVelocityConstraint while on this segment, in/s (for shooting on the move). */
   maxSpeed?: number;
 }
 

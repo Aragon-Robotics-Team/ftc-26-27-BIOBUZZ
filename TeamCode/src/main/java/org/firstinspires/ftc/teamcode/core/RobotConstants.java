@@ -37,6 +37,7 @@ public class RobotConstants {
         // While shooting. The intake drives the transfer, so this sets how fast balls go into the flywheel (Oct 28)
         public static double FEED_POWER = 0.7;
         public static double FLOWER_INTAKE_MS = 300; // how long Auto waits at a flower with the intake on TODO tune
+        public static int CAPACITY = 4;              // balls the robot holds
     }
 
     public static class Gate {
@@ -51,6 +52,13 @@ public class RobotConstants {
     public static class Led {
         public static String SERVO_NAME = "led";
         public static double FLASH_MS = 300;
+    }
+
+    /** PsiKit logging of the robot's state for AdvantageScope (util/MatchLog). */
+    public static class Logging {
+        // Write an .rlog of every TeleOp and Auto run to the Control Hub (FIRST/data/logs). Off until TeleOp testing:
+        // it costs loop time and nothing reads the logs yet. The sim logs the robot's state whatever this says.
+        public static boolean ENABLED = false;
     }
 
     /** Hive state from the Limelight 3A on the turret (HiveVision). */
@@ -187,11 +195,38 @@ public class RobotConstants {
 
         // ---- Chase ----
         public static double CHASE_MAX_SPEED = 30;  // in/s. TODO: tune
+        public static double NEAR_BALL_SPEED = 22;     // in/s within NEAR_BALL_DISTANCE of the ball, for the camera and intake
+        public static double NEAR_BALL_DISTANCE = 24;  // inches, robot center to ball
         public static double OVERSHOOT = 4;         // inches the mouth drives past the ball
         public static double REPLAN_DISTANCE = 2;   // inches the target has to move before the path is redone
         public static double LOST_S = 0.5;          // a target out of view this long (not at the intake) is given up
         public static double CONFIRM_S = 0.4;       // after driving over it, how long it has to stay gone to count
-        public static double GIVE_UP_S = 2;         // with no pollen in view this long, the chase ends
+        // With no pollen to chase the robot turns in place to look for more: left, the way the camera already looks
+        // rad/s. At 6 ms exposure a frame smears about 1° (under a pollen's width at 40 in), and a ball stays in the
+        // 70° view about 10 frames at 25 a second. TODO: tune on the robot, slower if frames blur
+        public static double SEARCH_TURN_RATE = Math.toRadians(180);
+        public static double SEARCH_TURN = Math.toRadians(360);     // turned this far without seeing pollen, the chase ends
+        // A search turns from a spot with room to turn (the robot's half diagonal plus KEEP_OUT_MARGIN clear of the
+        // walls, the hive's feet and the flowers), driving there first, for up to SEARCH_MOVE_S
+        public static double SEARCH_MOVE_S = 3;
+        // Giving up on a target, skipping it (and any pollen within SKIP_RADIUS of it) for SKIP_S: when the robot gets
+        // no closer for STUCK_S (moved under STUCK_DISTANCE and turned under STUCK_TURN), as against a wall, or when it
+        // has been within IN_REACH of the robot's center (the mouth's reach plus a bit) for IN_REACH_S without going in
+        public static double STUCK_S = 0.75;
+        public static double STUCK_DISTANCE = 1;
+        public static double STUCK_TURN = Math.toRadians(5);
+        public static double IN_REACH = 10;
+        public static double IN_REACH_S = 1.5;
+        public static double SKIP_RADIUS = 4;
+        public static double SKIP_S = 6;
+        // A target rolling faster than this (net, over MOVING_WINDOW_S) is waited for, not chased
+        public static double MOVING_SPEED = 10;     // in/s
+        public static double MOVING_WINDOW_S = 0.3;
+        // A ball within LINE_UP_DISTANCE of a wall, a hive foot or a flower column is approached square from its open
+        // side: first to LINE_UP_OUT out on that line (unless already within LINE_UP_TOLERANCE of it), then nose in
+        public static double LINE_UP_DISTANCE = 10;
+        public static double LINE_UP_OUT = 14;
+        public static double LINE_UP_TOLERANCE = 3;
     }
 
     public static class Launcher {
@@ -256,24 +291,28 @@ public class RobotConstants {
         public static double AIM_LOOKAHEAD = 0.05;
 
         // ---- Shot model (ShotSolver) ----
-        // Every shot is simulated (gravity, drag, backspin lift) to find the exit speed and turret angle that put the
+        // Every shot is simulated (gravity, drag, and lift if the ball spins) to find the exit speed and turret angle that put the
         // ball through the middle of the opening, allowing for the robot's motion.
         public static double HOOD_ANGLE = Math.toRadians(74); // fixed hood, above horizontal (Oct 28)
         public static double EXIT_HEIGHT = 10.3543;  // inches above the tiles where the ball leaves (CAD, Oct 26)
         public static double EXIT_RADIUS = 0;   // inches from the turret axis to where the ball leaves. TODO: set from CAD
         // Flywheel ticks/sec per inch/sec of ball exit speed. Depends on wheel size and grip, so it has to be measured:
         // stand still, nudge the flywheel until shots go through the middle of the opening, and read "Calibration" in
-        // the TeleOp details. Average it over a few distances. Starting value ≈ a 72 mm wheel at 80% grip.
-        // TODO: calibrate
-        public static double FLYWHEEL_TICKS_PER_EXIT_SPEED = 8.0;
+        // the TeleOp details. Average it over a few distances. Starting estimate: the 72 mm Rhino wheel at 1:1 on the
+        // 28-tick motor, the ball leaving at 80% of rim speed (counter-rollers: both surfaces move, so the full rim
+        // speed, not the half a single wheel on a fixed hood gives): 28 / (π × 2.835 in × 0.8) ≈ 3.9 (Oct 29).
+        // TODO: calibrate (grip 0.7 to 0.9 makes it 4.5 to 3.5)
+        public static double FLYWHEEL_TICKS_PER_EXIT_SPEED = 3.9;
         // The ball keeps the robot's velocity when it leaves; false simulates every shot from a standstill
         public static boolean SHOOT_ON_THE_MOVE = true;
         // Pollen, from the AndyMark product page. Nectar is bigger and heavier in proportion, so it flies the same.
         public static double BALL_DIAMETER = 2.8; // inches
         public static double BALL_MASS = 0.0249;  // kg
-        // Air: drag 0.4-0.6 for a smooth sphere; lift from the hood's backspin 0-0.45. TODO: fit to real shots
+        // Air: drag 0.4-0.6 for a smooth sphere. TODO: fit to real shots
         public static double DRAG_COEFFICIENT = 0.5;
-        public static double LIFT_COEFFICIENT = 0.3;
+        // No lift: the counter-rollers send the ball out with essentially no spin (Oct 28). A launcher that left
+        // backspin on it would give lift of about 0-0.45
+        public static double LIFT_COEFFICIENT = 0;
         public static double AIR_DENSITY = 1.2;   // kg/m³
         public static double SCORING_MARGIN = 0.5; // inches the ball's edge must clear each side of the opening by
         // Ready to shoot once flywheel and turret errors are within this fraction of what the shot can take
@@ -310,8 +349,14 @@ public class RobotConstants {
                 {46.27, 51.5, 48.27, 92.5},
                 {95.73, 51.5, 97.73, 92.5},
         };
+        public static double FLOWER_RADIUS = 2.65;   // a flower column's outside. TODO: check against the real field
         public static double FLOWER_KEEP_OUT = 5;  // inches from a flower column's center: inside it, or only the bottom one can be taken
         public static double KEEP_OUT_MARGIN = 2;  // inches added around the hive's feet
+        // In AUTO each alliance has its side of the field, columns A to C for red (x < CENTER_LINE), D to F for blue;
+        // driving onto the other side may be STRATEGIC (G402). A chase kept to our side stays HALF_MARGIN short of it
+        // (the pose estimate's error and the drive's overshoot); its drives pass our hive foot on the far side
+        public static double CENTER_LINE = 72;
+        public static double HALF_MARGIN = 2;
 
         // Robot frame, inches: width side to side, length front to back.
         public static double ROBOT_WIDTH = 15.748; //see below (incldues number sign) Oct 26

@@ -10,6 +10,7 @@ import org.firstinspires.ftc.robotcore.external.Telemetry;
 import org.firstinspires.ftc.robotcore.external.hardware.camera.WebcamName;
 import org.firstinspires.ftc.robotcore.external.hardware.camera.controls.ExposureControl;
 import org.firstinspires.ftc.robotcore.external.hardware.camera.controls.GainControl;
+import org.firstinspires.ftc.teamcode.core.Alliance;
 import org.firstinspires.ftc.teamcode.core.RobotConstants;
 import org.firstinspires.ftc.teamcode.vision.Ball;
 import org.firstinspires.ftc.teamcode.vision.BallGeometry;
@@ -17,11 +18,14 @@ import org.firstinspires.ftc.teamcode.vision.BallPipeline;
 import org.firstinspires.ftc.teamcode.vision.BallVisionProcessor;
 import org.firstinspires.ftc.teamcode.vision.PollenTracker;
 import org.firstinspires.ftc.vision.VisionPortal;
+import org.firstinspires.ftc.vision.VisionProcessor;
 
 import java.util.ArrayDeque;
+import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.concurrent.TimeUnit;
+import java.util.function.Consumer;
 import java.util.function.Supplier;
 
 /**
@@ -40,8 +44,12 @@ public class BallVision implements Subsystem {
     private final BallGeometry geometry;
     private final BallPipeline pipeline;
     private final BallVisionProcessor processor;
+    private final List<double[]> skipped = new ArrayList<>();
+    private Alliance half; // keepToHalf(): pollen and the chase kept to this alliance's side; null, either
     private final PollenTracker tracker;
     private VisionPortal portal;
+    // A camera that runs the processor itself instead of through a VisionPortal: the sim's webcam (BallChaseSimTest)
+    private boolean framesFromCamera = false;
     private boolean preview = false;
 
     // Robot poses from recent loops ({seconds, x, y, heading}), to place a frame by when it was taken
@@ -76,7 +84,7 @@ public class BallVision implements Subsystem {
         settings.intakeAxisLeft = 0;
         settings.nearMouth = NEAR_MOUTH;
         settings.edgeMarginPx = EDGE_MARGIN_PX;
-        tracker = new PollenTracker(settings, BallVision::chaseable);
+        tracker = new PollenTracker(settings, this::chaseable);
     }
 
     /** The ball pipeline's settings from RobotConstants.BallVision; the rest keep BallPipeline's defaults. */
@@ -106,8 +114,48 @@ public class BallVision implements Subsystem {
                 CAMERA_MATRIX[0], CAMERA_MATRIX[1], CAMERA_MATRIX[2], CAMERA_MATRIX[3], mount);
     }
 
+    /** Pollen within SKIP_RADIUS of here isn't chased for the next seconds (or until clearSkips): the robot couldn't get it. */
+    public void skip(double x, double y, double seconds) {
+        skipped.add(new double[] {x, y, now() + seconds});
+    }
+
+    private static double now() {
+        return System.nanoTime() / 1e9;
+    }
+
+    public void clearSkips() {
+        skipped.clear();
+    }
+
+    /**
+     * In AUTO (G402): chase only pollen the robot can take without its footprint crossing to the other alliance's side,
+     * from whichever way it comes at it, and keep the chase's drives and turns to this side. Null for either.
+     */
+    public void keepToHalf(Alliance alliance) {
+        half = alliance;
+    }
+
+    public Alliance half() {
+        return half;
+    }
+
+    /** Inside the walls, off the hive's feet, away from the flowers, not skipped and on our side if kept to it. */
+    private boolean chaseable(double x, double y) {
+        if (half != null) {
+            // With the ball at the mouth, the footprint reaches at most this far past it, whatever the approach
+            double reach = Math.hypot(RobotConstants.Field.ROBOT_LENGTH / 2 - INTAKE_REACH, RobotConstants.Field.ROBOT_WIDTH / 2);
+            double line = RobotConstants.Field.CENTER_LINE, margin = RobotConstants.Field.HALF_MARGIN;
+            if (half == Alliance.RED ? x > line - margin - reach : x < line + margin + reach) return false;
+        }
+        double now = now();
+        for (double[] s : skipped) {
+            if (now < s[2] && Math.hypot(x - s[0], y - s[1]) < SKIP_RADIUS) return false;
+        }
+        return onOpenFloor(x, y);
+    }
+
     /** Inside the walls, off the hive's feet and away from the flowers. */
-    static boolean chaseable(double x, double y) {
+    static boolean onOpenFloor(double x, double y) {
         if (x < 0 || y < 0 || x > 144 || y > 144) return false;
         double m = RobotConstants.Field.KEEP_OUT_MARGIN;
         for (double[] r : RobotConstants.Field.HIVE_FEET) {
@@ -123,8 +171,14 @@ public class BallVision implements Subsystem {
      * Opens the camera (call during init: it takes a moment). With preview, frames are also drawn for the Driver
      * Station and the Panels camera stream, which costs CPU.
      */
+    @SuppressWarnings("unchecked")
     public void enable(boolean preview) {
-        if (webcam == null || portal != null) return;
+        if (webcam == null || portal != null || framesFromCamera) return;
+        if (webcam instanceof Consumer) {
+            ((Consumer<VisionProcessor>) webcam).accept(processor);
+            framesFromCamera = true;
+            return;
+        }
         portal = new VisionPortal.Builder()
                 .setCamera(webcam)
                 .setCameraResolution(new android.util.Size(CAPTURE_WIDTH, CAPTURE_HEIGHT))
@@ -163,6 +217,11 @@ public class BallVision implements Subsystem {
         return lastBalls;
     }
 
+    /** How long the pipeline took on the newest frame, milliseconds; NaN before the first. */
+    public double getPipelineMs() {
+        return lastResult == null ? Double.NaN : lastResult.detectMs;
+    }
+
     /** Capture time of the newest frame, seconds (System.nanoTime), or NaN before the first. */
     public double getFrameTime() {
         return lastFrameTime;
@@ -172,13 +231,13 @@ public class BallVision implements Subsystem {
 
     @Override
     public void update() {
-        if (portal == null) return;
+        if (portal == null && !framesFromCamera) return;
         double now = System.nanoTime() / 1e9;
         Pose p = pose.get();
         poses.addLast(new double[]{now, p.x(), p.y(), p.heading()});
         while (poses.size() > 2 && poses.peekFirst()[0] < now - POSE_HISTORY_S) poses.removeFirst();
 
-        if (portal.getCameraState() == VisionPortal.CameraState.STREAMING) applyCameraSettings();
+        if (portal != null && portal.getCameraState() == VisionPortal.CameraState.STREAMING) applyCameraSettings();
 
         BallVisionProcessor.Result result = processor.latest();
         if (result == null || result == lastResult) return;
@@ -203,6 +262,11 @@ public class BallVision implements Subsystem {
             if (Math.abs(sample[0] - time) < Math.abs(best[0] - time)) best = sample;
         }
         return new double[]{best[1], best[2], best[3]};
+    }
+
+    /** Before the match: the camera's exposure and gain set once it's streaming, so the first frames after START use them. */
+    public void prepare() {
+        if (portal != null && portal.getCameraState() == VisionPortal.CameraState.STREAMING) applyCameraSettings();
     }
 
     /** Manual exposure and gain from RobotConstants, again whenever they change. */
@@ -235,8 +299,9 @@ public class BallVision implements Subsystem {
     /** One phrase for telemetry: what the camera is doing. */
     public String status() {
         if (webcam == null) return "no webcam (\"" + WEBCAM_NAME + "\" not in the configuration)";
-        if (portal == null) return "off";
+        if (portal == null && !framesFromCamera) return "off";
         if (processor.problem() != null) return processor.problem();
+        if (framesFromCamera) return String.format("sim camera, pipeline %.0f ms", lastResult == null ? 0 : lastResult.detectMs);
         if (portal.getCameraState() != VisionPortal.CameraState.STREAMING) return "starting (" + portal.getCameraState() + ")";
         return String.format("%.0f fps, pipeline %.0f ms", portal.getFps(), lastResult == null ? 0 : lastResult.detectMs);
     }
@@ -244,7 +309,7 @@ public class BallVision implements Subsystem {
     @Override
     public void telemetry(Telemetry telemetry) {
         telemetry.addData("Ball vision", status());
-        if (portal == null) return;
+        if (portal == null && !framesFromCamera) return;
         int pollen = 0;
         for (Ball ball : lastBalls) if (ball.type == Ball.Type.POLLEN) pollen++;
         telemetry.addData("Balls", "%d (%d pollen, %d chaseable)", lastBalls.size(), pollen, tracker.chaseable().size());

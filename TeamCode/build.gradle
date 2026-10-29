@@ -76,6 +76,9 @@ dependencies {
     implementation("dev.frozenmilk.sinister:Sloth:0.3.2")
     // Panels dashboard (Lazar). Supports Sloth itself since 1.0.16 (it depends on the Sloth above)
     implementation("com.bylazar:fullpanels:1.0.19")
+    // PsiKit (Dairy Foundation): logs the robot's state for AdvantageScope (util/MatchLog). Off on the robot until
+    // RobotConstants.Logging.ENABLED
+    implementation 'org.psilynx.psikit:core:0.2.0-beta2'
 
     // Unit tests for the hardware-free logic (src/test): ./gradlew :TeamCode:testDebugUnitTest
     testImplementation 'junit:junit:4.13.2'

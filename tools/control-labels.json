@@ -155,6 +155,10 @@
     "init.gamepad1.dpad_right": "Start in our RIGHT corner, back to alliance wall",
     "gamepad1.cross": "Chase again from here"
   },
+  "Chase And Shoot Test": {
+    "init.gamepad1.dpad_left": "Start in our LEFT corner, back to alliance wall",
+    "init.gamepad1.dpad_right": "Start in our RIGHT corner, back to alliance wall"
+  },
 
   "Ball Vision Test": {
     "gamepad1.left_stick": "Drive (field-centric: forward = the way the robot faced at start)",
