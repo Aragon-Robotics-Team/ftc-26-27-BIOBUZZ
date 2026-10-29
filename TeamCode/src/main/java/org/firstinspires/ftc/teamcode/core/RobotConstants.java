@@ -34,6 +34,8 @@ public class RobotConstants {
 
         public static double INTAKE_POWER = 1.0;
         public static double OUTTAKE_POWER = -1.0;
+        // While shooting. The intake drives the transfer, so this sets how fast balls go into the flywheel (Oct 28)
+        public static double FEED_POWER = 0.7;
         public static double FLOWER_INTAKE_MS = 300; // how long Auto waits at a flower with the intake on TODO tune
     }
 

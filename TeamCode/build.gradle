@@ -38,7 +38,8 @@ android {
     }
 }
 
-// Redraw doc/controls/<opmode>.png (the gamepad diagrams) from the OpMode source on every build.
+// Redraw doc/controls/<opmode>.png (the gamepad diagrams) from the OpMode source on every full install
+// (assembleDebug). Sloth deploys skip it: it takes a few seconds, more than the rest of a deploy.
 // Runs tools/ControlLayout.java on the JDK Gradle itself uses. A problem there only prints a warning,
 // so it can never stop a deploy.
 def controlLayoutSource = rootProject.file('tools/ControlLayout.java')
@@ -66,7 +67,7 @@ tasks.register('controlLayout') {
         }
     }
 }
-tasks.named('preBuild') { dependsOn 'controlLayout' }
+tasks.matching { it.name == 'assembleDebug' }.configureEach { dependsOn 'controlLayout' }
 
 dependencies {
     implementation project(':FtcRobotController')

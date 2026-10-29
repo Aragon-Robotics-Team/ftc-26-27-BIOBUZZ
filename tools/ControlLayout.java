@@ -44,7 +44,8 @@ import javax.imageio.ImageIO;
  *     java tools/ControlLayout.java --list     every binding with its code location
  * </pre>
  *
- * Every build runs this too (see TeamCode/build.gradle), so the diagrams follow the code on their own.
+ * Every full install (assembleDebug) runs this too (see TeamCode/build.gradle), so the diagrams follow
+ * the code on their own. Sloth deploys skip it to stay fast.
  * It only needs the JDK that Gradle already runs on.
  *
  * <p>How it works

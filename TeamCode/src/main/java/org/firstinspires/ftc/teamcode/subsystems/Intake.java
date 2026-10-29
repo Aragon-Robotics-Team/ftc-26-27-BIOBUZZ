@@ -2,6 +2,7 @@ package org.firstinspires.ftc.teamcode.subsystems;
 
 import static com.pedropathing.ivy.commands.Commands.instant;
 import static org.firstinspires.ftc.teamcode.core.RobotConstants.Intake.DIRECTION;
+import static org.firstinspires.ftc.teamcode.core.RobotConstants.Intake.FEED_POWER;
 import static org.firstinspires.ftc.teamcode.core.RobotConstants.Intake.INTAKE_POWER;
 import static org.firstinspires.ftc.teamcode.core.RobotConstants.Intake.MOTOR_NAME;
 import static org.firstinspires.ftc.teamcode.core.RobotConstants.Intake.OUTTAKE_POWER;
@@ -58,11 +59,14 @@ public class Intake implements Subsystem {
         return instant(() -> apply(mode == Mode.OUTTAKE ? Mode.OFF : Mode.OUTTAKE)).requiring(motor);
     }
 
-    /** Push everything stored into the shooter until {@link #stopFeeding()}. The chosen mode is kept. */
+    /**
+     * Push everything stored into the shooter at FEED_POWER (the intake drives the transfer) until
+     * {@link #stopFeeding()}. The chosen mode is kept.
+     */
     public Command feed() {
         return instant(() -> {
             feeding = true;
-            motor.setPower(INTAKE_POWER);
+            motor.setPower(FEED_POWER);
         }).requiring(motor);
     }
 
