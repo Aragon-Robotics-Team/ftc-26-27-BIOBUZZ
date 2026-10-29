@@ -284,6 +284,16 @@ public final class BiobuzzRobotSim {
         return this;
     }
 
+    /**
+     * The ball camera as slow and unsure as a Control Hub's: frames this many a second, each one's result lagMs
+     * after it's taken, and each ball missing from a frame with chance missFraction (seeded). Default: 25 a second,
+     * at once, all there.
+     */
+    public BiobuzzRobotSim ballCamera(int framesPerSecond, int lagMs, long seed, double missFraction) {
+        webcam.realism(Math.max(1, Math.round(50f / framesPerSecond)), Math.round(lagMs / 20f), seed, missFraction);
+        return this;
+    }
+
     /** The Limelight sees no tags (unplugged, or the pipeline wrong): hive vision and the tag fusion get nothing. */
     public BiobuzzRobotSim blindLimelight() {
         return blindLimelight(0);

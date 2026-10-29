@@ -30,6 +30,8 @@ import java.io.UncheckedIOException;
 import java.nio.file.DirectoryStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import org.horizon36596.simloop.field.GamePiece;
+
 import java.util.ArrayList;
 import java.util.List;
 
@@ -46,7 +48,7 @@ final class SimWebcam extends AbstractFakeDevice implements WebcamName, java.uti
     // PLACEHOLDER colors, 0xRRGGBB: inside the pipeline's hue windows, but not measured from real balls or tiles
     static final int POLLEN_RGB = 0xF2C21B, RED_NECTAR_RGB = 0xC8282D, BLUE_NECTAR_RGB = 0x2D6BD2;
     static final int TILE_RGB = 0x7A7A7A, SEAM_RGB = 0x5A5A5A, WALL_RGB = 0x3A3A3A, BOX_RGB = 0x9A9A9A;
-    static final int FRAME_EVERY = 2; // ticks: 25 frames a second at the sim's 50 Hz. PLACEHOLDER: the webcam's real rate
+    static final int FRAME_EVERY = 2; // ticks: 25 frames a second at the sim's 50 Hz, unless realism() says otherwise
     private static final double TICK_S = 0.02; // the sim's tick
 
     private final SimFrameRenderer renderer;
@@ -59,6 +61,12 @@ final class SimWebcam extends AbstractFakeDevice implements WebcamName, java.uti
     private int frames;
     private Path saveTo;
     private int saveEvery;
+    // realism(): a frame every frameEvery ticks, its result lagTicks after it's taken, each ball missing from it by
+    // chance (null: none)
+    private int frameEvery = FRAME_EVERY, lagTicks;
+    private java.util.Random missing;
+    private double missFraction;
+    private final java.util.ArrayDeque<Object[]> pending = new java.util.ArrayDeque<>(); // {due tick, Mat, capture ns}
 
     SimWebcam() {
         BallGeometry geometry = BallVision.geometry();
@@ -111,18 +119,62 @@ final class SimWebcam extends AbstractFakeDevice implements WebcamName, java.uti
         processor.init(width, height, null);
     }
 
-    /** One sim tick: a frame every FRAME_EVERY ticks, once BallVision has enabled the camera. Field frame, inches. */
+    /**
+     * The camera as a Control Hub runs it rather than as fast as the sim can: a frame every frameEvery ticks, the
+     * pipeline's result lagTicks later (stamped with when it was taken, as the camera stamps frames), and each ball
+     * left out of a frame with chance missFraction (seeded), as the real pipeline misses balls (52 to 84% found on
+     * the hand-labeled frames). Before the run.
+     */
+    void realism(int frameEvery, int lagTicks, long seed, double missFraction) {
+        this.frameEvery = frameEvery;
+        this.lagTicks = lagTicks;
+        this.missing = new java.util.Random(seed);
+        this.missFraction = missFraction;
+    }
+
+    /** One sim tick: a frame every frameEvery ticks, once BallVision has enabled the camera. Field frame, inches. */
     void tick(GamePieceTracker field, double x, double y, double heading) {
-        if (processor == null || ticks++ % FRAME_EVERY != 0) return;
-        SimFrame frame = renderer.render(field.getPieces(), x, y, heading, boxes, AprilTagLayout.empty());
+        if (processor == null) return;
+        while (!pending.isEmpty() && (int) pending.peekFirst()[0] <= ticks) {
+            Object[] due = pending.pollFirst();
+            process((Mat) due[1], (long) due[2]);
+            ((Mat) due[1]).release();
+        }
+        if (ticks++ % frameEvery != 0) return;
+        List<GamePiece> pieces = field.getPieces();
+        if (missing != null) {
+            List<GamePiece> seen = new ArrayList<>();
+            for (GamePiece piece : pieces) if (missing.nextDouble() >= missFraction) seen.add(piece);
+            pieces = seen;
+        }
+        SimFrame frame = renderer.render(pieces, x, y, heading, boxes, AprilTagLayout.empty());
         if (rgb == null) rgb = new Mat(frame.getHeightPx(), frame.getWidthPx(), CvType.CV_8UC3);
         byte[] bytes = frame.getRgbBytes();
-        holes.paint(frame, bytes, field.getPieces(), x, y, heading, FRAME_EVERY * TICK_S);
+        holes.paint(frame, bytes, pieces, x, y, heading, frameEvery * TICK_S);
         rgb.put(0, 0, bytes);
-        // No capture time: BallVision then uses when the pipeline got the frame, which in the sim is the same moment
-        Object result = processor.processFrame(rgb, Long.MAX_VALUE);
+        long taken = simNanos();
+        if (lagTicks == 0) process(rgb, taken);
+        else pending.addLast(new Object[] {ticks - 1 + lagTicks, rgb.clone(), taken});
+    }
+
+    /**
+     * The sim clock the team code reads, nanoseconds: its System.nanoTime() is SimLoop's sim-clock hook, in the copy
+     * the processor's class loader made.
+     */
+    private long simNanos() {
+        try {
+            Class<?> hooks = processor.getClass().getClassLoader()
+                    .loadClass("org.horizon36596.simloop.simclock.SimClockHooks");
+            return (long) hooks.getMethod("nanoTime").invoke(null);
+        } catch (ReflectiveOperationException | IllegalStateException e) {
+            return Long.MAX_VALUE; // no sim clock (a bare unit test): BallVision then uses when the pipeline got it
+        }
+    }
+
+    private void process(Mat image, long captureNanos) {
+        Object result = processor.processFrame(image, captureNanos);
         if (saveTo != null && frames % saveEvery == 0) {
-            Mat shown = rgb.clone();
+            Mat shown = image.clone();
             drawFound(shown, result);
             save(shown, saveTo.resolve(String.format("frame-%04d.png", frames)));
             shown.release();

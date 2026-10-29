@@ -94,6 +94,8 @@ class SoloCarrySimTest {
                 scenario("limelight-dies-early", Alliance.RED, 33, sim -> sim.blindLimelight(2), 0, 0, 0),
                 scenario("limelight-dies-later", Alliance.RED, 33, sim -> sim.blindLimelight(10), 0, 0, 0),
                 scenario("no-tags-drifting", Alliance.RED, 33, 1, sim -> sim.blindLimelight().imuDrift(IMU_DRIFT), 1, 1, 2),
+                // The ball camera as a Control Hub runs it: 10 frames a second, 100 ms late, 30% of balls missed
+                scenario("slow-ball-camera", Alliance.RED, 33, sim -> sim.ballCamera(10, 100, 6, 0.3), 0, 0, 0),
                 scenario("blue", Alliance.BLUE, 33, sim -> sim.imuDrift(IMU_DRIFT), 0, 0, 0),
                 scenario("everything", Alliance.BLUE, 13,
                         sim -> sim.imuDrift(-IMU_DRIFT).shotSpread(3, 0.03, 1.5), 1.5, 1.5, -4));

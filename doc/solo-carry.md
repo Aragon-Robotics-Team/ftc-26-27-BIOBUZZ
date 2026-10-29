@@ -2,7 +2,7 @@
 
 `routines/SoloCarry.java` (Auto menu: `SOLO_CARRY`) scores alone with a partner that only parks. It shoots the 4
 preloads into the up cell (with the 3 staged nectar, that tips it), chases pollen with the ball camera (the garden first),
-shoots it into the cell that's up now, and parks. The sim runs it in 16 scenarios (`SoloCarrySimTest`): 39 to 47
+shoots it into the cell that's up now, and parks. The sim runs it in 17 scenarios (`SoloCarrySimTest`): 39 to 47
 points, both robots parked in all (the flowers' pollen stays in the flowers; the intake only takes a ball whose
 center is between its side plates). None of its timing or noise numbers have been checked on the
 robot yet. This is what to check, roughly in order.
