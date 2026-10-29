@@ -15,6 +15,7 @@ import org.firstinspires.ftc.teamcode.core.Alliance;
 import org.firstinspires.ftc.teamcode.core.Hive;
 import org.firstinspires.ftc.teamcode.core.MatchState;
 import org.firstinspires.ftc.teamcode.core.PollenChase;
+import org.firstinspires.ftc.teamcode.core.PoseFilter;
 import org.firstinspires.ftc.teamcode.core.Robot;
 import org.firstinspires.ftc.teamcode.core.RobotConstants;
 import org.firstinspires.ftc.teamcode.util.MatchLog;
@@ -44,6 +45,8 @@ public class SoloCarry extends AutoRoutine {
     private static final double TIP_LOAD = 8, START_LOAD = 5;
     // Time to leave for parking: the drive there at about this speed, plus a margin for the turn and settling
     private static final double PARK_SPEED = 30, PARK_MARGIN_S = 2.5;
+    // Room between our park spot and the partner (parked at the rear end), and the most it parks short when unsure
+    private static final double PARK_GAP = 4, PARK_SHORT_MAX = 8;
     // Time a chase leaves for driving to the launch spot and shooting, and the shortest chase worth starting
     private static final double SHOOT_RESERVE_S = 5.5, MIN_CHASE_S = 2;
 
@@ -89,8 +92,11 @@ public class SoloCarry extends AutoRoutine {
                 deadline(carry.raceWith(waitUntil(this::timeToPark)), robot.aimAtHive(), robot.enableFlywheel()),
                 robot.stopShooting(),
                 robot.intake.off(),
-                instant(() -> stage("parking")),
-                robot.driveTo(park),
+                lazy(() -> {
+                    Pose to = parkSpot();
+                    stage(to == park ? "parking" : "parking short: pose unsure by " + Math.round(alongWallSigma()) + " in");
+                    return robot.driveTo(to);
+                }),
                 instant(() -> stage("parked")));
     }
 
@@ -159,6 +165,22 @@ public class SoloCarry extends AutoRoutine {
 
     private double timeLeft() {
         return AUTO_S - clock.seconds();
+    }
+
+    /**
+     * The park spot, or short of it, away from the partner, when the pose is too unsure (no tags seen for a while) for
+     * the 4 in left between them: by twice the pose's uncertainty along the wall less that gap, up to PARK_SHORT_MAX.
+     * Better out of the zone than into the partner (it could knock it out of the zone too).
+     */
+    private Pose parkSpot() {
+        double shortBy = Math.min(PARK_SHORT_MAX, 2 * alongWallSigma() - PARK_GAP);
+        if (shortBy <= 0) return park;
+        return poseFactory.of(9, 96 + 2 - RobotConstants.Field.ROBOT_LENGTH / 2 - shortBy, 90);
+    }
+
+    /** The fused pose's standard deviation along the alliance wall, inches. */
+    private double alongWallSigma() {
+        return robot.drivebase.getLocalizer().getFilter().sigma(PoseFilter.Y);
     }
 
     /** Time the drive to the park spot needs from here. */

@@ -162,6 +162,7 @@ public final class BiobuzzRobotSim {
     private final List<ObstacleBox> solid = new ArrayList<>();
     private String touching = "";
     private final double[] lastAxis = {Double.NaN, Double.NaN, Double.NaN}; // reportLimelight's last turret pose
+    private boolean limelightBlind;
     // The Pinpoint's IMU drifting (imuDrift): radians a second, and how far it has drifted. The Pinpoint is fed a
     // chassis turned that far, moved along by each tick's true motion turned that far too, so its pods still count
     // the true motion in the robot's frame and only its heading is off (Pedro inches)
@@ -262,6 +263,21 @@ public final class BiobuzzRobotSim {
      */
     public BiobuzzRobotSim imuDrift(double degreesPerSecond) {
         imuDriftPerS = Math.toRadians(degreesPerSecond);
+        return this;
+    }
+
+    /**
+     * Shots go off by chance (seeded): exit speed off by speedFraction and direction by headingDegrees, standard
+     * deviations, as balls that differ and a flywheel that sags would send them.
+     */
+    public BiobuzzRobotSim shotSpread(long seed, double speedFraction, double headingDegrees) {
+        launcher.spread(seed, speedFraction, Math.toRadians(headingDegrees));
+        return this;
+    }
+
+    /** The Limelight sees no tags (unplugged, or the pipeline wrong): hive vision and the tag fusion get nothing. */
+    public BiobuzzRobotSim blindLimelight() {
+        limelightBlind = true;
         return this;
     }
 
@@ -477,7 +493,8 @@ public final class BiobuzzRobotSim {
         lastAxis[0] = axis[0];
         lastAxis[1] = axis[1];
         lastAxis[2] = yaw;
-        limelight.setRobotPose(x - 72, y - 72, ahead);
+        if (limelightBlind) limelight.setRobotPose(-10000, -10000, 0); // far off the field: no tag in range
+        else limelight.setRobotPose(x - 72, y - 72, ahead);
     }
 
     /** The turret axis, Pedro coordinates: TURRET_OFFSET_X/Y from the robot center. */

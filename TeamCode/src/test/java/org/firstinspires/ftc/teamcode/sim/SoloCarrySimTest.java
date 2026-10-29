@@ -3,6 +3,8 @@ package org.firstinspires.ftc.teamcode.sim;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import com.pedropathing.math.Pose;
+
 import org.firstinspires.ftc.teamcode.core.Alliance;
 import org.firstinspires.ftc.teamcode.core.RobotConstants;
 import org.firstinspires.ftc.teamcode.opmodes.Auto;
@@ -10,21 +12,32 @@ import org.firstinspires.ftc.teamcode.routines.Routines;
 import org.horizon36596.simloop.opmode.OpModePhase;
 import org.horizon36596.simloop.opmode.OpModeRunResult;
 import org.junit.jupiter.api.BeforeAll;
+import org.junit.jupiter.api.DynamicTest;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.TestFactory;
 
 import java.nio.file.Paths;
 import java.util.List;
+import java.util.Locale;
+import java.util.function.UnaryOperator;
+import java.util.stream.Stream;
 
 /**
- * The Solo Carry Auto (routines/SoloCarry) on red, the match's staged balls, a partner that only parks (SimPartner),
- * and the Pinpoint's IMU drifting IMU_DRIFT degrees a second (harsh: more than a shaken IMU is likely to). It should
- * tip the hive, park clear of the partner, and keep its pose with the hive's tags while the Pinpoint's goes off
- * (pedro.FusedLocalizer). Logged to solo-carry.rlog, the ball camera's frames (every 5th, rings on what the pipeline
- * found) to build/sim/solo-carry-frames/.
+ * The Solo Carry Auto (routines/SoloCarry): the match's staged balls and a partner that only parks (SimPartner).
+ *
+ * The reference run, on red with the Pinpoint's IMU drifting IMU_DRIFT degrees a second (harsh: more than a shaken IMU
+ * is likely to), should tip the hive, park clear of the partner, and keep its pose with the hive's tags while the
+ * Pinpoint's goes off (pedro.FusedLocalizer). Logged to solo-carry.rlog, the ball camera's frames (every 5th, rings on
+ * what the pipeline found) to build/sim/solo-carry-frames/.
+ *
+ * The scenarios run it again with what goes wrong on a real field: the robot set down off its start, shots that
+ * scatter (some miss, so its count of what's in the cell is wrong), no tags at all, blue. Each has to end with both
+ * robots parked apart and score at least its floor. Logged to solo-carry-<scenario>.rlog.
  */
 class SoloCarrySimTest {
     private static final double IMU_DRIFT = 0.5; // degrees a second: 15° over the 30 s
     private static final int FIRST_PRESS_TICK = 30; // after Auto's init (the Pinpoint's 500 ms)
+    private static final Pose RED_START = new Pose(RobotConstants.Field.ROBOT_LENGTH / 2, 36, 0); // allianceWallStart
 
     @BeforeAll
     static void loadOpenCv() {
@@ -33,50 +46,110 @@ class SoloCarrySimTest {
 
     @Test
     void itTipsTheHiveAloneParksAndKeepsItsPose() throws java.io.IOException {
-        List<Routines> routines = Routines.enabled();
-        int menuIndex = routines.indexOf(Routines.SOLO_CARRY);
-        int allianceTick = FIRST_PRESS_TICK + 2 * menuIndex;
         BiobuzzRobotSim sim = new BiobuzzRobotSim().withParkingPartner().imuDrift(IMU_DRIFT);
-        sim.placeAt(RobotConstants.Field.ROBOT_LENGTH / 2, 36, 0); // FieldPoses.allianceWallStart
-
         sim.webcam.saveFrames(Paths.get("build", "sim", "solo-carry-frames"), 5);
+        Outcome run = run("solo-carry", Alliance.RED, sim, 0, 0, 0);
+        Errors errors = errors(sim.trace, SimTelemetry.poses(run.sent));
+        System.out.printf("Solo carry pose, IMU drifting %.1f°/s: fused off by %.2f in on average (%.2f at most, %.2f° "
+                        + "heading at most); the Pinpoint alone by %.2f in (%.2f at most, %.2f° at the end)%n", IMU_DRIFT,
+                errors.fusedMean, errors.fusedMax, errors.fusedHeadingMax, errors.odometryMean, errors.odometryMax,
+                errors.odometryHeadingEnd);
+
+        assertTrue(run.tips >= 1, "it should tip the hive on its own");
+        assertEquals(2, run.parked, "both robots should end in the loading zone");
+        assertTrue(run.apart > 0.5, "it should park clear of the partner, " + run.apart + " in apart");
+        // Tags are only in view from the up cell's side, so the fused pose drifts too while the robot is on the other
+        // side, and comes back when they're seen again
+        assertTrue(errors.fusedMean < 1, "the fused pose should stay within 1 in on average, was " + errors.fusedMean);
+        assertTrue(errors.odometryMean > 3 * errors.fusedMean, "the drift should throw the Pinpoint off much further");
+        assertTrue(errors.fusedMax < errors.odometryMax / 2, "the fused pose's worst should be well under the Pinpoint's");
+    }
+
+    /**
+     * What could go wrong, one at a time and together. Floors: a tip, both parked, apart (20 + 3 + 10), except where
+     * the shots scatter enough that the preload might not tip it, where it's both parked (13).
+     *
+     * With no tags and the IMU drifting, nothing corrects the heading: by the end the pose is about 16 in off, well
+     * past the 2 to 4 in the park has to spare, and the filter thinks it's off by half that (the drift is steady, the
+     * filter models it as random). It parks short of the partner by what it knows, which isn't enough here: all that's
+     * asked is that the partner stays parked. A Limelight check before the match is the fix.
+     */
+    @TestFactory
+    Stream<DynamicTest> scenarios() {
+        return Stream.of(
+                scenario("set-down-off", Alliance.RED, 33, sim -> sim.imuDrift(IMU_DRIFT), 1.5, -1.5, 4),
+                scenario("set-down-off-other-way", Alliance.RED, 33, sim -> sim.imuDrift(-IMU_DRIFT), -1, 2, -5),
+                scenario("shots-scatter", Alliance.RED, 13, sim -> sim.shotSpread(1, 0.03, 1.5), 0, 0, 0),
+                scenario("shots-scatter-2", Alliance.RED, 13, sim -> sim.shotSpread(2, 0.03, 1.5), 0, 0, 0),
+                scenario("no-tags", Alliance.RED, 33, sim -> sim.blindLimelight(), 0, 0, 0),
+                scenario("no-tags-drifting", Alliance.RED, 33, 1, sim -> sim.blindLimelight().imuDrift(IMU_DRIFT), 1, 1, 2),
+                scenario("blue", Alliance.BLUE, 33, sim -> sim.imuDrift(IMU_DRIFT), 0, 0, 0),
+                scenario("everything", Alliance.BLUE, 13,
+                        sim -> sim.imuDrift(-IMU_DRIFT).shotSpread(3, 0.03, 1.5), 1.5, 1.5, -4));
+    }
+
+    private DynamicTest scenario(String name, Alliance alliance, int floor, UnaryOperator<BiobuzzRobotSim> setUp,
+                                 double dx, double dy, double dhDegrees) {
+        return scenario(name, alliance, floor, 2, setUp, dx, dy, dhDegrees);
+    }
+
+    private DynamicTest scenario(String name, Alliance alliance, int floor, int parked,
+                                 UnaryOperator<BiobuzzRobotSim> setUp, double dx, double dy, double dhDegrees) {
+        return DynamicTest.dynamicTest(name, () -> {
+            BiobuzzRobotSim sim = setUp.apply(new BiobuzzRobotSim().alliance(alliance).withParkingPartner());
+            Outcome run = run("solo-carry-" + name, alliance, sim, dx, dy, dhDegrees);
+            assertTrue(run.parked >= parked, name + ": " + run.parked + " robots parked, should be " + parked);
+            if (parked == 2) assertTrue(run.apart > 0.5, name + ": it should park clear of the partner, " + run.apart + " in apart");
+            assertTrue(run.points >= floor, name + ": " + run.points + " points, under its floor of " + floor);
+        });
+    }
+
+    private static final class Outcome {
+        List<List<String>> sent;
+        int points, tips, parked;
+        double apart;
+    }
+
+    /**
+     * Picks Solo Carry and the alliance on the menu and runs the 30 s, with the robot set down (dx, dy) inches and
+     * dhDegrees off its start (red's frame: dx out from the alliance wall).
+     */
+    private static Outcome run(String name, Alliance alliance, BiobuzzRobotSim sim, double dx, double dy,
+                               double dhDegrees) {
+        List<Routines> routines = Routines.enabled();
+        int allianceTick = FIRST_PRESS_TICK + 2 * routines.indexOf(Routines.SOLO_CARRY);
+        Pose start = alliance.apply(new Pose(RED_START.x() + dx, RED_START.y() + dy,
+                RED_START.heading() + Math.toRadians(dhDegrees)));
+        sim.placeAt(start.x(), start.y(), start.heading());
         OpModeRunResult result = sim.runner(Auto.class)
                 .initLoopTicks(FIRST_PRESS_TICK + 2 * routines.size() + 10)
                 .activeTicks(1500) // 30 s
                 .gamepads(sim.drivers((phase, tick, gamepad1, gamepad2) -> {
                     boolean menu = phase == OpModePhase.INIT_LOOP;
                     gamepad1.dpad_down = menu && tick >= FIRST_PRESS_TICK && tick < allianceTick && tick % 2 == 0;
-                    gamepad1.b = menu && tick == allianceTick;
+                    gamepad1.b = menu && tick == allianceTick && alliance == Alliance.RED;
+                    gamepad1.x = menu && tick == allianceTick && alliance == Alliance.BLUE;
                 }))
-                .runLogged(BiobuzzRobotSim.ROBOT_CONFIG, Paths.get("build", "sim", "solo-carry.rlog"));
+                .runLogged(BiobuzzRobotSim.ROBOT_CONFIG, Paths.get("build", "sim", name + ".rlog"));
 
-        List<List<String>> sent = result.telemetry().transmissions();
-        assertTrue(SimTelemetry.lastLine(sent, "Routine").contains("SOLO_CARRY"), "the menu didn't land on Solo Carry");
+        Outcome run = new Outcome();
+        run.sent = result.telemetry().transmissions();
+        assertTrue(SimTelemetry.lastLine(run.sent, "Routine").contains("SOLO_CARRY"), "the menu didn't land on Solo Carry");
         // Both park along the alliance wall, the partner (18 in square) toward the rear: the gap between them along it,
-        // ours facing along the wall (RobotConstants.Field.ROBOT_LENGTH that way)
-        double[] partner = sim.partnerAt();
-        double apart = partner[1] - 9 - (sim.y() + Math.abs(Math.sin(sim.heading())) * RobotConstants.Field.ROBOT_LENGTH / 2
+        // in red's frame, ours facing along the wall (RobotConstants.Field.ROBOT_LENGTH that way)
+        Pose partner = alliance.apply(new Pose(sim.partnerAt()[0], sim.partnerAt()[1], 0));
+        Pose us = alliance.apply(new Pose(sim.x(), sim.y(), sim.heading()));
+        run.apart = partner.y() - 9 - (us.y() + Math.abs(Math.sin(sim.heading())) * RobotConstants.Field.ROBOT_LENGTH / 2
                 + Math.abs(Math.cos(sim.heading())) * RobotConstants.Field.ROBOT_WIDTH / 2);
-        int garden = SimField.ballsIn(sim.field, SimField.garden(Alliance.RED));
-        Errors errors = errors(sim.trace, SimTelemetry.poses(sent));
+        run.points = sim.match.score(alliance);
+        run.tips = sim.match.tips(alliance);
+        run.parked = sim.match.parked(alliance);
         System.out.println("Solo carry warnings: " + result.warnings());
-        System.out.printf("Solo carry: %d shots, %d held, %d points (%d tips, %d in the cell, %d parked); ended at x %.1f"
-                        + " y %.1f, %.1f in from the partner; %d left in the garden%n", sim.shotsFired(), sim.field.getHeldCount(),
-                sim.match.score(Alliance.RED), sim.match.tips(Alliance.RED), sim.match.cellBalls(Alliance.RED),
-                sim.match.parked(Alliance.RED), sim.x(), sim.y(), apart, garden);
-        System.out.printf("Solo carry pose, IMU drifting %.1f°/s: fused off by %.2f in on average (%.2f at most, %.2f° "
-                        + "heading at most); the Pinpoint alone by %.2f in (%.2f at most, %.2f° at the end)%n", IMU_DRIFT,
-                errors.fusedMean, errors.fusedMax, errors.fusedHeadingMax, errors.odometryMean, errors.odometryMax,
-                errors.odometryHeadingEnd);
-
-        assertTrue(sim.match.tips(Alliance.RED) >= 1, "it should tip the hive on its own");
-        assertEquals(2, sim.match.parked(Alliance.RED), "both robots should end in the loading zone");
-        assertTrue(apart > 0.5, "it should park clear of the partner, " + apart + " in apart");
-        // Tags are only in view from the up cell's side, so the fused pose drifts too while the robot is on the other
-        // side, and comes back when they're seen again
-        assertTrue(errors.fusedMean < 1, "the fused pose should stay within 1 in on average, was " + errors.fusedMean);
-        assertTrue(errors.odometryMean > 3 * errors.fusedMean, "the drift should throw the Pinpoint off much further");
-        assertTrue(errors.fusedMax < errors.odometryMax / 2, "the fused pose's worst should be well under the Pinpoint's");
+        System.out.printf(Locale.US, "Solo carry %s: %d shots, %d held, %d points (%d tips, %d in the cell, %d parked); "
+                        + "ended at x %.1f y %.1f, %.1f in from the partner; %d left in the garden%n", name,
+                sim.shotsFired(), sim.field.getHeldCount(), run.points, run.tips, sim.match.cellBalls(alliance),
+                run.parked, sim.x(), sim.y(), run.apart, SimField.ballsIn(sim.field, SimField.garden(alliance)));
+        return run;
     }
 
     private static final class Errors {
@@ -118,7 +191,6 @@ class SoloCarrySimTest {
                 if (best == null || e.fusedMean < best.fusedMean) best = e;
             }
         }
-        System.out.printf("Solo carry: %d transmissions, %d ticks, %d a tick%n", poses.size(), trace.size(), stride);
         return best;
     }
 }

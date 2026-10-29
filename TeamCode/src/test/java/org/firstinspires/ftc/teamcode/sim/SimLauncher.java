@@ -44,6 +44,8 @@ final class SimLauncher {
     private final ShotArcRecorder shots = new ShotArcRecorder(SHOT_SLOTS);
 
     private double intakeWait, feedWait;
+    private java.util.Random spread;              // null: every shot exactly as the flywheel and turret send it
+    private double speedSpread, headingSpread;
     private int flying = -1;                       // id of the newest shot while it's in the air
     private final List<double[]> flown = new ArrayList<>();
     private int shotsFired;
@@ -61,6 +63,13 @@ final class SimLauncher {
     /** Balls the robot starts holding (the match's preload). */
     void preload(Ball.Type type, int count) {
         for (int i = 0; i < count; i++) field.addHeldPiece(type.name(), type.diameter / 2);
+    }
+
+    /** Each shot's exit speed off by this fraction and its direction by this many radians (standard deviations). */
+    void spread(long seed, double speedFraction, double headingRadians) {
+        spread = new java.util.Random(seed);
+        speedSpread = speedFraction;
+        headingSpread = headingRadians;
     }
 
     int shotsFired() {
@@ -96,6 +105,10 @@ final class SimLauncher {
         double ex = x + r * Math.cos(heading), ey = y + r * Math.sin(heading);
         double ez = RobotConstants.Launcher.EXIT_HEIGHT;
         double speed = Math.abs(flywheel.getVelocity()) / RobotConstants.Launcher.FLYWHEEL_TICKS_PER_EXIT_SPEED;
+        if (spread != null) {
+            speed *= 1 + speedSpread * spread.nextGaussian();
+            heading += headingSpread * spread.nextGaussian();
+        }
         double horizontal = speed * Math.cos(hood);
         field.launch(id, "launcher", ex, ey, ez, horizontal * Math.cos(heading) + vx,
                 horizontal * Math.sin(heading) + vy, speed * Math.sin(hood));
