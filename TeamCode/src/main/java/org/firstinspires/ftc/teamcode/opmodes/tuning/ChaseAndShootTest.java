@@ -22,6 +22,7 @@ import com.qualcomm.robotcore.eventloop.opmode.Autonomous;
 import com.qualcomm.robotcore.eventloop.opmode.OpMode;
 import com.qualcomm.robotcore.util.ElapsedTime;
 
+import org.firstinspires.ftc.teamcode.core.FieldRoutes;
 import org.firstinspires.ftc.teamcode.core.Hive;
 import org.firstinspires.ftc.teamcode.core.MatchState;
 import org.firstinspires.ftc.teamcode.core.PollenChase;
@@ -37,7 +38,7 @@ import java.util.List;
 /**
  * Chase-and-shoot cycles, over and over: the pollen chase until the robot has maxBalls (or a search turn finds nothing,
  * or timeoutS), then it drives to the Autos' launch spot for the cell it thinks is up (MatchState.hive, which hive
- * vision keeps right as the hive tips; see launchFor), around the hive's feet, with the turret on the hive and the
+ * vision keeps right as the hive tips; see launchFor), around flowers and the hive's feet, with the turret on the hive and the
  * flywheel spinning up, shoots what it has, and chases again from there for the room left. It stops when a chase picks
  * up nothing, or when there's no shot from the launch spot. A test, not a menu Auto.
  *
@@ -135,57 +136,17 @@ public class ChaseAndShootTest extends OpMode {
         return MatchState.alliance.apply(red);
     }
 
-    /** From wherever the robot is, in straight lines, going around a hive foot that's in the way. */
+    /** From wherever the robot is, in straight lines, around flowers and hive feet in the way (FieldRoutes). */
     private Command driveTo(Pose target) {
         List<Command> legs = new ArrayList<>();
         Pose from = follower.pose();
-        for (double[] p : aroundFeet(from, target)) {
+        for (double[] p : FieldRoutes.between(from, target)) {
             Pose via = new Pose(p[0], p[1], target.heading());
             legs.add(follow(follower, line(from, via).linear(from, via)));
             from = via;
         }
         legs.add(follow(follower, line(from, target).linear(from, target)));
         return sequential(legs.toArray(new Command[0]));
-    }
-
-    /**
-     * Where to go first to get from a to b without driving into a hive foot, Pedro (x, y): the corner of the first foot
-     * in the way, grown by the robot's half diagonal and KEEP_OUT_MARGIN, on a's side of it and b's end of it; before
-     * that, straight out sideways if a is already that close to the foot. Empty if no foot is in the way. The feet are
-     * the same for both alliances.
-     */
-    private static List<double[]> aroundFeet(Pose a, Pose b) {
-        List<double[]> points = new ArrayList<>();
-        double grow = Math.hypot(RobotConstants.Field.ROBOT_LENGTH, RobotConstants.Field.ROBOT_WIDTH) / 2
-                + RobotConstants.Field.KEEP_OUT_MARGIN;
-        for (double[] foot : RobotConstants.Field.HIVE_FEET) {
-            double x0 = foot[0] - grow, y0 = foot[1] - grow, x1 = foot[2] + grow, y1 = foot[3] + grow;
-            boolean inside = a.x() > x0 && a.x() < x1 && a.y() > y0 && a.y() < y1;
-            if (!inside && !crosses(a.x(), a.y(), b.x(), b.y(), x0, y0, x1, y1)) continue;
-            double x = a.x() < (x0 + x1) / 2 ? x0 : x1;
-            double y = b.y() < (y0 + y1) / 2 ? y0 : y1;
-            if (inside) points.add(new double[] {x, a.y()});
-            points.add(new double[] {x, y});
-            break;
-        }
-        return points;
-    }
-
-    /** Whether the segment from (ax, ay) to (bx, by) passes through the box (Liang–Barsky clipping). */
-    private static boolean crosses(double ax, double ay, double bx, double by, double x0, double y0, double x1, double y1) {
-        double t0 = 0, t1 = 1, dx = bx - ax, dy = by - ay;
-        double[] p = {-dx, dx, -dy, dy}, q = {ax - x0, x1 - ax, ay - y0, y1 - ay};
-        for (int i = 0; i < 4; i++) {
-            if (p[i] == 0) {
-                if (q[i] < 0) return false;
-                continue;
-            }
-            double t = q[i] / p[i];
-            if (p[i] < 0) t0 = Math.max(t0, t);
-            else t1 = Math.min(t1, t);
-            if (t0 > t1) return false;
-        }
-        return true;
     }
 
     @Override

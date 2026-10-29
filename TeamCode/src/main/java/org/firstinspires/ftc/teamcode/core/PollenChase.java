@@ -15,6 +15,8 @@ import org.firstinspires.ftc.teamcode.pedro.Constants;
 import org.firstinspires.ftc.teamcode.subsystems.BallVision;
 import org.firstinspires.ftc.teamcode.vision.PollenTracker;
 
+import java.util.List;
+
 /**
  * Drives the intake over pollen the ball camera sees, one after another, with the intake running.
  *
@@ -24,6 +26,7 @@ import org.firstinspires.ftc.teamcode.vision.PollenTracker;
  * path is done, the target has to stay out of sight for CONFIRM_S to count as picked up; if it shows up again (pushed
  * or bounced) the chase goes after it again, up to MAX_TRIES times.
  *
+ * A flower or hive foot in the way is driven around (FieldRoutes): the path goes to the first waypoint, then on.
  * A target the robot gets no closer to for STUCK_S (pinned against a wall, say) is skipped for the rest of the chase.
  *
  * With nothing to chase it searches: turns in place at SEARCH_TURN_RATE, toward the side the camera looks, until pollen
@@ -59,6 +62,8 @@ public class PollenChase {
     private PollenTracker.Target chasing;
     private int tries;
     private Pose goal;
+    // A waypoint around a flower or hive foot on the way to goal, while the robot is driving to it
+    private Pose detour;
 
     public PollenChase(Robot robot, int maxBalls, double timeoutS) {
         this.robot = robot;
@@ -103,6 +108,7 @@ public class PollenChase {
         progressPose = null;
         chasing = null;
         goal = null;
+        detour = null;
         vision.tracker().drop();
         vision.clearSkips();
     }
@@ -120,6 +126,7 @@ public class PollenChase {
             chasing = target;
             tries = 0;
             goal = null;
+            detour = null;
             state = State.APPROACH;
             progressPose = null;
         }
@@ -133,6 +140,7 @@ public class PollenChase {
         if (state != State.CONFIRM && stuck(t)) {
             vision.skip(target.x, target.y);
             tracker.drop();
+            detour = null;
             return;
         }
 
@@ -142,14 +150,14 @@ public class PollenChase {
                     enter(State.BLIND, target, t);
                 } else if (!inView && t - target.lastSeen > LOST_S) {
                     tracker.drop();
-                } else if (goal != null && !follower.following()) {
+                } else if (goal != null && detour == null && !follower.following()) {
                     enter(State.CONFIRM, target, t); // drove all the way and it's still in view
                 } else {
                     driveTo(target);
                 }
                 break;
             case BLIND:
-                if (target.lastSeen > seenBefore) state = State.APPROACH; // it came back into view
+                if (target.lastSeen > seenBefore || detour != null) state = State.APPROACH; // back in view, or still going around
                 else if (!follower.following()) enter(State.CONFIRM, target, t);
                 break;
             case CONFIRM:
@@ -260,11 +268,22 @@ public class PollenChase {
         double ux = dx / distance, uy = dy / distance;
         double x = clamp(target.x + ux * (OVERSHOOT - INTAKE_REACH));
         double y = clamp(target.y + uy * (OVERSHOOT - INTAKE_REACH));
+        if (detour != null) {
+            if (follower.following()) return; // still going around
+            detour = null;                    // around it: on to the ball
+            goal = null;
+        }
         if (goal != null && Math.hypot(x - goal.x(), y - goal.y()) < REPLAN_DISTANCE) return;
 
         double heading = Math.atan2(uy, ux) - INTAKE_HEADING_OFFSET;
         goal = new Pose(x, y, heading);
-        follower.follow(line(pose, goal).constant(heading)
+        Pose end = goal;
+        List<double[]> route = FieldRoutes.between(pose, goal);
+        if (!route.isEmpty()) {
+            detour = new Pose(route.get(0)[0], route.get(0)[1], heading);
+            end = detour;
+        }
+        follower.follow(line(pose, end).constant(heading)
                 .with(Constants.foresightConfig.maxPathSpeed.at(CHASE_MAX_SPEED)));
     }
 
