@@ -442,7 +442,9 @@ public class PollenChase {
             detourLinesUp = true;
             end = lineUp;
         }
-        follower.follow(line(pose, end).constant(heading)
+        // Kept to our side, the goal can come out where the robot already is (Pedro won't follow a line of no length)
+        if (Math.hypot(end.x() - pose.x(), end.y() - pose.y()) < 0.5) follower.hold(end);
+        else follower.follow(line(pose, end).constant(heading)
                 .with(Constants.foresightConfig.maxVelocityConstraint.at(end == goal ? speed : CHASE_MAX_SPEED)));
     }
 
