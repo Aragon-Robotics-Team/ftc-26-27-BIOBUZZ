@@ -14,6 +14,7 @@ import com.pedropathing.ivy.Scheduler;
 import com.pedropathing.math.Pose;
 import com.pedropathing.utils.Angle;
 import com.qualcomm.robotcore.eventloop.opmode.OpMode;
+import com.qualcomm.robotcore.hardware.Gamepad;
 import com.qualcomm.robotcore.util.ElapsedTime;
 
 import org.firstinspires.ftc.robotcore.external.Telemetry;
@@ -58,6 +59,11 @@ public class TeleOp extends OpMode {
     private Pose initCorner = null;
     private boolean started = false;
     private PanelsDisplay panelsDisplay;
+    // Gamepad 1 going quiet (watchGamepad): its last timestamp, when it changed (ms on clock), and the longest gap
+    private long padStamp;
+    private boolean padMoving;
+    private double padChangedMs = Double.NaN, longestPadGapMs, longestPadGapAtS;
+    private int padGaps;
 
     @Override
     public void init() {
@@ -123,6 +129,7 @@ public class TeleOp extends OpMode {
     @Override
     public void loop() {
         MatchLog.beginLoop();
+        watchGamepad();
         bindControls();
 
         robot.update();
@@ -184,6 +191,34 @@ public class TeleOp extends OpMode {
         }
     }
 
+    private static final int PAD_GAP_MS = 200;
+
+    /**
+     * Times how long gamepad 1's data goes without changing while the driver was using it. Its timestamp only moves
+     * when the driver station sees an input change, so a gap counts only if, at its last update, a stick or trigger
+     * was off rest and none was pinned at its limit (a still or pinned stick stops the timestamp too). A long gap here
+     * while the robot kept driving means the driver station stopped sending: the gamepad, its USB, or the Wi-Fi.
+     */
+    private void watchGamepad() {
+        // Through a local: tools/ControlLayout follows gamepad1 and Gamepad parameters, and would draw these as controls
+        Gamepad pad = gamepad1;
+        double now = clock.milliseconds();
+        if (pad.timestamp == padStamp && !Double.isNaN(padChangedMs)) return;
+        double gap = now - padChangedMs;
+        if (padMoving && gap > longestPadGapMs) {
+            longestPadGapMs = gap;
+            longestPadGapAtS = clock.seconds();
+        }
+        if (padMoving && gap > PAD_GAP_MS) padGaps++;
+        padStamp = pad.timestamp;
+        padChangedMs = now;
+        float[] axes = {pad.left_stick_x, pad.left_stick_y, pad.right_stick_x, pad.right_stick_y, pad.left_trigger,
+                pad.right_trigger};
+        boolean pinned = false;
+        for (float axis : axes) pinned |= Math.abs(axis) >= 0.98;
+        padMoving = !pad.atRest() && !pinned;
+    }
+
     /**
      * Three tiers, most important first:
      * 1. the field diagram, then what the drivers need mid-match under it,
@@ -226,6 +261,9 @@ public class TeleOp extends OpMode {
         telemetry.addLine(String.format("Pose %.1f, %.1f", pose.x(), pose.y()));
         telemetry.addLine(heading);
         telemetry.addLine(String.format("Loop %.1f ms %.0f Hz", loopMs, 1000 / loopMs));
+        telemetry.addLine(String.format("Gamepad 1 updated %.0f ms ago (stamp %d)", clock.milliseconds() - padChangedMs, padStamp));
+        telemetry.addLine(String.format("Gamepad 1 longest gap %.0f ms at %.1f s (%d over %d ms)",
+                longestPadGapMs, longestPadGapAtS, padGaps, PAD_GAP_MS));
         telemetry.addLine("Follower " + robot.drivebase.getFollower().mode());
 
         // ---- 3. Everything else ----

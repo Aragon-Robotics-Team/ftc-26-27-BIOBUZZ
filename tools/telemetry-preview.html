@@ -505,6 +505,8 @@ function lines(s) {
   add(`Pose ${f(s.pose.x, 1)}, ${f(s.pose.y, 1)}`);
   add(`Heading ${f(s.pose.h, 0)}° → ${f(s.headingTarget, 0)}°`);
   add(`Loop ${f(s.loopMs, 1)} ms ${f(1000 / s.loopMs, 0)} Hz`);
+  add(`Gamepad 1 updated ${f(s.padAge, 0)} ms ago (stamp 412345)`);
+  add(`Gamepad 1 longest gap ${f(s.padGap, 0)} ms at ${f(s.padGapAt, 1)} s (${s.padGaps} over 200 ms)`);
   add("Follower MANUAL");
   tiers.push(out.length);
 
@@ -544,6 +546,7 @@ const base = {
   aiming: true, feasible: true, sotm: true, lead: 3.1,
   alliance: "RED", hive: "RIGHT", intake: "INTAKE", feeding: false, gate: false, loopMs: 11.5,
   pose: { x: 26, y: 104, h: -30 }, headingTarget: -30,
+  padAge: 8, padGap: 60, padGapAt: 12.4, padGaps: 0,
 };
 const scenarios = [
   ["Ready to shoot", {}],
@@ -555,6 +558,7 @@ const scenarios = [
   ["Flywheel off", { spinning: false, actual: 0, pose: { x: 100, y: 110, h: 180 } }],
   ["Turning to the right stick", { pose: { x: 30, y: 96, h: -30 }, headingTarget: 60 }],
   ["Operator nudged", { velNudge: 50, turNudge: -2, turretTarget: 10.9, turret: 10.6, actual: 2020, target: 1980 }],
+  ["Gamepad went quiet", { padGap: 420, padGapAt: 63.2, padGaps: 1 }],
 ];
 let state = structuredClone(base);
 let current = 0;
