@@ -334,7 +334,6 @@ public class RobotConstants {
         public static double HIVE_OPENING_TILT = Math.toRadians(30);
 
         // Flower column centers, one on each perimeter wall 48 in from a corner, about 3.5 in off the wall. The set looks the same from both alliances, so it's used as is for blue.
-        // TODO: check against the real field
         public static Pose[] FLOWERS = {
                 new Pose(48, 140.5),  // rear wall
                 new Pose(96, 3.5),    // audience wall
