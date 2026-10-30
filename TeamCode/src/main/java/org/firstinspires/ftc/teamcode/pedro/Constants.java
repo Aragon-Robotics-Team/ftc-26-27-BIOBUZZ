@@ -21,7 +21,7 @@ import org.firstinspires.ftc.robotcore.external.navigation.DistanceUnit;
  * so paste their output over it. Run them in order (see Tuning): Mecanum Tuner, Pinpoint Tuner, Foresight Tuner.
  */
 public class Constants {
-    // goBILDA 312 RPM mecanum
+    // goBILDA 435 RPM mecanum, 104 mm wheels: 93 in/s free at 12 V
     public static MecanumConfig drivetrainConfig = new MecanumConfig(c -> {
         c.frontLeftName.set("leftFront");
         c.backLeftName.set("leftRear");
@@ -52,12 +52,14 @@ public class Constants {
                 Controller primaryTranslationalLateral = Controller.proportional(0.4593751113521609);
                 Controller secondaryTranslationalLateral = Controller.proportional(0.1697268289155812);
 
-                c.forwardTranslational.set(Controller.piecewise(secondaryTranslationalForward).put(2.5, primaryTranslationalForward));
-                c.strafeTranslational.set(Controller.piecewise(secondaryTranslationalLateral).put(2.5, primaryTranslationalLateral));
+                // Not the tuner's Controller.piecewise: see twoSlope. Keep this when pasting new tuner output
+                c.forwardTranslational.set(twoSlope(secondaryTranslationalForward, primaryTranslationalForward));
+                c.strafeTranslational.set(twoSlope(secondaryTranslationalLateral, primaryTranslationalLateral));
 
                 c.coast.set(Controller.proportionalFeedforward(0.010290518588093182));
                 c.brake.set(Controller.proportionalFeedforward(0.008746940799879204));
 
+                // Fine at the 20 ms Auto loop; rings at about 4 Hz if the loop gets slower than about 40 ms (then ~1.6)
                 c.headingFeedback.set(Controller.proportional(4.008601635578677));
                 c.headingBrakeCoefficients.set(Vector2D.cartesian(0.05119995476703657, 0.005495822160256111));
 
@@ -70,6 +72,18 @@ public class Constants {
                 c.naturalStrafeDeceleration.set(67.51615368616619);
             }
     );
+
+    /**
+     * The tuner's two translational gains with no jump between them: small on the first 2.5 in of error, large on the
+     * rest. Controller.piecewise puts the whole error on the large gain past 2.5 in, so a steady sideways load (a curve
+     * at speed) between the two gains' outputs there has no point to settle on, and the drive buzzes on that edge.
+     */
+    static Controller twoSlope(Controller small, Controller large) {
+        return (target, error) -> {
+            double edge = Math.copySign(Math.min(Math.abs(error), 2.5), error);
+            return small.calculate(target, edge) + large.calculate(target, error - edge);
+        };
+    }
 
     public static Mecanum drivetrain(HardwareMap hardwareMap) {
         return new Mecanum(hardwareMap, drivetrainConfig);
