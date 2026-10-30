@@ -2,7 +2,7 @@
 // Usage: node tools/limelight-mount-table.js [lensHeightIn] > doc/limelight-mount.md
 const M = require('./camera-model.js');
 
-const height = +(process.argv[2] || 11);
+const height = +(process.argv[2] || 12.2);
 const tilts = [0, 5, 10, 15, 20, 25, 30, 35, 40, 45];
 const LIMITS = { range: 110, off: 60 }; // estimates until measured on the practice hive
 const range = (a) => (a.length ? `${a[0]}–${a[a.length - 1]}` : 'none');

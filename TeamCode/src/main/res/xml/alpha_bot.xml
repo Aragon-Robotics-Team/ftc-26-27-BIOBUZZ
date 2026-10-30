@@ -16,4 +16,5 @@
         </LynxModule>
     </LynxUsbDevice>
     <Webcam name="webcam" serialNumber="UC852" />
+    <EthernetDevice name="limelight" serialNumber="EthernetOverUsb:eth0:172.29.0.24" ipAddress="172.29.0.1" />
 </Robot>

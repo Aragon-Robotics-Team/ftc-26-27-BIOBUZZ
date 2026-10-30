@@ -2,7 +2,6 @@ import java.awt.BasicStroke;
 import java.awt.Color;
 import java.awt.Font;
 import java.awt.Graphics2D;
-import java.awt.GraphicsEnvironment;
 import java.awt.RenderingHints;
 import java.awt.Shape;
 import java.awt.geom.AffineTransform;
@@ -71,8 +70,11 @@ import javax.imageio.ImageIO;
  * dpad_right left_stick right_stick left_stick_button right_stick_button. The tool prints any binding
  * that still needs a label and any label that no longer matches a binding.
  *
- * <p>Each PNG stores a fingerprint of what it shows, so an image is only redrawn when the text it shows
- * or this file change. That keeps git quiet when teammates with different fonts build.
+ * <p>Text is drawn from the fonts in tools/fonts (Inter, SIL Open Font License) as filled outlines, not with the
+ * machine's own fonts and text rendering, so a Mac and a Windows build draw the same pixels.
+ *
+ * <p>Each PNG stores a fingerprint of what it shows, so an image is only redrawn when the text it shows, the code
+ * in this file (not its comments) or the fonts change. That keeps git quiet on every build.
  */
 public class ControlLayout {
 
@@ -82,6 +84,7 @@ public class ControlLayout {
     static final String THIS_FILE = "tools/ControlLayout.java";
     static final String OUTPUT_DIR = "doc/controls";
     static final String FINGERPRINT_KEY = "control-layout";
+    static final String[] FONT_FILES = {"tools/fonts/Inter-Regular.ttf", "tools/fonts/Inter-Bold.ttf"};
 
     // SDK name -> control on the diagram (PlayStation names; the SDK treats a/cross etc. as the same button)
     static final Map<String, String> ALIASES = Map.ofEntries(
@@ -673,16 +676,19 @@ public class ControlLayout {
             PART = new Color(0xf7f7f8), ON = new Color(0x2563eb), ON_FILL = new Color(0xdbe7ff),
             LEAD = new Color(0x2563eb & 0xffffff | 190 << 24, true), AUTO = new Color(0x9a6700);
 
-    static final String FAMILY = pickFamily("Helvetica Neue", "Segoe UI", "Arial", "Liberation Sans", "DejaVu Sans");
-    static final Font H1 = new Font(FAMILY, Font.BOLD, 28), H3 = new Font(FAMILY, Font.BOLD, 16),
-            SUB = new Font(FAMILY, Font.PLAIN, 14), CTL = new Font(FAMILY, Font.BOLD, 14),
-            TAG = new Font(FAMILY, Font.PLAIN, 14), ACT = new Font(FAMILY, Font.PLAIN, 15),
-            ACT_AUTO = new Font(FAMILY, Font.ITALIC, 15);
+    static final Font REGULAR = loadFont(FONT_FILES[0]), BOLD = loadFont(FONT_FILES[1]);
+    static final Font H1 = BOLD.deriveFont(28f), H3 = BOLD.deriveFont(16f),
+            SUB = REGULAR.deriveFont(14f), CTL = BOLD.deriveFont(14f),
+            TAG = REGULAR.deriveFont(14f), ACT = REGULAR.deriveFont(15f),
+            // Slanted regular: there's no italic font file
+            ACT_AUTO = ACT.deriveFont(AffineTransform.getShearInstance(-0.2, 0));
 
-    static String pickFamily(String... preferred) {
-        Set<String> installed = Set.of(GraphicsEnvironment.getLocalGraphicsEnvironment().getAvailableFontFamilyNames());
-        for (String f : preferred) if (installed.contains(f)) return f;
-        return Font.SANS_SERIF;
+    static Font loadFont(String file) {
+        try {
+            return Font.createFont(Font.TRUETYPE_FONT, findRoot().resolve(file).toFile());
+        } catch (Exception e) {
+            throw new IllegalStateException("Couldn't load the font " + file, e);
+        }
     }
 
     /** A graphics context for measuring text before the image exists. */
@@ -698,14 +704,11 @@ public class ControlLayout {
     }
 
     static double width(String text, Font font) {
-        return font.getStringBounds(text, MEASURE.getFontRenderContext()).getWidth();
+        return font.createGlyphVector(MEASURE.getFontRenderContext(), text).getLogicalBounds().getWidth();
     }
 
-    /** Arrows if the font has them, words if it doesn't. */
     static String display(String control) {
-        String name = DISPLAY.get(control);
-        if (CTL.canDisplayUpTo(name) == -1) return name;
-        return name.replace("↑", "up").replace("↓", "down").replace("←", "left").replace("→", "right");
+        return DISPLAY.get(control);
     }
 
     static List<String> wrap(String text, Font font) {
@@ -814,10 +817,10 @@ public class ControlLayout {
         return new Ellipse2D.Double(x - r, y - r, 2 * r, 2 * r);
     }
 
+    /** Text as filled outlines: Java's own shape filling, the same on every OS, where drawString isn't. */
     static void text(Graphics2D g, String s, Font f, Color c, double x, double y) {
-        g.setFont(f);
         g.setColor(c);
-        g.drawString(s, (float) x, (float) y);
+        g.fill(f.createGlyphVector(MEASURE.getFontRenderContext(), s).getOutline((float) x, (float) y));
     }
 
     static void drawPad(Graphics2D g, Pad pad) {
@@ -957,12 +960,12 @@ public class ControlLayout {
 
     // ---------------------------------------------------------------- PNG fingerprint
 
-    /** Everything an image shows, hashed together with this file, so unchanged images aren't redrawn. */
+    /** Everything an image shows, hashed with this file's code and the fonts, so unchanged images aren't redrawn. */
     static String fingerprint(Path root, String subtitle, OpModeInfo op, List<Card> cards) throws Exception {
         MessageDigest sha = MessageDigest.getInstance("SHA-256");
         Path self = root.resolve(THIS_FILE);
-        // Without the \r, so a Windows checkout (CRLF) gets the same fingerprint as a Mac or Linux one
-        if (Files.exists(self)) sha.update(Files.readString(self).replace("\r", "").getBytes(StandardCharsets.UTF_8));
+        if (Files.exists(self)) sha.update(codeOnly(Files.readString(self)).getBytes(StandardCharsets.UTF_8));
+        for (String font : FONT_FILES) sha.update(Files.readAllBytes(root.resolve(font)));
         StringBuilder b = new StringBuilder(op.name).append('\n').append(subtitle).append('\n');
         for (Card c : cards) {
             b.append(c.title).append('\n');
@@ -971,6 +974,39 @@ public class ControlLayout {
         }
         sha.update(b.toString().getBytes(StandardCharsets.UTF_8));
         return HexFormat.of().formatHex(sha.digest());
+    }
+
+    /**
+     * Java source without its comments, blank lines, trailing spaces or \r (a Windows checkout is CRLF), so editing a
+     * comment doesn't redraw every image. Strings, text blocks and chars are kept whole: a "//" in one isn't a comment.
+     */
+    static String codeOnly(String src) {
+        StringBuilder out = new StringBuilder();
+        int i = 0, n = src.length();
+        while (i < n) {
+            char c = src.charAt(i);
+            if (src.startsWith("//", i)) {
+                while (i < n && src.charAt(i) != '\n') i++;
+            } else if (src.startsWith("/*", i)) {
+                int end = src.indexOf("*/", i + 2);
+                i = end < 0 ? n : end + 2;
+            } else if (src.startsWith("\"\"\"", i)) {
+                int end = src.indexOf("\"\"\"", i + 3);
+                end = end < 0 ? n : end + 3;
+                out.append(src, i, end);
+                i = end;
+            } else if (c == '"' || c == '\'') {
+                int start = i++;
+                while (i < n && src.charAt(i) != c && src.charAt(i) != '\n') i += src.charAt(i) == '\\' ? 2 : 1;
+                i = Math.min(i + 1, n);
+                out.append(src, start, i);
+            } else {
+                out.append(c);
+                i++;
+            }
+        }
+        return out.toString().replace("\r", "").lines().map(String::stripTrailing).filter(l -> !l.isEmpty())
+                .collect(Collectors.joining("\n"));
     }
 
     static String pngText(byte[] png, String key) {
