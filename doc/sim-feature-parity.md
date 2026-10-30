@@ -64,7 +64,8 @@ From the screen recording, in `doc/media/`.
   `python3 tools/advantagescope/build_sim_field.py` (numpy and trimesh); it writes into AdvantageScope's userAssets.
 - `tools/advantagescope/sim-layout.json` sets up every tab (File → Import Layout in AdvantageScope); it replaces the
   open layout.
-- Replay an Auto in one step: `python3 tools/advantagescope/replay_auto.py one_cycle_garden_park` runs it in the sim,
+- Replay an Auto in one step: `./replay-auto.sh one_cycle_garden_park` (or the `python3
+  tools/advantagescope/replay_auto.py` it calls, with the same arguments) runs it in the sim,
   sets up AdvantageScope's tabs (`sim-layout.json`) and opens the log; with no routine it runs every Auto and puts
   them on one field (`merge_autos.py`: a colored ghost and route per routine); `--blue` for blue, `--no-sim` to reopen
   the last run. It closes AdvantageScope first and replaces its open tabs (the old ones are kept in
