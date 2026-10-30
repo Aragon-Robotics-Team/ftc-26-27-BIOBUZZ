@@ -50,6 +50,7 @@ tasks.register('controlLayout') {
     description = 'Redraws doc/controls/<opmode>.png from the gamepad bindings in TeamCode.'
     inputs.dir('src/main/java')
     inputs.files(controlLayoutSource, rootProject.file('tools/control-labels.json'))
+    inputs.dir(rootProject.file('tools/fonts'))
     outputs.dir(rootProject.file('doc/controls'))
     doLast {
         try {
