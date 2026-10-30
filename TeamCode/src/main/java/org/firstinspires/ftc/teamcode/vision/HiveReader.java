@@ -10,10 +10,11 @@ import java.util.List;
  * Reads which of our hive's cells is up from the AprilTags in one camera frame. No hardware, so it's unit tested.
  *
  * Each cell has four tags on the underside of its floor (Competition Manual 9.9). They tip with the hive, so an up
- * cell's tags sit about 49.7 in above the tiles and a down cell's about 35.5 in; the gap is 14.3 in whatever the
- * damper rest angle. The tag ID says which cell it's on, its height says whether that cell is up, and the two cells
- * always move together, so any one of our tags gives the whole hive. Tags only read from their face side, and all
- * eight face the side of the field where the up cell is.
+ * cell's tags sit about 49.7 in above the tiles and a down cell's about 35.5 in at the 30° rest angle. The gap
+ * changes with the damper rest angle (12.5 in at 26°, 15.1 in at 32°), but the point halfway between stays at about
+ * 42.5 in, so a threshold there works whatever angle the hive settles at. The tag ID says which cell it's on, its
+ * height says whether that cell is up, and the two cells always move together, so any one of our tags gives the whole
+ * hive. Tags only read from their face side, and all eight face the side of the field where the up cell is.
  */
 public final class HiveReader {
     private HiveReader() {}
