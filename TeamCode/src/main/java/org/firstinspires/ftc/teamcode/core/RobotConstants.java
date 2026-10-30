@@ -248,11 +248,11 @@ public class RobotConstants {
             PIDF,     // battery-compensated feedforward plus PID on the speed error
             BANG_BANG // full power below target, the feedforward at or above it
         }
-        public static FlywheelControl FLYWHEEL_CONTROL = FlywheelControl.PIDF;
+        public static FlywheelControl FLYWHEEL_CONTROL = FlywheelControl.BANG_BANG;
         // Feedforward: power at 12 V to hold a speed, scaled by 12 / battery volts so it holds the same on a tired battery.
         // The Flywheel Auto Tuner prints KV. A little low is fine; too high and the flywheel settles above target.
         public static double FLYWHEEL_KV = 0.000541; // power per tick/sec (Oct 28)
-        public static double FLYWHEEL_KS = 0;        // power to overcome friction
+        public static double FLYWHEEL_KS = 0.003244;        // power to overcome friction
         // PID on the speed error. KP = KV is about the hub PIDF that rapid-fired well on Oct 28 (P = F = 16.84 in the
         // hub's units). The Flywheel Auto Tuner finds KP.
         public static double FLYWHEEL_KP = 0.000541; // power per tick/sec of error
@@ -302,7 +302,7 @@ public class RobotConstants {
         // 28-tick motor, the ball leaving at 80% of rim speed (counter-rollers: both surfaces move, so the full rim
         // speed, not the half a single wheel on a fixed hood gives): 28 / (π × 2.835 in × 0.8) ≈ 3.9 (Oct 29).
         // TODO: calibrate (grip 0.7 to 0.9 makes it 4.5 to 3.5)
-        public static double FLYWHEEL_TICKS_PER_EXIT_SPEED = 3.9;
+        public static double FLYWHEEL_TICKS_PER_EXIT_SPEED = 3.4;
         // The ball keeps the robot's velocity when it leaves; false simulates every shot from a standstill
         public static boolean SHOOT_ON_THE_MOVE = true;
         // Pollen, from the AndyMark product page. Nectar is bigger and heavier in proportion, so it flies the same.
