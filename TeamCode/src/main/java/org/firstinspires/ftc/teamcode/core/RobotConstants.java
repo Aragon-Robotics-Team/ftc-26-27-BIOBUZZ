@@ -43,7 +43,6 @@ public class RobotConstants {
     public static class Gate {
         public static String SERVO_NAME = "gate";
 
-        // TODO: tune
         public static double CLOSED_POSITION = 0.25;
         public static double OPEN_POSITION = 0.4;
         public static double AUTO_SHOOT_MS = 2000; // how long Auto holds the gate open to empty the robot
@@ -295,13 +294,13 @@ public class RobotConstants {
         // ball through the middle of the opening, allowing for the robot's motion.
         public static double HOOD_ANGLE = Math.toRadians(74); // fixed hood, above horizontal (Oct 28)
         public static double EXIT_HEIGHT = 10.3543;  // inches above the tiles where the ball leaves (CAD, Oct 26)
-        public static double EXIT_RADIUS = 0;   // inches from the turret axis to where the ball leaves. TODO: set from CAD
+        public static double EXIT_RADIUS = 0;   // inches from the turret axis to where the ball leaves
         // Flywheel ticks/sec per inch/sec of ball exit speed. Depends on wheel size and grip, so it has to be measured:
         // stand still, nudge the flywheel until shots go through the middle of the opening, and read "Calibration" in
         // the TeleOp details. Average it over a few distances. Starting estimate: the 72 mm Rhino wheel at 1:1 on the
         // 28-tick motor, the ball leaving at 80% of rim speed (counter-rollers: both surfaces move, so the full rim
         // speed, not the half a single wheel on a fixed hood gives): 28 / (π × 2.835 in × 0.8) ≈ 3.9 (Oct 29).
-        // TODO: calibrate (grip 0.7 to 0.9 makes it 4.5 to 3.5)
+        // Grip 0.7 to 0.9 makes it 4.5 to 3.5.
         public static double FLYWHEEL_TICKS_PER_EXIT_SPEED = 3.4;
         // The ball keeps the robot's velocity when it leaves; false simulates every shot from a standstill
         public static boolean SHOOT_ON_THE_MOVE = true;
@@ -359,7 +358,7 @@ public class RobotConstants {
 
         // Robot frame, inches: width side to side, length front to back.
         public static double ROBOT_WIDTH = 15.748; //see below (incldues number sign) Oct 26
-        public static double ROBOT_LENGTH = 12.2441; //measured from cad OCT 26- michael
+        public static double ROBOT_LENGTH = 16; // Oct 30
 
         // Pose resets: robot pushed into the corner, back against the alliance wall, so the center is half the
         // length off the alliance wall and half the width off the side wall.
