@@ -37,8 +37,9 @@ public class Constants {
         c.name.set("pinpoint");
         c.podType.set(GoBildaPinpointDriver.GoBildaOdometryPods.goBILDA_4_BAR_POD);
         // Offsets measured on the robot: keep them if you run the Pinpoint Tuner for the pod directions
+        // Pinpoint convention: X pod's sideways offset (left +), Y (strafe) pod's forward offset (forward +)
         c.xPodOffset.set(5.0);
-        c.yPodOffset.set(4.8);
+        c.yPodOffset.set(-4.8); // the strafe pod is behind the center
         c.xPodDirection.set(GoBildaPinpointDriver.EncoderDirection.FORWARD);
         c.yPodDirection.set(GoBildaPinpointDriver.EncoderDirection.REVERSED);
         c.globalDistanceUnit.set(DistanceUnit.INCH);
