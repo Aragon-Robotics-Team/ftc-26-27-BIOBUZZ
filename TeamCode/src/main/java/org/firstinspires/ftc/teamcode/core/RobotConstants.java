@@ -71,7 +71,8 @@ public class RobotConstants {
         public static double LENS_HEIGHT = 12.2;           // inches from the tiles to the lens
         public static double LENS_AHEAD = 4.8;             // inches from the turret axis to the lens, along the turret
         public static double TILT = Math.toRadians(45);    // above horizontal
-        // Up-cell tags sit about 49.7 in above the tiles, down-cell tags about 35.5 in. TODO: measure on the practice hive
+        // Up-cell tags sit about 49.7 in above the tiles, down-cell tags about 35.5 in (at the 30° rest angle). Halfway,
+        // about 42.5 in, barely moves with the rest angle, so keep the threshold near there. TODO: measure on the practice hive
         public static double HEIGHT_THRESHOLD = 42;        // inches
         public static int FRAMES_TO_SWITCH = 3;            // new frames in a row showing the other state
         public static long MAX_STALENESS_MS = 100;         // ignore results older than this
@@ -128,7 +129,7 @@ public class RobotConstants {
         public static int FRAME_HEIGHT = 400;
         // Manual exposure keeps motion blur down while driving; gain makes up the brightness.
         // TODO: tune on the robot. 0 leaves the camera on auto exposure
-        public static double EXPOSURE_MS = 6;
+        public static double EXPOSURE_MS = 0;
         public static int GAIN = 100;          // clamped to what the camera allows
 
         // ---- Lens ----
