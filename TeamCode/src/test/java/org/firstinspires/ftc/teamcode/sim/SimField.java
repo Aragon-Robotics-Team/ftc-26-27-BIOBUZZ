@@ -109,9 +109,12 @@ final class SimField {
                 .pieceMass(Ball.Type.BLUE_NECTAR.name(), SimHiveTrays.NECTAR_MASS)
                 .airDragPerInch(DRAG_PER_INCH)
                 .build();
-        // The robot pushes balls it drives into (it's a box to them: SimLoop doesn't push the robot back)
+        // The robot pushes balls it drives into (it's a box to them: SimLoop doesn't push the robot back). Its front ends
+        // at the intake's mouth for them, which sits 1 in inside the bumper: balls come in through the gap between the
+        // bumpers. The box is centered, so its back is that much short too
+        double ballFootprint = 2 * Math.min(RobotConstants.Field.ROBOT_LENGTH / 2, RobotConstants.BallVision.INTAKE_REACH);
         FieldWorld.Builder world = FieldWorld.builder().physics(physics).perimeter(72, 72)
-                .robotFootprint(RobotConstants.Field.ROBOT_LENGTH, RobotConstants.Field.ROBOT_WIDTH)
+                .robotFootprint(ballFootprint, RobotConstants.Field.ROBOT_WIDTH)
                 .kinematicBody(SimHiveTrays.tray(SimHiveTrays.RED, false))
                 .kinematicBody(SimHiveTrays.tray(SimHiveTrays.BLUE, true));
         for (int side = -1; side <= 1; side += 2) {

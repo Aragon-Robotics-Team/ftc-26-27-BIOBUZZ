@@ -37,8 +37,9 @@ final class SimLauncher {
     private final GamePieceTracker field;
     private final FakeMotor intake, flywheel;
     private final FakeServo gate;
-    // The intake's mouth: just inside the front bumper to past INTAKE_REACH, between the side plates (RobotConstants)
+    // The intake's mouth: at INTAKE_REACH, between the side plates (RobotConstants)
     private final TriggerVolume mouth;
+    private static final double MOUTH_DEPTH = 0.5; // inches inside INTAKE_REACH a ball still counts as touching it
     // The intake only takes pollen: nectar is too big for it, so the robot pushes nectar like any other obstacle
     private static final List<String> POLLEN_ONLY = java.util.Collections.singletonList(Ball.Type.POLLEN.name());
     private final ShotArcRecorder shots = new ShotArcRecorder(SHOT_SLOTS);
@@ -59,13 +60,13 @@ final class SimLauncher {
         this.intake = intake;
         this.gate = gate;
         this.flywheel = flywheel;
-        // Where a pollen's center has to be for the rollers to take it: between the side plates with room for the
-        // ball, from just inside the bumper out to the mouth (INTAKE_REACH, plus the ball's radius: one touching it).
-        // SimLoop's trigger counts any ball that overlaps the box, so the box is that region less a radius all round
+        // A pollen is taken once it touches the mouth: SimLoop's trigger counts any ball that overlaps the box, so the
+        // box is the half inch just inside the mouth (INTAKE_REACH), between the side plates with room for the ball.
+        // That takes a ball whose center is within its radius in front of the mouth or up to MOUTH_DEPTH + r inside
         double r = Ball.Type.POLLEN.diameter / 2;
-        double front = RobotConstants.Field.ROBOT_LENGTH / 2, reach = RobotConstants.BallVision.INTAKE_REACH;
-        double back = front - 1 + r, out = reach, halfWidth = RobotConstants.BallVision.INTAKE_WIDTH / 2 - 2 * r;
-        mouth = new TriggerVolume("intake", (back + out) / 2, 0, out - back, 2 * halfWidth);
+        double reach = RobotConstants.BallVision.INTAKE_REACH;
+        double halfWidth = RobotConstants.BallVision.INTAKE_WIDTH / 2 - 2 * r;
+        mouth = new TriggerVolume("intake", reach - MOUTH_DEPTH / 2, 0, MOUTH_DEPTH, 2 * halfWidth);
     }
 
     /** Balls the robot starts holding (the match's preload). */
