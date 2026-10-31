@@ -21,10 +21,12 @@ public class RobotConstants {
         public static double HEADING_STICK_THRESHOLD = 0.5;
         // Radians counter-clockwise from the front of the robot (Pedro +x) to the intake. The intake is on the front.
         public static double INTAKE_HEADING_OFFSET = 0;
-        // TODO: tune with the Heading Tuner OpMode
-        public static double HEADING_KP = 1.0;        // turn power per radian of error
+        // From the measured turn (Foresight heading system ID: 9.62 rad/s per unit turn power, 0.116 s lag) with the
+        // command a loop behind the Pinpoint, simulated at a 20 ms loop: 90° in 0.45 s with no overshoot, a degree or
+        // two short when wheel friction holds it. Still about 5° overshoot at a 40 ms loop; past kP 2.5 that grows to 10°
+        public static double HEADING_KP = 2.0;        // turn power per radian of error
         public static double HEADING_KI = 0;          // turn power per radian-second
-        public static double HEADING_KD = 0;          // turn power per radian/sec of turn speed
+        public static double HEADING_KD = 0.2;        // turn power per radian/sec of turn speed
         public static double HEADING_MAX_POWER = 1.0; // full power: get to the heading as fast as possible
     }
 
