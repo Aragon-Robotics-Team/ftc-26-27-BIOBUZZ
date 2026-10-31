@@ -1,42 +1,45 @@
 package org.firstinspires.ftc.teamcode.opmodes.tuning;
 
 import com.bylazar.configurables.annotations.Configurable;
-import com.bylazar.field.FieldManager;
-import com.bylazar.field.FieldPresets;
-import com.bylazar.field.PanelsField;
 import com.bylazar.telemetry.PanelsTelemetry;
 import com.bylazar.telemetry.TelemetryManager;
-import com.pedropathing.drivetrain.DrivePowers;
+import com.pedropathing.ivy.Scheduler;
 import com.pedropathing.math.Pose;
-import com.pedropathing.revhub.drivetrains.Mecanum;
-import com.pedropathing.revhub.localizers.PinpointLocalizer;
 import com.qualcomm.robotcore.eventloop.opmode.OpMode;
 import com.qualcomm.robotcore.eventloop.opmode.TeleOp;
 
-import org.firstinspires.ftc.teamcode.pedro.Constants;
+import org.firstinspires.ftc.teamcode.core.Robot;
 
 import java.util.ArrayList;
+import java.util.List;
 
+/**
+ * Push the robot around by hand and record poses from odometry.
+ *   B  save the current pose
+ *   X  zero the pose (0, 0, 0°), keep saved poses
+ *   A  zero the pose and clear saved poses
+ */
 @Configurable
 @TeleOp(name = "Pose Helper", group = "Tuning")
 public class PoseHelper extends OpMode {
 
-    private PinpointLocalizer localizer;
-    private Mecanum drivetrain;
+    private Robot robot;
     private TelemetryManager panels;
-    private FieldManager field;
-    private ArrayList<Pose> poseList = new ArrayList<>();
-    private boolean lastB = false;
-
+    private final List<Pose> poseList = new ArrayList<>();
+    private boolean lastA = false, lastB = false, lastX = false;
 
     @Override
     public void init() {
-        localizer = Constants.localizer(hardwareMap);
-        drivetrain = Constants.drivetrain(hardwareMap);
+        Scheduler.reset();
+        robot = new Robot(hardwareMap);
         panels = PanelsTelemetry.INSTANCE.getTelemetry();
-        field = PanelsField.INSTANCE.getField();
-        field.setOffsets(FieldPresets.INSTANCE.getPEDRO_PATHING());
         reset();
+    }
+
+    @Override
+    public void init_loop() {
+        robot.update();
+        updateTelemetry();
     }
 
     @Override
@@ -46,39 +49,48 @@ public class PoseHelper extends OpMode {
 
     @Override
     public void loop() {
-        localizer.update();
+        robot.update(); // updates the follower / odometry
 
         boolean b = gamepad1.b;
-        if (b && !lastB) savePose(localizer.pose());
+        if (b && !lastB) poseList.add(robot.drivebase.getPose());
         lastB = b;
 
-        if (gamepad1.a) reset();
+        boolean x = gamepad1.x;
+        if (x && !lastX) zeroPose();
+        lastX = x;
+
+        boolean a = gamepad1.a;
+        if (a && !lastA) reset();
+        lastA = a;
 
         updateTelemetry();
     }
 
     @Override
     public void stop() {
-        drivetrain.drive(new DrivePowers(0, 0, 0), true);
+        Scheduler.reset();
+        robot.stop();
     }
+
+    private void zeroPose() {
+        robot.drivebase.setPose(new Pose(0, 0, 0));
+    }
+
     private void reset() {
-        localizer.setPose(Pose.zero());
+        zeroPose();
         poseList.clear();
     }
-    private void savePose(Pose currentPose) {
-        poseList.add(currentPose);
+
+    private static String format(Pose p) {
+        return String.format("x %.2f, y %.2f, heading %.1f°", p.x(), p.y(), Math.toDegrees(p.heading()));
     }
+
     private void updateTelemetry() {
-        panels.addLine("Current: " + localizer.pose());
+        panels.addLine("Current: " + format(robot.drivebase.getPose()));
         panels.addLine("");
-        int i = 1;
-        for (Pose pose : poseList) {
-            panels.addLine("Pose " + i + ": " + pose);
-            i++;
+        for (int i = 0; i < poseList.size(); i++) {
+            panels.addLine("Pose " + (i + 1) + ": " + format(poseList.get(i)));
         }
         panels.update(telemetry);
     }
-
-
-
 }
