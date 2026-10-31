@@ -4,6 +4,8 @@ import static com.pedropathing.ivy.commands.Commands.instant;
 import static org.firstinspires.ftc.teamcode.core.RobotConstants.Vision.*;
 
 import com.pedropathing.ivy.Command;
+import com.pedropathing.math.Pose;
+import com.pedropathing.utils.Angle;
 import com.qualcomm.hardware.limelightvision.LLResult;
 import com.qualcomm.hardware.limelightvision.LLResultTypes;
 import com.qualcomm.hardware.limelightvision.Limelight3A;
@@ -287,6 +289,11 @@ public class HiveVision implements Subsystem {
             telemetry.addData("Pose from tags", "%d tags used, %d thrown out, ±%.1f in ±%.1f°", fusedTags,
                     filter.getRejected(), Math.hypot(filter.sigma(PoseFilter.X), filter.sigma(PoseFilter.Y)),
                     Math.toDegrees(filter.sigma(PoseFilter.HEADING)));
+            // Resets move the Pinpoint too, so this is only what the tags have done
+            Pose odometry = localizer.getOdometryPose();
+            telemetry.addData("Tags moved the pose", "%+.1f, %+.1f in, %+.1f° from the Pinpoint's",
+                    filter.x() - odometry.x(), filter.y() - odometry.y(),
+                    Math.toDegrees(Angle.normalizeSigned(filter.heading() - odometry.heading())));
         }
         if (!running || !enabled) return;
         StringBuilder tags = new StringBuilder();
