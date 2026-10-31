@@ -24,7 +24,7 @@ import org.firstinspires.ftc.teamcode.subsystems.Launcher;
  * 2. Raise kP until it recovers quickly from a shot without oscillating. Add kI only if it settles below target.
  * Bang-bang (bangBang = true): only kV matters. Lower it if the speed sits above target with the power at the hold
  * value; it's fine for the power to flick to full now and then.
- * A (gamepad 1) toggles the flywheel on / off.
+ * Cross (gamepad 1) toggles the flywheel on / off.
  */
 @Configurable
 @TeleOp(name = "Flywheel Tuner", group = "Tuning")
@@ -58,12 +58,12 @@ public class FlywheelTuner extends OpMode {
     @Override
     public void loop() {
         pushChanges();
-        if (gamepad1.aWasPressed()) schedule(launcher.toggleFlywheel());
+        if (gamepad1.crossWasPressed()) schedule(launcher.toggleFlywheel());
 
         launcher.update();
         Scheduler.execute();
 
-        panels.addLine(launcher.isSpinning() ? "Flywheel ON (A to stop)" : "Flywheel OFF (A to start)");
+        panels.addLine(launcher.isSpinning() ? "Flywheel ON (cross to stop)" : "Flywheel OFF (cross to start)");
         panels.addLine("Control: " + RobotConstants.Launcher.FLYWHEEL_CONTROL);
         panels.addData("Target", launcher.getTargetVelocity());
         panels.addData("Actual", launcher.getFlywheelVelocity());

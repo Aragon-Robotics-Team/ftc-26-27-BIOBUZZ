@@ -18,7 +18,7 @@ import org.firstinspires.ftc.teamcode.core.Robot;
  * Tries the pollen chase: the robot drives the intake over the pollen the ball camera sees until it has maxBalls,
  * nothing is in view, or timeoutS runs out. Set maxBalls and timeoutS under Configurables > BallChaseTest in Panels.
  *
- * During init pick the alliance (X / B) and the corner the robot starts in, back against the alliance wall (dpad left /
+ * During init pick the alliance (square / circle) and the corner the robot starts in, back against the alliance wall (dpad left /
  * right), so the chase knows where the walls, flowers and hive are. Start chases; cross chases again from wherever
  * the robot is.
  */
@@ -41,7 +41,7 @@ public class BallChaseTest extends OpMode {
 
     @Override
     public void init_loop() {
-        MatchState.selectAlliance(gamepad1, telemetry);
+        MatchState.selectAlliance(gamepad1, 1, telemetry);
         if (gamepad1.dpadLeftWasPressed()) corner = RED_LEFT_CORNER;
         if (gamepad1.dpadRightWasPressed()) corner = RED_RIGHT_CORNER;
         telemetry.addData("Start", "%s corner, back to the alliance wall   (dpad ←→)",

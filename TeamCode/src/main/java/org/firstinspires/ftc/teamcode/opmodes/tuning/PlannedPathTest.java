@@ -66,7 +66,7 @@ public class PlannedPathTest extends OpMode {
 
     @Override
     public void init_loop() {
-        MatchState.selectAlliance(gamepad1, telemetry);
+        MatchState.selectAlliance(gamepad1, 1, telemetry);
         if (builtFor != MatchState.alliance) buildPaths();
         if (names.isEmpty()) {
             telemetry.addLine("No planned paths: copy one from tools/path-planner.html into a routine.");

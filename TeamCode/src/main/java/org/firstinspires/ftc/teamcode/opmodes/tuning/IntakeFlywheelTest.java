@@ -16,7 +16,7 @@ import org.firstinspires.ftc.teamcode.core.RobotConstants;
 /**
  * Temporary: spin the intake and the flywheel together, like the Motor Tester but for both at once. The intake always
  * runs at full power; the flywheel runs at the power setting.
- * Gamepad 1: hold RB = both forward, hold LB = both reverse, let go = stop. D-pad up / down = flywheel power up / down
+ * Gamepad 1: hold R1 = both forward, hold L1 = both reverse, let go = stop. D-pad up / down = flywheel power up / down
  * by powerStep. Power is also editable under Configurables > IntakeFlywheelTest.
  *
  * <p>Raw power (no flywheel PIDF), with each motor's direction from RobotConstants so forward = intake in / shoot.
@@ -62,7 +62,7 @@ public class IntakeFlywheelTest extends OpMode {
         setPower(direction);
 
         panels.addLine("== INTAKE + FLYWHEEL TEST (gamepad 1) ==");
-        panels.addLine("Hold RB: both forward   Hold LB: both reverse");
+        panels.addLine("Hold R1: both forward   Hold L1: both reverse");
         panels.addLine("D-pad UP / DOWN: more / less flywheel power");
         panels.addLine("");
         panels.addData("Flywheel power setting", String.format("%.2f", power));

@@ -27,6 +27,8 @@
     "gamepad2.circle": "Tap: hive RIGHT cell is up. Hold 1 s: also lock / unlock auto hive",
     "gamepad2.share": "Reset pose: pushed into our LEFT corner, back to alliance wall",
     "gamepad2.options": "Reset pose: pushed into our RIGHT corner, back to alliance wall",
+    "init.gamepad2.square": "Blue alliance (until pressed: the alliance Auto ran as)",
+    "init.gamepad2.circle": "Red alliance (until pressed: the alliance Auto ran as)",
     "init.gamepad2.share": "Start pose: pushed into our LEFT corner, back to alliance wall",
     "init.gamepad2.options": "Start pose: pushed into our RIGHT corner, back to alliance wall"
   },
@@ -165,5 +167,11 @@
     "gamepad1.right_stick": "Turn",
     "gamepad1.left_trigger": "Hold: slow mode",
     "gamepad1.cross": "Apply the mount values from Panels (reopens the camera)"
+  },
+
+  "Pose Helper": {
+    "gamepad1.circle": "Save the current pose",
+    "gamepad1.square": "Zero the pose (0, 0, 0°), keep saved poses",
+    "gamepad1.cross": "Zero the pose and clear saved poses"
   }
 }

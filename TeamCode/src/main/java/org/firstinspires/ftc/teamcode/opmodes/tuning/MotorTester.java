@@ -31,8 +31,8 @@ import java.util.Set;
  *
  * <p>Gamepad 1, any device: D-pad left / right picks the device.
  * <ul>
- *   <li>Motor / CR servo: hold RB = forward, hold LB = reverse, let go = stop. D-pad up / down = power up / down by powerStep.
- *   <li>Servo: RB = position + step, LB = position - step, square (X) = go to 0.5. D-pad up / down = bigger /
+ *   <li>Motor / CR servo: hold R1 = forward, hold L1 = reverse, let go = stop. D-pad up / down = power up / down by powerStep.
+ *   <li>Servo: R1 = position + step, L1 = position - step, square = go to 0.5. D-pad up / down = bigger /
  *       smaller step (0.01, 0.05, 0.1). A servo isn't moved until you first press one of these.
  * </ul>
  * In Panels (Configurables > MotorTester): power, servoPosition (type a value and the selected servo goes there),
@@ -225,11 +225,11 @@ public class MotorTester extends OpMode {
         panels.addLine("== MOTOR TESTER (gamepad 1) ==");
         panels.addLine("D-pad LEFT / RIGHT: choose device");
         if (device.kind == Kind.SERVO) {
-            panels.addLine("RB: move + step   LB: move - step");
-            panels.addLine("SQUARE (X): go to 0.5");
+            panels.addLine("R1: move + step   L1: move - step");
+            panels.addLine("SQUARE: go to 0.5");
             panels.addLine("D-pad UP / DOWN: bigger / smaller step");
         } else {
-            panels.addLine("Hold RB: forward   Hold LB: reverse");
+            panels.addLine("Hold R1: forward   Hold L1: reverse");
             panels.addLine("D-pad UP / DOWN: more / less power");
         }
         panels.addLine("");

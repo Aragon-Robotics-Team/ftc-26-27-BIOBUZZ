@@ -25,7 +25,7 @@ import java.util.ArrayDeque;
  * The field shows the trail magnified ZOOM times around the field center, with rings at 1 in and 2 in of real drift.
  * The Graph shows x and y: a spin with wrong offsets makes them wave up and down once per turn.
  * Uses the localizer and drivetrain directly, so it runs before the Foresight Tuner.
- * Left stick drives, right stick x turns, A clears the trail and puts the robot back at 0, 0.
+ * Left stick drives, right stick x turns, cross clears the trail and puts the robot back at 0, 0.
  */
 @Configurable
 @TeleOp(name = "Localization Test", group = "Tuning")
@@ -60,7 +60,7 @@ public class LocalizationTest extends OpMode {
 
     @Override
     public void loop() {
-        if (gamepad1.aWasPressed()) reset();
+        if (gamepad1.crossWasPressed()) reset();
         drivetrain.drive(new DrivePowers(-gamepad1.left_stick_y, -gamepad1.left_stick_x, -gamepad1.right_stick_x), true);
         localizer.update();
 
@@ -79,7 +79,7 @@ public class LocalizationTest extends OpMode {
         }
         if (field.getShouldUpdateCanvas()) draw(pose);
 
-        panels.addLine("Spin in place with the right stick. A: clear and reset to 0, 0");
+        panels.addLine("Spin in place with the right stick. Cross: clear and reset to 0, 0");
         panels.addData("x (in)", pose.x());
         panels.addData("y (in)", pose.y());
         panels.addData("Heading (deg)", Math.toDegrees(pose.heading()));

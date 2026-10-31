@@ -19,7 +19,8 @@ import org.firstinspires.ftc.teamcode.subsystems.Launcher;
  * 0. Set kS (from the Turret Auto Tuner) so small errors still move the turret past friction.
  * 1. Raise kP until the turret gets to the target quickly, then back off if it overshoots.
  * 2. Add kD to damp any overshoot. Add kI only if it stalls just short of the target.
- * X / A / B (gamepad 1) jump the target left / center / right by stepDegrees, so you can watch the response.
+ * Square / cross / circle (gamepad 1) jump the target left / center / right by stepDegrees, so you can watch the
+ * response.
  */
 @Configurable
 @TeleOp(name = "Turret Tuner", group = "Tuning")
@@ -57,16 +58,16 @@ public class TurretTuner extends OpMode {
         RobotConstants.Launcher.TURRET_MAX_POWER = maxPower;
 
         // Positive angle is counter-clockwise, i.e. to the left
-        if (gamepad1.xWasPressed()) schedule(launcher.turnTurretTo(Math.toRadians(stepDegrees)));
-        if (gamepad1.aWasPressed()) schedule(launcher.turnTurretTo(0));
-        if (gamepad1.bWasPressed()) schedule(launcher.turnTurretTo(Math.toRadians(-stepDegrees)));
+        if (gamepad1.squareWasPressed()) schedule(launcher.turnTurretTo(Math.toRadians(stepDegrees)));
+        if (gamepad1.crossWasPressed()) schedule(launcher.turnTurretTo(0));
+        if (gamepad1.circleWasPressed()) schedule(launcher.turnTurretTo(Math.toRadians(-stepDegrees)));
 
         launcher.update();
         Scheduler.execute();
 
         double target = Math.toDegrees(launcher.getTurretTargetAngle());
         double actual = Math.toDegrees(launcher.getTurretAngle());
-        panels.addLine("X left, A center, B right");
+        panels.addLine("Square left, cross center, circle right");
         panels.addData("On target", launcher.isTurretOnTarget());
         panels.addData("Target (deg)", target);
         panels.addData("Actual (deg)", actual);

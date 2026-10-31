@@ -15,9 +15,9 @@ import java.util.List;
 
 /**
  * Push the robot around by hand and record poses from odometry.
- *   B  save the current pose
- *   X  zero the pose (0, 0, 0°), keep saved poses
- *   A  zero the pose and clear saved poses
+ *   circle  save the current pose
+ *   square  zero the pose (0, 0, 0°), keep saved poses
+ *   cross   zero the pose and clear saved poses
  */
 @Configurable
 @TeleOp(name = "Pose Helper", group = "Tuning")
@@ -26,7 +26,7 @@ public class PoseHelper extends OpMode {
     private Robot robot;
     private TelemetryManager panels;
     private final List<Pose> poseList = new ArrayList<>();
-    private boolean lastA = false, lastB = false, lastX = false;
+    private boolean lastCross = false, lastCircle = false, lastSquare = false;
 
     @Override
     public void init() {
@@ -51,17 +51,17 @@ public class PoseHelper extends OpMode {
     public void loop() {
         robot.update(); // updates the follower / odometry
 
-        boolean b = gamepad1.b;
-        if (b && !lastB) poseList.add(robot.drivebase.getPose());
-        lastB = b;
+        boolean circle = gamepad1.circle;
+        if (circle && !lastCircle) poseList.add(robot.drivebase.getPose());
+        lastCircle = circle;
 
-        boolean x = gamepad1.x;
-        if (x && !lastX) zeroPose();
-        lastX = x;
+        boolean square = gamepad1.square;
+        if (square && !lastSquare) zeroPose();
+        lastSquare = square;
 
-        boolean a = gamepad1.a;
-        if (a && !lastA) reset();
-        lastA = a;
+        boolean cross = gamepad1.cross;
+        if (cross && !lastCross) reset();
+        lastCross = cross;
 
         updateTelemetry();
     }

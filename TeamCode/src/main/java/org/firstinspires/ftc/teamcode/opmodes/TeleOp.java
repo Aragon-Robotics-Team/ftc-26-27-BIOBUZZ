@@ -37,11 +37,12 @@ import org.firstinspires.ftc.teamcode.util.PanelsDisplay;
  *   left stick      field-centric drive (stick forward = away from our driver station)
  *   right stick     point the intake that way (same frame); the robot holds that heading when let go.
  *                   With RobotConstants.Drive.TURN_MODE = RATE, right stick x sets the turn speed instead
- *   hold LT         slow mode (driving only; with RATE, turning too)
+ *   hold L2         slow mode (driving only; with RATE, turning too)
  *   triangle        toggle intake        cross   toggle outtake
- *   RB              flywheel on          LB      flywheel off
- *   hold RT         open the gate and feed the shooter
+ *   R1              flywheel on          L1      flywheel off
+ *   hold R2         open the gate and feed the shooter
  * Gamepad 2 (operator):
+ *   square / circle during init: blue / red alliance (until pressed, the alliance Auto ran as)
  *   dpad left/right nudge turret         dpad up/down  nudge flywheel speed
  *   square / circle tap: hive LEFT / RIGHT cell is up (the Limelight keeps checking it)
  *                   hold 1 s: set that cell and lock / unlock automatic hive detection (short rumble)
@@ -85,7 +86,7 @@ public class TeleOp extends OpMode {
     @Override
     public void init_loop() {
         telemetry.addLine(color(bold("Did you remember to zero the turret? :-)"), YELLOW));
-        MatchState.selectAlliance(gamepad1, telemetry);
+        MatchState.selectAlliance(gamepad2, 2, telemetry);
         // Only remembered here: the alliance can still change, so the corner is turned into a pose at start
         if (gamepad2.shareWasPressed()) initCorner = RED_LEFT_CORNER;
         if (gamepad2.optionsWasPressed()) initCorner = RED_RIGHT_CORNER;

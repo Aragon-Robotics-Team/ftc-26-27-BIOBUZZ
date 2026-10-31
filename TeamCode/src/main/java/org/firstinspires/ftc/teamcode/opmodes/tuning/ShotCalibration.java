@@ -119,7 +119,7 @@ public class ShotCalibration extends OpMode {
 
     @Override
     public void init_loop() {
-        MatchState.selectAlliance(gamepad1, telemetry);
+        MatchState.selectAlliance(gamepad1, 1, telemetry);
         telemetry.addData("Saved spots", samples.size());
         telemetry.addLine("Turret must face forward at init. Localize after start: gamepad 2 share / options in a corner");
         telemetry.update();
