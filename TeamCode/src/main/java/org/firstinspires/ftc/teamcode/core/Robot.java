@@ -124,7 +124,7 @@ public class Robot {
      */
     public Command shoot() {
         return sequential(
-                waitUntil(launcher::isReady).raceWith(waitMs(1500)),
+                waitUntil(launcher::isReady).raceWith(waitMs(2000)),
                 conditional(launcher::hasShot,
                         sequential(startShooting(), waitMs(AUTO_SHOOT_MS), stopShooting()),
                         instant(() -> {}))

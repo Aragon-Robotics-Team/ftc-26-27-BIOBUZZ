@@ -1,6 +1,7 @@
 package org.firstinspires.ftc.teamcode.routines;
 
 import static com.pedropathing.api.Paths.line;
+import static com.pedropathing.ivy.commands.Commands.waitMs;
 import static com.pedropathing.ivy.groups.Groups.deadline;
 import static com.pedropathing.ivy.groups.Groups.sequential;
 import static com.pedropathing.ivy.pedro.PedroCommands.follow;
@@ -39,12 +40,12 @@ public class OneCycleGardenPark extends AutoRoutine {
         return line(poses.gardenBorder, poses.gardenIntake).linear(poses.gardenBorder, poses.gardenIntake);
     }
 
-    private Path finishGardenIntake() {
-        return line(poses.gardenIntake, poses.gardenBorder).linear(poses.gardenIntake, poses.gardenBorder);
+    private Path adjustBeforePark() {
+        return line(poses.gardenIntake, poses.adjustToPark).linear(poses.gardenIntake, poses.adjustToPark);
     }
 
     private Path park() {
-        return line(poses.gardenBorder, poses.bottomPark).linear(poses.gardenBorder, poses.bottomPark);
+        return line(poses.adjustToPark, poses.bottomPark).linear(poses.adjustToPark, poses.bottomPark);
     }
 
     @Override
@@ -59,8 +60,8 @@ public class OneCycleGardenPark extends AutoRoutine {
                 // Garden: intake on the way in, stop once back out
                 robot.intake.intake(),
                 follow(follower, prepareGardenIntake()),
-                follow(follower, gardenIntake()),
-                follow(follower, finishGardenIntake()),
+                follow(follower, gardenIntake()).raceWith(waitMs(1500)),
+                follow(follower, adjustBeforePark()),
                 robot.intake.off()
         );
 
