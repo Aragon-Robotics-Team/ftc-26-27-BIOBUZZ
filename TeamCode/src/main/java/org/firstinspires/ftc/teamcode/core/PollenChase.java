@@ -6,6 +6,7 @@ import static org.firstinspires.ftc.teamcode.core.RobotConstants.BallVision.*;
 import static org.firstinspires.ftc.teamcode.core.RobotConstants.Drive.INTAKE_HEADING_OFFSET;
 import static org.firstinspires.ftc.teamcode.core.RobotConstants.Field.ROBOT_LENGTH;
 import static org.firstinspires.ftc.teamcode.core.RobotConstants.Field.ROBOT_WIDTH;
+import static org.firstinspires.ftc.teamcode.core.RobotConstants.Field.WALL;
 
 import com.pedropathing.follower.Follower;
 import com.pedropathing.ivy.Command;
@@ -318,7 +319,8 @@ public class PollenChase {
 
     static Pose roomToTurn(Pose pose) {
         double r = Math.hypot(ROBOT_LENGTH, ROBOT_WIDTH) / 2 + RobotConstants.Field.KEEP_OUT_MARGIN;
-        double x = Math.max(r, Math.min(144 - r, pose.x())), y = Math.max(r, Math.min(144 - r, pose.y()));
+        double lo = WALL + r, hi = 144 - WALL - r;
+        double x = Math.max(lo, Math.min(hi, pose.x())), y = Math.max(lo, Math.min(hi, pose.y()));
         for (Pose flower : RobotConstants.Field.FLOWERS) {
             double dx = x - flower.x(), dy = y - flower.y(), d = Math.hypot(dx, dy), need = r + RobotConstants.Field.FLOWER_RADIUS;
             if (d >= need) continue;
@@ -339,7 +341,7 @@ public class PollenChase {
             else if (least == down) y = y0;
             else y = y1;
         }
-        return new Pose(Math.max(r, Math.min(144 - r, x)), Math.max(r, Math.min(144 - r, y)), pose.heading());
+        return new Pose(Math.max(lo, Math.min(hi, x)), Math.max(lo, Math.min(hi, y)), pose.heading());
     }
 
     /** How far the robot's footprint at this heading reaches along x from its center. */
@@ -453,7 +455,8 @@ public class PollenChase {
     static double[] besideSomething(double x, double y) {
         double best = LINE_UP_DISTANCE;
         double[] open = null;
-        double[][] walls = {{x, 1, 0}, {144 - x, -1, 0}, {y, 0, 1}, {144 - y, 0, -1}}; // distance, then the way out
+        double far = 144 - WALL;
+        double[][] walls = {{x - WALL, 1, 0}, {far - x, -1, 0}, {y - WALL, 0, 1}, {far - y, 0, -1}}; // distance, then the way out
         for (double[] w : walls) {
             if (w[0] < best) {
                 best = w[0];
@@ -535,10 +538,10 @@ public class PollenChase {
     /** How far from (x, y), going (ux, uy), to the wall. */
     static double wallAhead(double x, double y, double ux, double uy) {
         double d = Double.POSITIVE_INFINITY;
-        if (ux > 1e-6) d = Math.min(d, (144 - x) / ux);
-        if (ux < -1e-6) d = Math.min(d, -x / ux);
-        if (uy > 1e-6) d = Math.min(d, (144 - y) / uy);
-        if (uy < -1e-6) d = Math.min(d, -y / uy);
+        if (ux > 1e-6) d = Math.min(d, (144 - WALL - x) / ux);
+        if (ux < -1e-6) d = Math.min(d, (WALL - x) / ux);
+        if (uy > 1e-6) d = Math.min(d, (144 - WALL - y) / uy);
+        if (uy < -1e-6) d = Math.min(d, (WALL - y) / uy);
         return d;
     }
 
@@ -566,6 +569,6 @@ public class PollenChase {
     /** Keeps path ends inside the walls, by half the robot's longer side. */
     private static double clamp(double v) {
         double half = Math.max(ROBOT_WIDTH, ROBOT_LENGTH) / 2;
-        return Math.max(half, Math.min(144 - half, v));
+        return Math.max(WALL + half, Math.min(144 - WALL - half, v));
     }
 }

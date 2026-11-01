@@ -94,7 +94,7 @@ public class RobotConstants {
      */
     public static class Localization {
         // Correct the pose from the hive's tags. Off: the pose is the Pinpoint's alone, as before
-        public static boolean FUSE_HIVE_TAGS = true;
+        public static boolean FUSE_HIVE_TAGS = false;
         // Odometry: how far off it gets
         public static double TRANSLATION_DRIFT = 0.1;                 // inches per √inch driven
         public static double HEADING_DRIFT_PER_RADIAN = 0.02;         // radians per √radian turned
@@ -335,12 +335,18 @@ public class RobotConstants {
         public static double HIVE_OPENING_HEIGHT = 14;
         public static double HIVE_OPENING_TILT = Math.toRadians(30);
 
-        // Flower column centers, one on each perimeter wall 48 in from a corner, about 3.5 in off the wall. The set looks the same from both alliances, so it's used as is for blue.
+        // The walls' inside faces are WALL in from Pedro's 0 and 144: the field is 141.5 in across inside them, and
+        // centered on 72 like everything measured from the middle (the hive, its tags, the tile seams). The tiles next
+        // to the walls are the ones cut short
+        public static double WALL = (144 - 141.5) / 2;
+
+        // Flower column centers, one on each perimeter wall on a tile seam (Competition Manual 9.4), about 3.5 in off
+        // the wall. The set looks the same from both alliances, so it's used as is for blue.
         public static Pose[] FLOWERS = {
-                new Pose(48, 140.5),  // rear wall
-                new Pose(96, 3.5),    // audience wall
-                new Pose(3.5, 48),    // red alliance wall
-                new Pose(140.5, 96),  // blue alliance wall
+                new Pose(48, 144 - WALL - 3.5),  // rear wall
+                new Pose(96, WALL + 3.5),        // audience wall
+                new Pose(WALL + 3.5, 48),        // red alliance wall
+                new Pose(144 - WALL - 3.5, 96),  // blue alliance wall
         };
 
         // Where the pollen chase won't go for a ball. Both are symmetric about the field center, so they're the same
@@ -366,8 +372,8 @@ public class RobotConstants {
         // Pose resets: robot pushed into the corner, back against the alliance wall, so the center is half the
         // length off the alliance wall and half the width off the side wall.
         public static Pose RED_LEFT_CORNER =  // tile A6, alliance wall x rear wall
-                new Pose(ROBOT_LENGTH / 2, 144 - ROBOT_WIDTH / 2, 0);
+                new Pose(WALL + ROBOT_LENGTH / 2, 144 - WALL - ROBOT_WIDTH / 2, 0);
         public static Pose RED_RIGHT_CORNER = // tile A1, alliance wall x audience wall
-                new Pose(ROBOT_LENGTH / 2, ROBOT_WIDTH / 2, 0);
+                new Pose(WALL + ROBOT_LENGTH / 2, WALL + ROBOT_WIDTH / 2, 0);
     }
 }

@@ -29,7 +29,7 @@ speed model against logs from real runs.
 Hand-written in `src/core/field.ts`, measured from the official BIOBUZZ field CAD (Onshape v1, STEP v26-27.2) and the
 manual (Fig 9-8). Pedro frame, inches: x from the red wall, y from the audience wall. The manual allows ±1 in.
 
-- Walls: inner faces at 1.4 and 142.6.
+- Walls: inner faces at 1.25 and 142.75 (the field is 141.5 in across, centered on 72).
 - Hive A-frames: foot bar (solid, 2.15 in lip) x 47.25–49.5, y 52.5–91.5; legs are 1 in square tube leaning inward,
   centerline x = 48.06 + 0.2729·h, y = 53.20 + 0.4452·h (audience leg) / 90.80 − 0.4452·h (rear leg), from h ≈ 2.
   Keep-out = foot bar + the leg's sweep from h = 2 up to robot height + headroom. Blue's frame is x → 144 − x.

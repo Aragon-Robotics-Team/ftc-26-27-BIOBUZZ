@@ -6,6 +6,7 @@ import static org.firstinspires.ftc.teamcode.core.RobotConstants.Field.HIVE_FEET
 import static org.firstinspires.ftc.teamcode.core.RobotConstants.Field.KEEP_OUT_MARGIN;
 import static org.firstinspires.ftc.teamcode.core.RobotConstants.Field.ROBOT_LENGTH;
 import static org.firstinspires.ftc.teamcode.core.RobotConstants.Field.ROBOT_WIDTH;
+import static org.firstinspires.ftc.teamcode.core.RobotConstants.Field.WALL;
 
 import com.pedropathing.math.Pose;
 
@@ -103,7 +104,7 @@ public final class FieldRoutes {
 
     /** Keeps a waypoint CLEARANCE inside the walls. */
     private static double onField(double v) {
-        return Math.max(CLEARANCE, Math.min(144 - CLEARANCE, v));
+        return Math.max(WALL + CLEARANCE, Math.min(144 - WALL - CLEARANCE, v));
     }
 
     /** Distance from (px, py) to the segment from (ax, ay) to (bx, by). */

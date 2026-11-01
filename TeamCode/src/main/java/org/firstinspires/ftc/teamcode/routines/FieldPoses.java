@@ -56,13 +56,16 @@ public class FieldPoses {
     }
 
     public FieldPoses(PoseFactory poseFactory) {
-        start = poseFactory.of(56.8946, 5.0366, 90);
-        startLaunch = poseFactory.of(59.808, 10.9598, 90);
-        gardenBorder = poseFactory.of(9.577, 24.0776, -90);
-        gardenIntake = poseFactory.of(9.561, 12.0859, -90);
-        adjustToPark = poseFactory.of(14.561, 20.0859, -90);
-        bottomPark = poseFactory.of(10.5389, 91.9567, 0);
-        topPark = poseFactory.of(11.4049,120.4324, 0);
+        // Back against the audience wall. The poses down to topPark were tuned on the robot (Oct 30) from a start of
+        // y = 5.0366, 4.2134 in short of where the robot really sits, so they're all 4.2134 in up from what was tuned:
+        // the same moves on the field
+        start = poseFactory.of(56.8946, RobotConstants.Field.WALL + RobotConstants.Field.ROBOT_LENGTH / 2, 90);
+        startLaunch = poseFactory.of(59.808, 15.1732, 90);
+        gardenBorder = poseFactory.of(9.577, 28.2910, -90);
+        gardenIntake = poseFactory.of(9.561, 16.2993, -90);
+        adjustToPark = poseFactory.of(14.561, 24.2993, -90);
+        bottomPark = poseFactory.of(10.5389, 96.1701, 0);
+        topPark = poseFactory.of(11.4049, 124.6458, 0);
         gardenCenterLine = poseFactory.of(60, 40, 90);
         flowerLaunch = poseFactory.of(60, 119.7, 90);
         flowerIntake = poseFactory.of(51, 131, 95);
@@ -70,7 +73,7 @@ public class FieldPoses {
         rightLaunch = poseFactory.of(56, 20.219975, 90);
         leftLaunch = poseFactory.of(56, 144 - 20.219975, -90);
         // The camera looks 20° left of the intake (RobotConstants.BallVision.YAW): heading = where to look - 20°
-        allianceWallStart = poseFactory.of(RobotConstants.Field.ROBOT_LENGTH / 2, 36, 0);
+        allianceWallStart = poseFactory.of(RobotConstants.Field.WALL + RobotConstants.Field.ROBOT_LENGTH / 2, 36, 0);
         gardenLook = poseFactory.of(30, 16, 190);
 
 
