@@ -21,6 +21,8 @@ public class FieldPoses {
     public final Pose gardenBorder;
     /** Inside the garden, at the end of the intake drive. */
     public final Pose gardenIntake;
+    /** Back up to try again. */
+    public final Pose gardenIntakeBack;
     /** After garden intake, adjust position to not hit flower */
     public final Pose adjustToPark;
     /** Bottom side of the loading zone. */
@@ -62,8 +64,9 @@ public class FieldPoses {
         start = poseFactory.of(56.8946, RobotConstants.Field.WALL + RobotConstants.Field.ROBOT_LENGTH / 2, 90);
         startLaunch = poseFactory.of(59.808, 15.1732, 90);
         gardenBorder = poseFactory.of(9.577, 28.2910, -90);
-        gardenIntake = poseFactory.of(9.561, 16.2993, -90);
-        adjustToPark = poseFactory.of(14.561, 24.2993, -90);
+        gardenIntake = poseFactory.of(9.561, 13.2993, -90);
+        gardenIntakeBack = poseFactory.of(9.561, 25.2993, -90);
+        adjustToPark = poseFactory.of(38.561, 24.2993, -90);
         bottomPark = poseFactory.of(10.5389, 96.1701, 0);
         topPark = poseFactory.of(11.4049, 124.6458, 0);
         gardenCenterLine = poseFactory.of(60, 40, 90);

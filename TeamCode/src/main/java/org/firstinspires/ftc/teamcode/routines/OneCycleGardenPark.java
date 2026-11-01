@@ -36,8 +36,16 @@ public class OneCycleGardenPark extends AutoRoutine {
         return line(poses.startLaunch, poses.gardenBorder).linear(poses.startLaunch, poses.gardenBorder);
     }
 
-    private Path gardenIntake() {
+    private Path gardenIntake1() {
         return line(poses.gardenBorder, poses.gardenIntake).linear(poses.gardenBorder, poses.gardenIntake);
+    }
+
+    private Path gardenIntakeBack() {
+        return line(poses.gardenIntake, poses.gardenIntakeBack).linear(poses.gardenIntake, poses.gardenIntakeBack);
+    }
+
+    private Path gardenIntake2() {
+        return line(poses.gardenIntakeBack, poses.gardenIntake).linear(poses.gardenIntakeBack, poses.gardenIntake);
     }
 
     private Path adjustBeforePark() {
@@ -60,7 +68,11 @@ public class OneCycleGardenPark extends AutoRoutine {
                 // Garden: intake on the way in, stop once back out
                 robot.intake.intake(),
                 follow(follower, prepareGardenIntake()),
-                follow(follower, gardenIntake()).raceWith(waitMs(1500)),
+                follow(follower, gardenIntake1()).raceWith(waitMs(1500)),
+                waitMs(1500),
+                follow(follower, gardenIntakeBack()),
+                follow(follower, gardenIntake2()).raceWith(waitMs(1500)),
+                waitMs(1500),
                 follow(follower, adjustBeforePark()),
                 robot.intake.off()
         );
