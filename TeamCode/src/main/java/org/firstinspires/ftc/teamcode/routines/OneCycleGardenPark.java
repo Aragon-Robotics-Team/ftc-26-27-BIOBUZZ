@@ -69,10 +69,10 @@ public class OneCycleGardenPark extends AutoRoutine {
                 robot.intake.intake(),
                 follow(follower, prepareGardenIntake()),
                 follow(follower, gardenIntake1()).raceWith(waitMs(1500)),
-                waitMs(1500),
+                waitMs(1000),
                 follow(follower, gardenIntakeBack()),
                 follow(follower, gardenIntake2()).raceWith(waitMs(1500)),
-                waitMs(1500),
+                waitMs(1000),
                 follow(follower, adjustBeforePark()),
                 robot.intake.off()
         );
