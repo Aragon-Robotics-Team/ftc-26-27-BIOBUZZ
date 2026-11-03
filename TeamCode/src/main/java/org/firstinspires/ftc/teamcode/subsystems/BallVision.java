@@ -184,11 +184,11 @@ public class BallVision implements Subsystem {
                 .setCameraResolution(new android.util.Size(CAPTURE_WIDTH, CAPTURE_HEIGHT))
                 .setStreamFormat(VisionPortal.StreamFormat.MJPEG)
                 .addProcessor(processor)
-                .enableLiveView(preview)
+                .enableLiveView(preview && LIVE_VIEW)
                 .build();
         this.preview = preview;
-        processor.setStreaming(preview);
-        if (preview) PanelsCameraStream.INSTANCE.startStream(processor, null);
+        processor.setStreaming(preview, STREAM_FPS);
+        if (preview) PanelsCameraStream.INSTANCE.startStream(processor, STREAM_FPS);
     }
 
     public boolean isAvailable() {

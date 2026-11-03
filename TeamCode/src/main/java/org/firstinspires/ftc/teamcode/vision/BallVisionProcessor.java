@@ -57,6 +57,8 @@ public class BallVisionProcessor implements VisionProcessor, CameraStreamSource 
     private volatile String problem;
     private volatile double[] highlight;  // u, v, r of the ball being chased
     private volatile boolean streaming = false;
+    private volatile int streamFps = 15;
+    private long lastStreamNanos;
     private final AtomicReference<Bitmap> streamFrame = new AtomicReference<>();
 
     public BallVisionProcessor(BallGeometry geometry, BallPipeline pipeline, double[] distortion) {
@@ -104,7 +106,11 @@ public class BallVisionProcessor implements VisionProcessor, CameraStreamSource 
         List<Ball> balls = Collections.unmodifiableList(pipeline.detect(input));
         Result result = new Result(balls, captureTimeNanos, start, (System.nanoTime() - start) / 1e6);
         latest = result;
-        if (streaming) stream(input, result);
+        // Panels takes frames at its own rate, so only draw as often as it can use them
+        if (streaming && start - lastStreamNanos >= 1e9 / streamFps) {
+            lastStreamNanos = start;
+            stream(input, result);
+        }
         return result;
     }
 
@@ -123,9 +129,10 @@ public class BallVisionProcessor implements VisionProcessor, CameraStreamSource 
         highlight = ball;
     }
 
-    /** Draw each frame for {@link #getFrameBitmap} (Panels camera stream). */
-    public void setStreaming(boolean streaming) {
+    /** Draw frames for {@link #getFrameBitmap} (Panels camera stream), at most fps a second. */
+    public void setStreaming(boolean streaming, int fps) {
         this.streaming = streaming;
+        this.streamFps = fps;
     }
 
     // ---- Drawing ----

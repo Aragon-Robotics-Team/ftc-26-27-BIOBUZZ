@@ -133,6 +133,10 @@ public class RobotConstants {
         // TODO: tune on the robot. 0 leaves the camera on auto exposure
         public static double EXPOSURE_MS = 0;
         public static int GAIN = 100;          // clamped to what the camera allows
+        // Previews, when an OpMode asks for them: the Driver Station's live view (false leaves only Panels, saving
+        // CPU for the pipeline) and how many frames a second the Panels camera stream draws
+        public static boolean LIVE_VIEW = true;
+        public static int STREAM_FPS = 15;
 
         // ---- Lens ----
         // Nominal horizontal field of view, used when CAMERA_MATRIX is null
