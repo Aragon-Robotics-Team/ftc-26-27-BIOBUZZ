@@ -289,8 +289,8 @@ public class RobotConstants {
         // Velocity feedforward, so the turret keeps up while the robot drives and turns instead of lagging behind.
         // Power per radian/sec of turret speed. 1 / free speed is a good start: 1150 RPM / (100/30) ≈ 36 rad/s. TODO: tune
         public static double TURRET_KV = 1.0 / 36;
-        // Aim from where the robot will be this far ahead, to make up for loop and localizer lag (seconds). TODO: tune
-        public static double AIM_LOOKAHEAD = 0.05;
+        // Aim from where the robot will be this far ahead, to make up for loop, localizer lag, and transfer time (seconds). TODO: tune
+        public static double AIM_LOOKAHEAD = 0.2;
 
         // ---- Shot model (ShotSolver) ----
         // Every shot is simulated (gravity, drag, and lift if the ball spins) to find the exit speed and turret angle that put the
