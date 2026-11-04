@@ -174,12 +174,19 @@ public class Robot {
             }
             for (double[] p : FieldRoutes.between(from, target, ballVision.half())) {
                 Pose via = new Pose(p[0], p[1], target.heading());
+                if (!apart(from, via)) continue; // a waypoint where it already is (Pedro won't follow a line of no length)
                 legs.add(holdIfCut(follower, follow(follower, line(from, via).linear(from, via))));
                 from = via;
             }
-            legs.add(holdIfCut(follower, follow(follower, line(from, target).linear(from, target))));
+            if (apart(from, target)) legs.add(holdIfCut(follower, follow(follower, line(from, target).linear(from, target))));
+            else legs.add(instant(() -> follower.hold(target))); // there already: just turn to its heading
             return sequential(legs.toArray(new Command[0]));
         });
+    }
+
+    /** Far enough apart for a path between them. */
+    private static boolean apart(Pose a, Pose b) {
+        return Math.hypot(b.x() - a.x(), b.y() - a.y()) > 0.5;
     }
 
     // ---- Localization ----
