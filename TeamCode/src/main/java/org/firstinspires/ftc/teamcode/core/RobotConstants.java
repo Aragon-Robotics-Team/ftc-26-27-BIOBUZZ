@@ -11,7 +11,8 @@ public class RobotConstants {
         /** How the TeleOp right stick turns the robot. */
         public enum TurnMode {
             TWIN_STICK, // the intake turns to face where the right stick points, and holds that heading when let go
-            RATE        // right stick x sets the turn speed
+            RATE,       // right stick x sets the turn speed
+            RATE_SNAP   // like RATE, but driving hard with the stick centered lines the robot up with the drive direction
         }
         public static TurnMode TURN_MODE = TurnMode.RATE; // Oct 26: normal turning for now, TWIN_STICK once the heading PID is tuned
 
@@ -28,6 +29,18 @@ public class RobotConstants {
         public static double HEADING_KI = 0;          // turn power per radian-second
         public static double HEADING_KD = 0.2;        // turn power per radian/sec of turn speed
         public static double HEADING_MAX_POWER = 1.0; // full power: get to the heading as fast as possible
+
+        // ---- Rate turning with heading snap (TurnMode.RATE_SNAP) ----
+        // Mecanum is slower driving off its own axis (about 8% at 5° off, 15% at 10°). With the turn stick centered and
+        // the drive stick pushed hard, a heading this close to the drive direction (nose or tail first) is turned onto
+        // it with the heading PID above. TODO: tune
+        public static double SNAP_ENTER = Math.toRadians(10);
+        public static double SNAP_EXIT = Math.toRadians(13);  // stays snapped until this far off, so it doesn't flicker
+        // Drive stick (after slow mode) below this never snaps: the wheels aren't at full power, so there's no speed to gain
+        public static double SNAP_MIN_DRIVE = 0.8;
+        // Turning takes wheel power too, so the snap turns gently instead of slowing the robot down to do it
+        public static double SNAP_MAX_TURN = 0.3;
+        public static double TURN_DEADBAND = 0.05;            // turn stick within this counts as centered
     }
 
     public static class Intake {

@@ -234,6 +234,7 @@ public class Robot {
         Logger.recordOutput("Drive/speed", Math.hypot(velocity.vx, velocity.vy));
         Logger.recordOutput("Drive/turnRateDeg", Math.toDegrees(velocity.omega));
         Logger.recordOutput("Drive/targetHeadingDeg", Math.toDegrees(drivebase.getTargetHeading()));
+        Logger.recordOutput("Drive/headingSnap", drivebase.isSnapping());
 
         Logger.recordOutput("Launcher/status", launcher.getStatus());
         Logger.recordOutput("Launcher/flywheelTarget", launcher.getTargetVelocity());

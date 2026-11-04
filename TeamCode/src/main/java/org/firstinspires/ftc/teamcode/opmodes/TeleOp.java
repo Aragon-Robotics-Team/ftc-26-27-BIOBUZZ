@@ -10,6 +10,7 @@ import static org.firstinspires.ftc.teamcode.core.RobotConstants.Vision.HOLD_TO_
 import static org.firstinspires.ftc.teamcode.core.RobotConstants.Vision.LOCK_RUMBLE_MS;
 import static org.firstinspires.ftc.teamcode.util.Html.*;
 
+import com.pedropathing.ivy.Command;
 import com.pedropathing.ivy.Scheduler;
 import com.pedropathing.math.Pose;
 import com.pedropathing.utils.Angle;
@@ -37,7 +38,9 @@ import org.firstinspires.ftc.teamcode.util.PanelsDisplay;
  * Gamepad 1 (driver):
  *   left stick      field-centric drive (stick forward = away from our driver station)
  *   right stick     point the intake that way (same frame); the robot holds that heading when let go.
- *                   With RobotConstants.Drive.TURN_MODE = RATE, right stick x sets the turn speed instead
+ *                   With RobotConstants.Drive.TURN_MODE = RATE, right stick x sets the turn speed instead.
+ *                   RATE_SNAP is RATE, plus: driving hard with the right stick centered and the robot within 10° of
+ *                   the drive direction (nose or tail first) turns it onto that direction, for full mecanum speed
  *   hold L2         slow mode (driving only; with RATE, turning too)
  *   triangle        toggle intake        cross   toggle outtake
  *   R1              flywheel on          L1      flywheel off
@@ -112,22 +115,33 @@ public class TeleOp extends OpMode {
         // Stick forward points away from our driver station: +x for red, -x for blue
         double headingOffset = MatchState.alliance == Alliance.BLUE ? Math.PI : 0;
         // Always-on commands, running for the whole match
-        schedule(
-                TURN_MODE == TurnMode.TWIN_STICK
-                        ? robot.drivebase.driveTwinStick(
-                                () -> -gamepad1.left_stick_y * driveScale(),
-                                () -> -gamepad1.left_stick_x * driveScale(),
-                                () -> -gamepad1.right_stick_y,
-                                () -> -gamepad1.right_stick_x,
-                                headingOffset)
-                        : robot.drivebase.driveFieldCentric(
-                                () -> -gamepad1.left_stick_y * driveScale(),
-                                () -> -gamepad1.left_stick_x * driveScale(),
-                                () -> -gamepad1.right_stick_x * driveScale(),
-                                headingOffset),
-                robot.aimAtHive()
-        );
+        schedule(drive(headingOffset), robot.aimAtHive());
         loopTimer.reset();
+    }
+
+    /** The driver's always-on drive command, for TURN_MODE. */
+    private Command drive(double headingOffset) {
+        switch (TURN_MODE) {
+            case TWIN_STICK:
+                return robot.drivebase.driveTwinStick(
+                        () -> -gamepad1.left_stick_y * driveScale(),
+                        () -> -gamepad1.left_stick_x * driveScale(),
+                        () -> -gamepad1.right_stick_y,
+                        () -> -gamepad1.right_stick_x,
+                        headingOffset);
+            case RATE_SNAP:
+                return robot.drivebase.driveRateSnap(
+                        () -> -gamepad1.left_stick_y * driveScale(),
+                        () -> -gamepad1.left_stick_x * driveScale(),
+                        () -> -gamepad1.right_stick_x * driveScale(),
+                        headingOffset);
+            default:
+                return robot.drivebase.driveFieldCentric(
+                        () -> -gamepad1.left_stick_y * driveScale(),
+                        () -> -gamepad1.left_stick_x * driveScale(),
+                        () -> -gamepad1.right_stick_x * driveScale(),
+                        headingOffset);
+        }
     }
 
     @Override
@@ -267,8 +281,8 @@ public class TeleOp extends OpMode {
             // How far off the hive the turret points to make up for the robot's motion
             telemetry.addLine(String.format("Aim ahead %+.1f°", Math.toDegrees(shot.leadAngle)));
         }
-        String heading = TURN_MODE == TurnMode.TWIN_STICK
-                // Where the robot is pointing → where the driver asked it to point
+        String heading = TURN_MODE == TurnMode.TWIN_STICK || robot.drivebase.isSnapping()
+                // Where the robot is pointing → where the driver asked it to point (or the snap is turning it to)
                 ? String.format("Heading %.0f° → %.0f°", Math.toDegrees(Angle.normalizeSigned(pose.heading())),
                         Math.toDegrees(robot.drivebase.getTargetHeading()))
                 : String.format("Heading %.0f°", Math.toDegrees(pose.heading()));
