@@ -21,3 +21,13 @@ replay-auto.bat --no-sim          reopen the last run without running the sim ag
 
 The routine names are in `TeamCode/.../routines/Routines.java`, in lower case.
 After pulling new code, run the setup again if the sim field looks out of date.
+
+## Your own auto
+
+1. Your branch needs the sim: merge `simloop` into it (Android Studio: Git > Branches > `origin/simloop` >
+   Merge into Current).
+2. Add your routine to `Routines.java` and take `@Disabled` off it: the sim runs the routines in the Auto menu.
+3. `replay-auto.bat josh` runs the routine named `JOSH` in `Routines.java` (Mac: `./replay-auto.sh josh`).
+
+It starts where your routine's `startPose()` says. If a check fails ("Auto should drive off its start", "the two
+preloads should tip our hive"), the log still opens: watch it to see what your auto did.

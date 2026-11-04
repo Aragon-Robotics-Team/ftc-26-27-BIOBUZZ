@@ -93,14 +93,11 @@ def assets_dir():
 
 def check_assets(base):
     user_assets = os.path.join(base, "userAssets")
-    needed = ["Field3d_BIOBUZZSim", "Robot_BIOBUZZ Hive Red", "Robot_BIOBUZZ Hive Blue"]
+    needed = ["Field3d_BIOBUZZSim", "Robot_BIOBUZZ Hive Red", "Robot_BIOBUZZ Hive Blue", "Robot_BIOBUZZ"]
     if not all(os.path.isdir(os.path.join(user_assets, name)) for name in needed):
         print("Building the sim field and hive models into AdvantageScope (build_sim_field.py)...")
         if subprocess.run([sys.executable, os.path.join(HERE, "build_sim_field.py"), user_assets]).returncode != 0:
             print("  Couldn't build them (needs numpy, scipy and trimesh). AdvantageScope will show its default field.")
-    if not os.path.isdir(os.path.join(user_assets, "Robot_BIOBUZZ")):
-        print("  No Robot_BIOBUZZ model in AdvantageScope's userAssets: the robot is drawn as a plain box. "
-              "Copy that folder from a computer that has it.")
 
 
 def uuid():
@@ -117,7 +114,7 @@ def all_autos_tabs(names):
     first = names[0] + "/RealOutputs/"
     sources += [source("robot", first + "Hive/red/trayPose3d", "Pose3d", model="BIOBUZZ Hive Red"),
                 source("robot", first + "Hive/blue/trayPose3d", "Pose3d", model="BIOBUZZ Hive Blue"),
-                source("robot", first + "Sim/partner/pose2d", "Pose2d", model="Drive Base (Simple)")]
+                source("robot", first + "Sim/partner/pose2d", "Pose2d", model="Drive Base")]
     return [{"type": 0, "title": "", "controller": None, "controllerUUID": uuid(), "renderer": "", "controlsHeight": 0},
             {"type": 3, "title": "All autos", "controller": {"sources": sources, "game": GAME},
              "controllerUUID": uuid(), "controlsHeight": 200,
