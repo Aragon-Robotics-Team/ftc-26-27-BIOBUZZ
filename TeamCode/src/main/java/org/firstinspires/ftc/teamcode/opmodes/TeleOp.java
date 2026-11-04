@@ -16,6 +16,7 @@ import com.pedropathing.utils.Angle;
 import com.qualcomm.robotcore.eventloop.opmode.OpMode;
 import com.qualcomm.robotcore.hardware.Gamepad;
 import com.qualcomm.robotcore.util.ElapsedTime;
+import com.qualcomm.robotcore.util.RobotLog;
 
 import org.firstinspires.ftc.robotcore.external.Telemetry;
 import org.firstinspires.ftc.teamcode.core.Alliance;
@@ -60,10 +61,12 @@ public class TeleOp extends OpMode {
     private Pose initCorner = null;
     private boolean started = false;
     private PanelsDisplay panelsDisplay;
-    // Gamepad 1 going quiet (watchGamepad): its last timestamp, when it changed (ms on clock), and the longest gap
+    // Gamepad 1 going quiet (watchGamepad): its last timestamp, when it changed (ms on clock), and the longest gap.
+    // The slowest loop since the last change, and in the longest gap: a gap that's one slow loop is the robot stalling
     private long padStamp;
     private boolean padMoving;
     private double padChangedMs = Double.NaN, longestPadGapMs, longestPadGapAtS;
+    private double lastLoopMs = Double.NaN, slowestLoopSincePadMs, longestPadGapLoopMs;
     private int padGaps;
 
     @Override
@@ -197,26 +200,36 @@ public class TeleOp extends OpMode {
     /**
      * Times how long gamepad 1's data goes without changing while the driver was using it. Its timestamp only moves
      * when the driver station sees an input change, so a gap counts only if, at its last update, a stick or trigger
-     * was off rest and none was pinned at its limit (a still or pinned stick stops the timestamp too). A long gap here
-     * while the robot kept driving means the driver station stopped sending: the gamepad, its USB, or the Wi-Fi.
+     * was off rest and none was pinned at its limit (a still or pinned stick stops the timestamp too). A stick is
+     * pinned when pushed to its rim in any direction, not just along an axis: diagonal driving and twin-stick aiming
+     * hold it there. A long gap while loops kept running means the driver station stopped sending: the gamepad, its
+     * USB, or the Wi-Fi. A gap that is mostly one slow loop is this OpMode stalling, not the driver station.
+     * Each gap over PAD_GAP_MS also goes to the robot controller log (tag PadGap) to line up with the SDK's own lines.
      */
     private void watchGamepad() {
         // Through a local: tools/ControlLayout follows gamepad1 and Gamepad parameters, and would draw these as controls
         Gamepad pad = gamepad1;
         double now = clock.milliseconds();
+        if (!Double.isNaN(lastLoopMs)) slowestLoopSincePadMs = Math.max(slowestLoopSincePadMs, now - lastLoopMs);
+        lastLoopMs = now;
         if (pad.timestamp == padStamp && !Double.isNaN(padChangedMs)) return;
         double gap = now - padChangedMs;
         if (padMoving && gap > longestPadGapMs) {
             longestPadGapMs = gap;
             longestPadGapAtS = clock.seconds();
+            longestPadGapLoopMs = slowestLoopSincePadMs;
         }
-        if (padMoving && gap > PAD_GAP_MS) padGaps++;
+        if (padMoving && gap > PAD_GAP_MS) {
+            padGaps++;
+            RobotLog.ii("PadGap", "gamepad 1 quiet %.0f ms, ended %.1f s after init, slowest loop in it %.0f ms",
+                    gap, clock.seconds(), slowestLoopSincePadMs);
+        }
         padStamp = pad.timestamp;
         padChangedMs = now;
-        float[] axes = {pad.left_stick_x, pad.left_stick_y, pad.right_stick_x, pad.right_stick_y, pad.left_trigger,
-                pad.right_trigger};
-        boolean pinned = false;
-        for (float axis : axes) pinned |= Math.abs(axis) >= 0.98;
+        slowestLoopSincePadMs = 0;
+        boolean pinned = Math.hypot(pad.left_stick_x, pad.left_stick_y) >= 0.9
+                || Math.hypot(pad.right_stick_x, pad.right_stick_y) >= 0.9
+                || pad.left_trigger >= 0.98 || pad.right_trigger >= 0.98;
         padMoving = !pad.atRest() && !pinned;
     }
 
@@ -263,8 +276,8 @@ public class TeleOp extends OpMode {
         telemetry.addLine(heading);
         telemetry.addLine(String.format("Loop %.1f ms %.0f Hz", loopMs, 1000 / loopMs));
         telemetry.addLine(String.format("Gamepad 1 updated %.0f ms ago (stamp %d)", clock.milliseconds() - padChangedMs, padStamp));
-        telemetry.addLine(String.format("Gamepad 1 longest gap %.0f ms at %.1f s (%d over %d ms)",
-                longestPadGapMs, longestPadGapAtS, padGaps, PAD_GAP_MS));
+        telemetry.addLine(String.format("Gamepad 1 longest gap %.0f ms at %.1f s, slowest loop in it %.0f ms (%d over %d ms)",
+                longestPadGapMs, longestPadGapAtS, longestPadGapLoopMs, padGaps, PAD_GAP_MS));
         telemetry.addLine("Follower " + robot.drivebase.getFollower().mode());
 
         // ---- 3. Everything else ----
