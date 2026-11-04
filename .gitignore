@@ -85,3 +85,6 @@ node_modules/
 
 # Python bytecode from the tools' scripts
 __pycache__/
+
+# setup-sim.command's Python (tools/advantagescope/setup_mac.sh)
+tools/advantagescope/.venv/
