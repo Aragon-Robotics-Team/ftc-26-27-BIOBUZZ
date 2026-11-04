@@ -10,6 +10,10 @@ rem Then press play (space) in AdvantageScope.
 cd /d "%~dp0"
 rem setup-sim.bat's Python, which has what the sim field needs
 set PYTHON=tools\advantagescope\.venv\Scripts\python.exe
-if not exist "%PYTHON%" set PYTHON=py -3
-%PYTHON% tools\advantagescope\replay_auto.py %*
+if not exist "%PYTHON%" (
+    echo Run setup-sim.bat first, until it says Done: it installs the Python this uses.
+    pause
+    exit /b 1
+)
+"%PYTHON%" tools\advantagescope\replay_auto.py %*
 if "%~1"=="" pause
