@@ -29,7 +29,7 @@ speed model against logs from real runs.
 Hand-written in `src/core/field.ts`, measured from the official BIOBUZZ field CAD (Onshape v1, STEP v26-27.2) and the
 manual (Fig 9-8). Pedro frame, inches: x from the red wall, y from the audience wall. The manual allows ±1 in.
 
-- Walls: inner faces at 1.4 and 142.6.
+- Walls: inner faces at 1.25 and 142.75 (the field is 141.5 in across, centered on 72).
 - Hive A-frames: foot bar (solid, 2.15 in lip) x 47.25–49.5, y 52.5–91.5; legs are 1 in square tube leaning inward,
   centerline x = 48.06 + 0.2729·h, y = 53.20 + 0.4452·h (audience leg) / 90.80 − 0.4452·h (rear leg), from h ≈ 2.
   Keep-out = foot bar + the leg's sweep from h = 2 up to robot height + headroom. Blue's frame is x → 144 − x.
@@ -90,7 +90,7 @@ A point (or area) can shoot at a hive cell, in one of two ways:
   only stops at the end of a path, so the path is driven as separate Pedro paths with `robot.shoot()` between them;
   the robot may leave a stop in any direction. Allowed on any point, including the start and the end.
 - **Shoot on the move**: the volley is centred on a point in the middle of the path, on a stretch where Pedro's speed
-  is capped (`maxPathSpeed`, set per segment). Pedro doesn't slow down ahead of a cap, and on a capped segment it
+  is capped (`maxVelocityConstraint`, in/s, set per segment; Pedro's `maxPathSpeed` is a fraction of the top speed). Pedro doesn't slow down ahead of a cap, and on a capped segment it
   coasts while too fast, so the capped stretch starts where coasting from the planned speed reaches the cap in time.
 
 Shots are simulated with TeamCode's `ShotSolver`, ported line for line (`src/core/shot.ts`): ball flight with drag and

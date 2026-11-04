@@ -2,8 +2,8 @@ package org.firstinspires.ftc.teamcode.routines;
 
 import com.qualcomm.robotcore.eventloop.opmode.Disabled;
 
-import org.firstinspires.ftc.teamcode.Alliance;
-import org.firstinspires.ftc.teamcode.Robot;
+import org.firstinspires.ftc.teamcode.core.Alliance;
+import org.firstinspires.ftc.teamcode.core.Robot;
 
 import java.lang.reflect.InvocationTargetException;
 import java.util.ArrayList;
@@ -15,7 +15,12 @@ import java.util.List;
  */
 //super advanced reflection stuff wow!
 public enum Routines {
+    ONE_CYCLE_GARDEN_PARK(OneCycleGardenPark.class),
+    TWO_CYCLE_GARDEN_PARK(TwoCycleGardenPark.class),
+    ONE_CYCLE_FLOWER_PARK(OneCycleFlowerPark.class),
+    TWO_CYCLE_FLOWER_PARK(TwoCycleFlowerPark.class),
     CYCLE_GARDEN_PARK(CycleGardenPark.class),
+    SOLO_CARRY(SoloCarry.class),
     EXAMPLE(ExampleRoutine.class);
 
     private final Class<? extends AutoRoutine> type;

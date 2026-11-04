@@ -1,44 +1,48 @@
 package org.firstinspires.ftc.teamcode.opmodes;
 
 import static com.pedropathing.ivy.Scheduler.schedule;
-import static org.firstinspires.ftc.teamcode.RobotConstants.Drive.SLOW_MODE_SCALE;
-import static org.firstinspires.ftc.teamcode.RobotConstants.Drive.TURN_MODE;
-import static org.firstinspires.ftc.teamcode.RobotConstants.Field.RED_LEFT_CORNER;
-import static org.firstinspires.ftc.teamcode.RobotConstants.Field.RED_RIGHT_CORNER;
-import static org.firstinspires.ftc.teamcode.RobotConstants.Launcher.SHOOT_ON_THE_MOVE;
-import static org.firstinspires.ftc.teamcode.RobotConstants.Vision.HOLD_TO_LOCK_S;
-import static org.firstinspires.ftc.teamcode.RobotConstants.Vision.LOCK_RUMBLE_MS;
+import static org.firstinspires.ftc.teamcode.core.RobotConstants.Drive.SLOW_MODE_SCALE;
+import static org.firstinspires.ftc.teamcode.core.RobotConstants.Drive.TURN_MODE;
+import static org.firstinspires.ftc.teamcode.core.RobotConstants.Field.RED_LEFT_CORNER;
+import static org.firstinspires.ftc.teamcode.core.RobotConstants.Field.RED_RIGHT_CORNER;
+import static org.firstinspires.ftc.teamcode.core.RobotConstants.Launcher.SHOOT_ON_THE_MOVE;
+import static org.firstinspires.ftc.teamcode.core.RobotConstants.Vision.HOLD_TO_LOCK_S;
+import static org.firstinspires.ftc.teamcode.core.RobotConstants.Vision.LOCK_RUMBLE_MS;
 import static org.firstinspires.ftc.teamcode.util.Html.*;
 
 import com.pedropathing.ivy.Scheduler;
 import com.pedropathing.math.Pose;
 import com.pedropathing.utils.Angle;
 import com.qualcomm.robotcore.eventloop.opmode.OpMode;
+import com.qualcomm.robotcore.hardware.Gamepad;
 import com.qualcomm.robotcore.util.ElapsedTime;
 
 import org.firstinspires.ftc.robotcore.external.Telemetry;
-import org.firstinspires.ftc.teamcode.Alliance;
-import org.firstinspires.ftc.teamcode.Hive;
-import org.firstinspires.ftc.teamcode.MatchState;
-import org.firstinspires.ftc.teamcode.Robot;
-import org.firstinspires.ftc.teamcode.RobotConstants.Drive.TurnMode;
-import org.firstinspires.ftc.teamcode.ShotSolver.Shot;
+import org.firstinspires.ftc.teamcode.core.Alliance;
+import org.firstinspires.ftc.teamcode.core.Hive;
+import org.firstinspires.ftc.teamcode.core.MatchState;
+import org.firstinspires.ftc.teamcode.core.Robot;
+import org.firstinspires.ftc.teamcode.core.RobotConstants.Drive.TurnMode;
+import org.firstinspires.ftc.teamcode.core.ShotSolver.Shot;
 import org.firstinspires.ftc.teamcode.subsystems.Intake;
 import org.firstinspires.ftc.teamcode.subsystems.Launcher;
 import org.firstinspires.ftc.teamcode.util.FieldDiagram;
 import org.firstinspires.ftc.teamcode.util.HoldButton;
 import org.firstinspires.ftc.teamcode.util.Html;
+import org.firstinspires.ftc.teamcode.util.MatchLog;
+import org.firstinspires.ftc.teamcode.util.PanelsDisplay;
 
 /**
  * Gamepad 1 (driver):
  *   left stick      field-centric drive (stick forward = away from our driver station)
  *   right stick     point the intake that way (same frame); the robot holds that heading when let go.
  *                   With RobotConstants.Drive.TURN_MODE = RATE, right stick x sets the turn speed instead
- *   hold LT         slow mode (driving only; with RATE, turning too)
+ *   hold L2         slow mode (driving only; with RATE, turning too)
  *   triangle        toggle intake        cross   toggle outtake
- *   RB              flywheel on          LB      flywheel off
- *   hold RT         open the gate and feed the shooter
+ *   R1              flywheel on          L1      flywheel off
+ *   hold R2         open the gate and feed the shooter
  * Gamepad 2 (operator):
+ *   square / circle during init: blue / red alliance (until pressed, the alliance Auto ran as)
  *   dpad left/right nudge turret         dpad up/down  nudge flywheel speed
  *   square / circle tap: hive LEFT / RIGHT cell is up (the Limelight keeps checking it)
  *                   hold 1 s: set that cell and lock / unlock automatic hive detection (short rumble)
@@ -47,8 +51,6 @@ import org.firstinspires.ftc.teamcode.util.Html;
  */
 @com.qualcomm.robotcore.eventloop.opmode.TeleOp(name = "TeleOp", group = "Competition")
 public class TeleOp extends OpMode {
-    private static final int LEFT_COLUMN = 22; // characters, for the side-by-side numbers
-
     private Robot robot;
     private final ElapsedTime loopTimer = new ElapsedTime();
     private final ElapsedTime clock = new ElapsedTime();
@@ -57,14 +59,22 @@ public class TeleOp extends OpMode {
     /** Red-side corner the operator picked during init, or null. */
     private Pose initCorner = null;
     private boolean started = false;
+    private PanelsDisplay panelsDisplay;
+    // Gamepad 1 going quiet (watchGamepad): its last timestamp, when it changed (ms on clock), and the longest gap
+    private long padStamp;
+    private boolean padMoving;
+    private double padChangedMs = Double.NaN, longestPadGapMs, longestPadGapAtS;
+    private int padGaps;
 
     @Override
     public void init() {
         telemetry.setDisplayFormat(Telemetry.DisplayFormat.HTML);
         Scheduler.reset();
+        MatchLog.start("TeleOp");
 
         robot = new Robot(hardwareMap);
         robot.hiveVision.setEnabled(true);
+        panelsDisplay = new PanelsDisplay();
         // Pick up where Auto left off. Without an Auto run the robot starts at the origin with the turret
         // forward; push it into a corner and use share / options (during init or after start) to localize.
         if (MatchState.pose != null) {
@@ -75,7 +85,8 @@ public class TeleOp extends OpMode {
 
     @Override
     public void init_loop() {
-        MatchState.selectAlliance(gamepad1, telemetry);
+        telemetry.addLine(color(bold("Did you remember to zero the turret? :-)"), YELLOW));
+        MatchState.selectAlliance(gamepad2, 2, telemetry);
         // Only remembered here: the alliance can still change, so the corner is turned into a pose at start
         if (gamepad2.shareWasPressed()) initCorner = RED_LEFT_CORNER;
         if (gamepad2.optionsWasPressed()) initCorner = RED_RIGHT_CORNER;
@@ -118,18 +129,22 @@ public class TeleOp extends OpMode {
 
     @Override
     public void loop() {
+        MatchLog.beginLoop();
+        watchGamepad();
         bindControls();
 
         robot.update();
         Scheduler.execute();
 
         showTelemetry();
+        MatchLog.endLoop();
     }
 
     @Override
     public void stop() {
         Scheduler.reset();
         robot.stop();
+        MatchLog.stop();
         // This match's Auto pose is used up; a later TeleOp without Auto must not start from it.
         // Not after an init-only stop: re-initializing TeleOp still needs it.
         if (started) {
@@ -177,10 +192,38 @@ public class TeleOp extends OpMode {
         }
     }
 
+    private static final int PAD_GAP_MS = 200;
+
+    /**
+     * Times how long gamepad 1's data goes without changing while the driver was using it. Its timestamp only moves
+     * when the driver station sees an input change, so a gap counts only if, at its last update, a stick or trigger
+     * was off rest and none was pinned at its limit (a still or pinned stick stops the timestamp too). A long gap here
+     * while the robot kept driving means the driver station stopped sending: the gamepad, its USB, or the Wi-Fi.
+     */
+    private void watchGamepad() {
+        // Through a local: tools/ControlLayout follows gamepad1 and Gamepad parameters, and would draw these as controls
+        Gamepad pad = gamepad1;
+        double now = clock.milliseconds();
+        if (pad.timestamp == padStamp && !Double.isNaN(padChangedMs)) return;
+        double gap = now - padChangedMs;
+        if (padMoving && gap > longestPadGapMs) {
+            longestPadGapMs = gap;
+            longestPadGapAtS = clock.seconds();
+        }
+        if (padMoving && gap > PAD_GAP_MS) padGaps++;
+        padStamp = pad.timestamp;
+        padChangedMs = now;
+        float[] axes = {pad.left_stick_x, pad.left_stick_y, pad.right_stick_x, pad.right_stick_y, pad.left_trigger,
+                pad.right_trigger};
+        boolean pinned = false;
+        for (float axis : axes) pinned |= Math.abs(axis) >= 0.98;
+        padMoving = !pad.atRest() && !pinned;
+    }
+
     /**
      * Three tiers, most important first:
-     * 1. the field diagram, with the shot readouts beside it (each diagram row and its readout share a line),
-     * 2. two monospace columns of numbers,
+     * 1. the field diagram, then what the drivers need mid-match under it,
+     * 2. numbers, one per line (side by side they wrap on the Driver Hub),
      * 3. every subsystem's own telemetry.
      * tools/telemetry-preview.html draws this layout in a browser; keep it in step.
      */
@@ -192,51 +235,45 @@ public class TeleOp extends OpMode {
         loopTimer.reset();
 
         // ---- 1. Field + what the drivers need mid-match ----
-        String[] field = FieldDiagram.draw(pose, MatchState.alliance, MatchState.hive);
-        String[] side = {
-                reachLine(shot),
-                flywheelLine(launcher),
-                turretLine(launcher),
-                "",
-                "Alliance " + Html.alliance(MatchState.alliance),
-                "Hive " + bold(color(MatchState.hive.toString(), MatchState.hive == Hive.LEFT ? PINK : CYAN)) + " " + hiveVisionWord(),
-                "Intake " + intakeWord(robot.intake.getMode()) + (robot.intake.isFeeding() ? " (feeding)" : ""),
-                "Gate " + (robot.gate.isOpen() ? bold(color("open", GREEN)) : bold(color("closed", GRAY))),
-        };
-        for (int r = 0; r < FieldDiagram.ROWS; r++) {
-            telemetry.addLine(mono(field[r]) + NBSP + NBSP + (r < side.length ? side[r] : ""));
-        }
+        for (String row : FieldDiagram.draw(pose, MatchState.alliance, MatchState.hive)) telemetry.addLine(mono(row));
+        telemetry.addLine(reachLine(shot));
+        telemetry.addLine(flywheelLine(launcher));
+        telemetry.addLine(turretLine(launcher));
+        telemetry.addLine("Alliance " + Html.alliance(MatchState.alliance));
+        telemetry.addLine("Hive " + bold(color(MatchState.hive.toString(), MatchState.hive == Hive.LEFT ? PINK : CYAN)) + " " + hiveVisionWord());
+        telemetry.addLine("Intake " + intakeWord(robot.intake.getMode()) + (robot.intake.isFeeding() ? " (feeding)" : ""));
+        telemetry.addLine("Gate " + (robot.gate.isOpen() ? bold(color("open", GREEN)) : bold(color("closed", GRAY))));
 
-        // ---- 2. Numbers, side by side ----
+        // ---- 2. Numbers ----
         if (shot != null && shot.feasible) {
-            telemetry.addLine(columns(String.format("Ball speed %.0f in/s", shot.exitSpeed),
-                    String.format("Flight time %.2f s", shot.timeOfFlight)));
+            telemetry.addLine(String.format("Ball speed %.0f in/s", shot.exitSpeed));
+            telemetry.addLine(String.format("Flight time %.2f s", shot.timeOfFlight));
             // How far flywheel speed and turret angle can be off and the ball still goes in
-            telemetry.addLine(columns(String.format("Speed margin ±%.1f%%", shot.speedTolerance / shot.exitSpeed * 100),
-                    String.format("Aim margin ±%.1f°", Math.toDegrees(shot.angleTolerance))));
+            telemetry.addLine(String.format("Speed margin ±%.1f%%", shot.speedTolerance / shot.exitSpeed * 100));
+            telemetry.addLine(String.format("Aim margin ±%.1f°", Math.toDegrees(shot.angleTolerance)));
             // How far off the hive the turret points to make up for the robot's motion
-            telemetry.addLine(mono(String.format("Aim ahead %+.1f°", Math.toDegrees(shot.leadAngle))));
+            telemetry.addLine(String.format("Aim ahead %+.1f°", Math.toDegrees(shot.leadAngle)));
         }
         String heading = TURN_MODE == TurnMode.TWIN_STICK
                 // Where the robot is pointing → where the driver asked it to point
                 ? String.format("Heading %.0f° → %.0f°", Math.toDegrees(Angle.normalizeSigned(pose.heading())),
                         Math.toDegrees(robot.drivebase.getTargetHeading()))
                 : String.format("Heading %.0f°", Math.toDegrees(pose.heading()));
-        telemetry.addLine(columns(String.format("Pose %.1f, %.1f", pose.x(), pose.y()), heading));
-        telemetry.addLine(columns(String.format("Loop %.1f ms %.0f Hz", loopMs, 1000 / loopMs),
-                "Follower " + robot.drivebase.getFollower().mode()));
+        telemetry.addLine(String.format("Pose %.1f, %.1f", pose.x(), pose.y()));
+        telemetry.addLine(heading);
+        telemetry.addLine(String.format("Loop %.1f ms %.0f Hz", loopMs, 1000 / loopMs));
+        telemetry.addLine(String.format("Gamepad 1 updated %.0f ms ago (stamp %d)", clock.milliseconds() - padChangedMs, padStamp));
+        telemetry.addLine(String.format("Gamepad 1 longest gap %.0f ms at %.1f s (%d over %d ms)",
+                longestPadGapMs, longestPadGapAtS, padGaps, PAD_GAP_MS));
+        telemetry.addLine("Follower " + robot.drivebase.getFollower().mode());
 
         // ---- 3. Everything else ----
         telemetry.addLine(color("──── details ────", GRAY));
         robot.telemetry(telemetry);
         telemetry.update();
-    }
 
-    /** Two plain-text columns on one line, lined up by setting the whole line in monospace. */
-    private static String columns(String left, String right) {
-        StringBuilder line = new StringBuilder(left);
-        for (int i = left.length(); i < LEFT_COLUMN; i++) line.append(NBSP);
-        return mono(line + NBSP + right);
+        panelsDisplay.update(robot, loopMs);
+        robot.log(loopMs);
     }
 
     private static String nudge(double value, String unit) {

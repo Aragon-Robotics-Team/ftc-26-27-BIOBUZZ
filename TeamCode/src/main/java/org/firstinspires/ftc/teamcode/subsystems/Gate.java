@@ -1,9 +1,9 @@
 package org.firstinspires.ftc.teamcode.subsystems;
 
 import static com.pedropathing.ivy.commands.Commands.instant;
-import static org.firstinspires.ftc.teamcode.RobotConstants.Gate.CLOSED_POSITION;
-import static org.firstinspires.ftc.teamcode.RobotConstants.Gate.OPEN_POSITION;
-import static org.firstinspires.ftc.teamcode.RobotConstants.Gate.SERVO_NAME;
+import static org.firstinspires.ftc.teamcode.core.RobotConstants.Gate.CLOSED_POSITION;
+import static org.firstinspires.ftc.teamcode.core.RobotConstants.Gate.OPEN_POSITION;
+import static org.firstinspires.ftc.teamcode.core.RobotConstants.Gate.SERVO_NAME;
 
 import com.pedropathing.ivy.Command;
 import com.qualcomm.robotcore.hardware.HardwareMap;

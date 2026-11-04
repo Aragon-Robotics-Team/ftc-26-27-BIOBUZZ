@@ -1,4 +1,4 @@
-package org.firstinspires.ftc.teamcode;
+package org.firstinspires.ftc.teamcode.core;
 
 import com.pedropathing.math.Pose;
 import com.pedropathing.utils.Angle;
