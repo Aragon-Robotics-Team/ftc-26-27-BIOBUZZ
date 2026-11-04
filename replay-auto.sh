@@ -8,4 +8,7 @@
 #
 # Then press play (space) in AdvantageScope.
 cd "$(dirname "$0")" || exit 1
-exec python3 tools/advantagescope/replay_auto.py "$@"
+# setup-sim.command's Python, which has what the sim field needs
+PYTHON=tools/advantagescope/.venv/bin/python
+[ -x "$PYTHON" ] || PYTHON=python3
+exec "$PYTHON" tools/advantagescope/replay_auto.py "$@"

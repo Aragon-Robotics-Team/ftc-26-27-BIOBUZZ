@@ -70,9 +70,12 @@ def run_sim(routine, alliance):
 
 
 def windows_jdk17():
-    """A JDK 17 where its Windows installers put it (setup_windows.ps1 installs Microsoft's), or None."""
-    for vendor in ["Microsoft", "Eclipse Adoptium", "Java"]:
-        found = sorted(glob.glob(os.path.join(os.environ.get("ProgramFiles", r"C:\Program Files"), vendor, "jdk-17*")))
+    """A JDK 17 where setup_windows.ps1 puts it or an installer did, or None."""
+    program_files = os.environ.get("ProgramFiles", r"C:\Program Files")
+    places = [os.path.join(os.environ.get("LOCALAPPDATA", ""), "Programs")] + [
+        os.path.join(program_files, vendor) for vendor in ["Microsoft", "Eclipse Adoptium", "Java"]]
+    for place in places:
+        found = sorted(glob.glob(os.path.join(place, "jdk-17*")))
         if found:
             return found[-1]
     return None

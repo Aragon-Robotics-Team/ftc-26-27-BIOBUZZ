@@ -8,5 +8,8 @@ rem   replay-auto.bat --no-sim                         reopen the last run's log
 rem
 rem Then press play (space) in AdvantageScope.
 cd /d "%~dp0"
-py -3 tools\advantagescope\replay_auto.py %*
+rem setup-sim.bat's Python, which has what the sim field needs
+set PYTHON=tools\advantagescope\.venv\Scripts\python.exe
+if not exist "%PYTHON%" set PYTHON=py -3
+%PYTHON% tools\advantagescope\replay_auto.py %*
 if "%~1"=="" pause
