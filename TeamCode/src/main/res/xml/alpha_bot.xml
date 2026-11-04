@@ -5,6 +5,7 @@
             <goBILDA5202SeriesMotor name="intake" port="0" />
             <goBILDA5202SeriesMotor name="flywheel" port="1" />
             <goBILDA5202SeriesMotor name="turret" port="2" />
+            <Servo name="matchloader" port="4" />
             <Servo name="gate" port="5" />
         </LynxModule>
         <LynxModule name="Control Hub" port="173">
