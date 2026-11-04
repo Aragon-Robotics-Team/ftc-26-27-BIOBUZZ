@@ -82,3 +82,6 @@ lint/tmp/
 CLAUDE.md
 .claude/
 node_modules/
+
+# Python bytecode from the tools' scripts
+__pycache__/

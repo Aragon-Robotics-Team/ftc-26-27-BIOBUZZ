@@ -11,8 +11,8 @@
     "gamepad2": "Operator",
 
     "gamepad1.left_stick": "Drive (field-centric: forward = away from our driver station)",
-    "gamepad1.right_stick": "Point the intake this way (field-centric); holds that heading when let go",
-    "gamepad1.left_trigger": "Hold: slow mode (driving, not turning)",
+    "gamepad1.right_stick": "Turn (x). With TURN_MODE = TWIN_STICK: point the intake this way, holds that heading",
+    "gamepad1.left_trigger": "Hold: slow mode (turning too, except with TWIN_STICK)",
     "gamepad1.right_trigger": "Hold: open gate and feed the shooter",
     "gamepad1.right_bumper": "Flywheel on",
     "gamepad1.left_bumper": "Flywheel off",
@@ -27,6 +27,8 @@
     "gamepad2.circle": "Tap: hive RIGHT cell is up. Hold 1 s: also lock / unlock auto hive",
     "gamepad2.share": "Reset pose: pushed into our LEFT corner, back to alliance wall",
     "gamepad2.options": "Reset pose: pushed into our RIGHT corner, back to alliance wall",
+    "init.gamepad2.square": "Blue alliance (until pressed: the alliance Auto ran as)",
+    "init.gamepad2.circle": "Red alliance (until pressed: the alliance Auto ran as)",
     "init.gamepad2.share": "Start pose: pushed into our LEFT corner, back to alliance wall",
     "init.gamepad2.options": "Start pose: pushed into our RIGHT corner, back to alliance wall"
   },
@@ -56,8 +58,82 @@
     "gamepad1.triangle": "Turn the target heading around (180°)"
   },
 
+  "Controller Test": {
+    "gamepad1.left_stick": "Shown on screen",
+    "gamepad1.right_stick": "Shown on screen",
+    "gamepad1.left_trigger": "Shown on screen",
+    "gamepad1.right_trigger": "Shown on screen",
+    "gamepad1.cross": "Shown on screen",
+    "gamepad1.circle": "Shown on screen",
+    "gamepad1.square": "Shown on screen",
+    "gamepad1.triangle": "Shown on screen",
+    "gamepad1.dpad_up": "Shown on screen",
+    "gamepad1.dpad_down": "Shown on screen",
+    "gamepad1.dpad_left": "Shown on screen",
+    "gamepad1.dpad_right": "Shown on screen",
+    "gamepad1.left_bumper": "Shown on screen",
+    "gamepad1.right_bumper": "Shown on screen",
+    "gamepad1.left_stick_button": "Shown on screen",
+    "gamepad1.right_stick_button": "Shown on screen",
+    "gamepad1.share": "Shown on screen",
+    "gamepad1.options": "Shown on screen",
+    "gamepad1.ps": "Shown on screen",
+    "gamepad1.touchpad": "Shown on screen",
+    "gamepad2.left_stick": "Shown on screen",
+    "gamepad2.right_stick": "Shown on screen",
+    "gamepad2.left_trigger": "Shown on screen",
+    "gamepad2.right_trigger": "Shown on screen",
+    "gamepad2.cross": "Shown on screen",
+    "gamepad2.circle": "Shown on screen",
+    "gamepad2.square": "Shown on screen",
+    "gamepad2.triangle": "Shown on screen",
+    "gamepad2.dpad_up": "Shown on screen",
+    "gamepad2.dpad_down": "Shown on screen",
+    "gamepad2.dpad_left": "Shown on screen",
+    "gamepad2.dpad_right": "Shown on screen",
+    "gamepad2.left_bumper": "Shown on screen",
+    "gamepad2.right_bumper": "Shown on screen",
+    "gamepad2.left_stick_button": "Shown on screen",
+    "gamepad2.right_stick_button": "Shown on screen",
+    "gamepad2.share": "Shown on screen",
+    "gamepad2.options": "Shown on screen",
+    "gamepad2.ps": "Shown on screen",
+    "gamepad2.touchpad": "Shown on screen"
+  },
+
+  "Localization Test": {
+    "gamepad1.left_stick": "Drive (robot-centric)",
+    "gamepad1.right_stick": "Turn: spin in place to check the pod offsets",
+    "gamepad1.cross": "Clear the trail and reset the pose to 0, 0"
+  },
+
   "Flywheel Tuner": {
     "gamepad1.cross": "Toggle flywheel on / off"  },
+
+  "Shot Calibration": {
+    "gamepad1": "Driver",
+    "gamepad2": "Calibrator",
+
+    "gamepad1.left_stick": "Drive (field-centric: forward = away from our driver station)",
+    "gamepad1.right_stick": "Turn (x)",
+    "gamepad1.left_trigger": "Hold: slow mode",
+    "gamepad1.right_trigger": "Hold: open gate and feed the shooter",
+    "gamepad1.right_bumper": "Flywheel on (standing-shot speed for this spot)",
+    "gamepad1.left_bumper": "Flywheel off",
+    "gamepad1.triangle": "Toggle intake",
+    "gamepad1.cross": "Toggle outtake",
+
+    "gamepad2.dpad_up": "Flywheel speed up",
+    "gamepad2.dpad_down": "Flywheel speed down",
+    "gamepad2.dpad_left": "Nudge turret left",
+    "gamepad2.dpad_right": "Nudge turret right",
+    "gamepad2.cross": "Save this spot (shots going through the middle)",
+    "gamepad2.triangle": "Delete the last saved spot",
+    "gamepad2.square": "Aim at hive LEFT cell",
+    "gamepad2.circle": "Aim at hive RIGHT cell",
+    "gamepad2.share": "Reset pose: pushed into our LEFT corner, back to alliance wall",
+    "gamepad2.options": "Reset pose: pushed into our RIGHT corner, back to alliance wall"
+  },
 
   "Motor Tester": {
     "gamepad1.dpad_left": "Previous device",
@@ -70,9 +146,32 @@
   },
 
   "Intake + Flywheel Test": {
-    "gamepad1.right_bumper": "Hold: intake + flywheel forward",
-    "gamepad1.left_bumper": "Hold: intake + flywheel reverse",
-    "gamepad1.dpad_up": "More power (both)",
-    "gamepad1.dpad_down": "Less power (both)"
+    "gamepad1.right_bumper": "Hold: intake (full power) + flywheel forward",
+    "gamepad1.left_bumper": "Hold: intake (full power) + flywheel reverse",
+    "gamepad1.dpad_up": "More flywheel power",
+    "gamepad1.dpad_down": "Less flywheel power"
+  },
+
+  "Ball Chase Test": {
+    "init.gamepad1.dpad_left": "Start in our LEFT corner, back to alliance wall",
+    "init.gamepad1.dpad_right": "Start in our RIGHT corner, back to alliance wall",
+    "gamepad1.cross": "Chase again from here"
+  },
+  "Chase And Shoot Test": {
+    "init.gamepad1.dpad_left": "Start in our LEFT corner, back to alliance wall",
+    "init.gamepad1.dpad_right": "Start in our RIGHT corner, back to alliance wall"
+  },
+
+  "Ball Vision Test": {
+    "gamepad1.left_stick": "Drive (field-centric: forward = the way the robot faced at start)",
+    "gamepad1.right_stick": "Turn",
+    "gamepad1.left_trigger": "Hold: slow mode",
+    "gamepad1.cross": "Apply the mount values from Panels (reopens the camera)"
+  },
+
+  "Pose Helper": {
+    "gamepad1.circle": "Save the current pose",
+    "gamepad1.square": "Zero the pose (0, 0, 0°), keep saved poses",
+    "gamepad1.cross": "Zero the pose and clear saved poses"
   }
 }

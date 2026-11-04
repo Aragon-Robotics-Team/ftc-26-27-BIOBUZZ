@@ -42,7 +42,7 @@ export interface Profile {
 }
 
 /**
- * Drive no faster than `vmax` from `from` to `to` (arc length): Pedro's maxPathSpeed on that stretch of the path. Pedro
+ * Drive no faster than `vmax` from `from` to `to` (arc length): Pedro's maxVelocityConstraint on that stretch of the path. Pedro
  * doesn't slow down ahead of it, and on a capped stretch it cuts drive power and coasts while it's too fast, so the
  * capped stretch starts early enough to coast down in time (`capStarts`); with `fixedStart`, it starts at `from`.
  */

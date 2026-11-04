@@ -10,9 +10,9 @@ import com.qualcomm.robotcore.eventloop.opmode.Autonomous;
 import com.qualcomm.robotcore.eventloop.opmode.OpMode;
 import com.qualcomm.robotcore.util.ElapsedTime;
 
-import org.firstinspires.ftc.teamcode.Alliance;
-import org.firstinspires.ftc.teamcode.MatchState;
-import org.firstinspires.ftc.teamcode.Robot;
+import org.firstinspires.ftc.teamcode.core.Alliance;
+import org.firstinspires.ftc.teamcode.core.MatchState;
+import org.firstinspires.ftc.teamcode.core.Robot;
 import org.firstinspires.ftc.teamcode.routines.PlannedPath;
 import org.firstinspires.ftc.teamcode.routines.Routines;
 import org.firstinspires.ftc.teamcode.util.PathLog;
@@ -66,7 +66,7 @@ public class PlannedPathTest extends OpMode {
 
     @Override
     public void init_loop() {
-        MatchState.selectAlliance(gamepad1, telemetry);
+        MatchState.selectAlliance(gamepad1, 1, telemetry);
         if (builtFor != MatchState.alliance) buildPaths();
         if (names.isEmpty()) {
             telemetry.addLine("No planned paths: copy one from tools/path-planner.html into a routine.");
