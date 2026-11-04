@@ -62,7 +62,8 @@ class AutoSimTest {
         int initTicks = FIRST_PRESS_TICK + 2 * routines.size() + 10;
 
         Pose start = startOf(routine);
-        BiobuzzRobotSim sim = new BiobuzzRobotSim().alliance(ALLIANCE).withPartner();
+        // The drive like a real mecanum's: slower, strafing less well, slipping on the tiles
+        BiobuzzRobotSim sim = new BiobuzzRobotSim(true).alliance(ALLIANCE).withPartner();
         sim.placeAt(start.x(), start.y(), start.heading());
 
         String name = (routine + "-" + ALLIANCE).toLowerCase(Locale.US);
