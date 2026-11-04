@@ -18,7 +18,7 @@ Frames:
   Tray model: the tray pose's own frame, origin on the pivot. The logged frame is FieldFrame's (x toward the
     audience, y away from the red wall), so the cells lie along +-x and the arm turns about y (pitch).
 
-Usage: python3 build_sim_field.py [userAssets dir]   (needs numpy and trimesh)
+Usage: python3 build_sim_field.py [userAssets dir]   (needs numpy, scipy and trimesh)
 """
 import json
 import math

@@ -57,6 +57,8 @@ def run_sim(routine, alliance):
             env["JAVA_HOME"] = subprocess.check_output(["/usr/libexec/java_home", "-v", "17"], text=True).strip()
         except (OSError, subprocess.CalledProcessError):
             pass  # whatever JAVA_HOME says
+    elif SYSTEM == "Windows" and windows_jdk17():
+        env["JAVA_HOME"] = windows_jdk17()
     print(f"Running {routine if routine != 'all' else 'every Auto'} ({alliance}) in the sim...")
     result = subprocess.run(command, cwd=ROOT, env=env, capture_output=True, text=True)
     for line in result.stdout.splitlines():
@@ -65,6 +67,15 @@ def run_sim(routine, alliance):
     if result.returncode != 0:
         # A failed check still leaves its log, so show what there is
         print("  The sim test failed (above); opening its log anyway. Details: TeamCode/build/reports/tests/")
+
+
+def windows_jdk17():
+    """A JDK 17 where its Windows installers put it (setup_windows.ps1 installs Microsoft's), or None."""
+    for vendor in ["Microsoft", "Eclipse Adoptium", "Java"]:
+        found = sorted(glob.glob(os.path.join(os.environ.get("ProgramFiles", r"C:\Program Files"), vendor, "jdk-17*")))
+        if found:
+            return found[-1]
+    return None
 
 
 def assets_dir():
@@ -82,8 +93,8 @@ def check_assets(base):
     needed = ["Field3d_BIOBUZZSim", "Robot_BIOBUZZ Hive Red", "Robot_BIOBUZZ Hive Blue"]
     if not all(os.path.isdir(os.path.join(user_assets, name)) for name in needed):
         print("Building the sim field and hive models into AdvantageScope (build_sim_field.py)...")
-        if subprocess.run([sys.executable, os.path.join(HERE, "build_sim_field.py")]).returncode != 0:
-            print("  Couldn't build them (needs numpy and trimesh). AdvantageScope will show its default field.")
+        if subprocess.run([sys.executable, os.path.join(HERE, "build_sim_field.py"), user_assets]).returncode != 0:
+            print("  Couldn't build them (needs numpy, scipy and trimesh). AdvantageScope will show its default field.")
     if not os.path.isdir(os.path.join(user_assets, "Robot_BIOBUZZ")):
         print("  No Robot_BIOBUZZ model in AdvantageScope's userAssets: the robot is drawn as a plain box. "
               "Copy that folder from a computer that has it.")

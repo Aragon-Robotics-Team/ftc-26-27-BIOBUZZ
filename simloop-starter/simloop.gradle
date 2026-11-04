@@ -55,9 +55,14 @@ repositories {
 // `./gradlew :SimLoop:publishToMavenLocal`, then run the tests here with `-PsimloopLocal`. That build is
 // published as org.horizon36596:SimLoop:<the version in SimLoop/build.gradle>, a different coordinate from
 // JitPack's, so it never shadows the pinned release. `-PsimloopLocal=<version>` picks another version.
+//
+// Until Horizon-36596/simloop#30 (an iterative OpMode's init() waits in sim time) is in a release, the JitPack
+// coordinate is that fix's commit on saltyeg/simloop, v0.2.0-alpha.2 plus the fix: BiobuzzRobotSim runs Pedro on
+// sim time, and Pedro's PinpointLocalizer sleeps in init(). Back to the line in the comment once it's released.
+//     "com.github.Horizon-36596:simloop:${simloopVersion}"
 def simloopLocal = project.findProperty('simloopLocal')
 def simloopCoordinate = simloopLocal == null
-        ? "com.github.Horizon-36596:simloop:${simloopVersion}"
+        ? "com.github.saltyeg:simloop:be41c22"
         : "org.horizon36596:SimLoop:${simloopLocal in ['', 'true'] ? simloopVersion.substring(1) : simloopLocal}"
 
 dependencies {
