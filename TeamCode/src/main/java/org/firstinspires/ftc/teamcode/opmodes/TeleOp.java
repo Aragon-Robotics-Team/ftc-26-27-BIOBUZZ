@@ -40,7 +40,9 @@ import org.firstinspires.ftc.teamcode.util.PanelsDisplay;
  *   right stick     point the intake that way (same frame); the robot holds that heading when let go.
  *                   With RobotConstants.Drive.TURN_MODE = RATE, right stick x sets the turn speed instead.
  *                   RATE_SNAP is RATE, plus: driving hard with the right stick centered and the robot within 10° of
- *                   the drive direction (nose or tail first) turns it onto that direction, for full mecanum speed
+ *                   the drive direction (nose or tail first) turns it onto that direction, for full mecanum speed.
+ *                   The "TeleOp (Rate Snap)" and "TeleOp (Twin Stick)" OpModes (TeleOpRateSnap, TeleOpTwinStick)
+ *                   always use RATE_SNAP / TWIN_STICK
  *   hold L2         slow mode (driving only; with RATE, turning too)
  *   triangle        toggle intake        cross   toggle outtake
  *   R1              flywheel on          L1      flywheel off
@@ -119,9 +121,14 @@ public class TeleOp extends OpMode {
         loopTimer.reset();
     }
 
-    /** The driver's always-on drive command, for TURN_MODE. */
+    /** How the right stick turns the robot: RobotConstants.Drive.TURN_MODE, unless a subclass fixes it. */
+    protected TurnMode turnMode() {
+        return TURN_MODE;
+    }
+
+    /** The driver's always-on drive command, for turnMode(). */
     private Command drive(double headingOffset) {
-        switch (TURN_MODE) {
+        switch (turnMode()) {
             case TWIN_STICK:
                 return robot.drivebase.driveTwinStick(
                         () -> -gamepad1.left_stick_y * driveScale(),
@@ -281,7 +288,7 @@ public class TeleOp extends OpMode {
             // How far off the hive the turret points to make up for the robot's motion
             telemetry.addLine(String.format("Aim ahead %+.1f°", Math.toDegrees(shot.leadAngle)));
         }
-        String heading = TURN_MODE == TurnMode.TWIN_STICK || robot.drivebase.isSnapping()
+        String heading = turnMode() == TurnMode.TWIN_STICK || robot.drivebase.isSnapping()
                 // Where the robot is pointing → where the driver asked it to point (or the snap is turning it to)
                 ? String.format("Heading %.0f° → %.0f°", Math.toDegrees(Angle.normalizeSigned(pose.heading())),
                         Math.toDegrees(robot.drivebase.getTargetHeading()))
