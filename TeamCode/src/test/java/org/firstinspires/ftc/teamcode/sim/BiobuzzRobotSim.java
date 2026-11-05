@@ -513,7 +513,7 @@ public final class BiobuzzRobotSim {
         lastFieldY = fy;
         field.updateRobotPose(fx, fy, fh);
         double[] axis = turretAxis();
-        launcher.update(deltaTime, FieldFrame.x(axis[0], axis[1]), FieldFrame.y(axis[0], axis[1]),
+        launcher.update(deltaTime, fx, fy, fh, FieldFrame.x(axis[0], axis[1]), FieldFrame.y(axis[0], axis[1]),
                 fh + turretAngle(), vx, vy, SimHiveTrays.upOpening(field, us.alliance == Alliance.BLUE));
         if (partner != null) partner.update(deltaTime);
         field.advance(deltaTime);
