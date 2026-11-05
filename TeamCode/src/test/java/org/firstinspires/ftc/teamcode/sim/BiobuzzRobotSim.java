@@ -89,6 +89,15 @@ public final class BiobuzzRobotSim {
 
     private static final double INTAKE_MAX_TICKS_PER_SECOND = 2800; // PLACEHOLDER: nothing reads it back
 
+    // ---- Matchloader: the front frame that swings down in front of the intake, on a servo (the matchloader branch's
+    // Matchloader subsystem). It pivots on the front intake roller's shaft (CAD, Nov 4). Only drawn: balls don't feel it
+    private static final String MATCHLOADER_SERVO = "matchloader";
+    private static final double MATCHLOADER_PIVOT_X = 0.1688, MATCHLOADER_PIVOT_Z = 0.107; // meters, robot frame
+    // Servo positions as RobotConstants.Matchloader has them (UP 0.0, DOWN 0.5, both TODO there), and how far down DOWN
+    // swings it. PLACEHOLDER: 90 deg leaves its bar 1.8 in off the tiles 14 in ahead of the center; about 105 touches them
+    private static final double MATCHLOADER_UP = 0.0, MATCHLOADER_DOWN = 0.5;
+    private static final double MATCHLOADER_DOWN_ANGLE = Math.toRadians(90);
+
     // ---- Limelight 3A: on the turret, 4.8 in ahead of its axis, lens 12.2 in up, tilted up (RobotConstants.Vision) ----
     private static final double LIMELIGHT_AHEAD_OF_TURRET_AXIS = 4.8; // inches (CAD, Oct 26)
     private static final double LIMELIGHT_H_FOV = 54.5, LIMELIGHT_V_FOV = 42; // degrees, Limelight 3A spec
@@ -162,6 +171,7 @@ public final class BiobuzzRobotSim {
             10, RobotConstants.Launcher.TURRET_MOTOR_TICKS_PER_REV);
     public final FakeMotor intake = new FakeMotor(INTAKE_MAX_TICKS_PER_SECOND, 10);
     public final FakeServo gate = new FakeServo();
+    public final FakeServo matchloader = new FakeServo();
     public final SimWebcam webcam = new SimWebcam();
     public final FakeVoltageSensor battery = new FakeVoltageSensor(); // 12 V
     public final FakeLimelight3A limelight;
@@ -256,6 +266,7 @@ public final class BiobuzzRobotSim {
         hardwareMap.register(RobotConstants.Launcher.TURRET_MOTOR_NAME, turret);
         hardwareMap.register(RobotConstants.Intake.MOTOR_NAME, intake);
         hardwareMap.register(RobotConstants.Gate.SERVO_NAME, gate);
+        hardwareMap.register(MATCHLOADER_SERVO, matchloader);
         hardwareMap.register(RobotConstants.BallVision.WEBCAM_NAME, webcam);
         // The Launcher's FlywheelController scales its power by the battery voltage
         hardwareMap.register("Control Hub", battery);
@@ -643,11 +654,13 @@ public final class BiobuzzRobotSim {
         Logger.recordOutput("Sim/TurretFieldPose", Pose2d.struct, FieldFrame.pose2d(x(), y(), heading() + turretAngle()));
         Logger.recordOutput("Sim/FlywheelTicksPerSec", flywheel.getVelocity());
         // The robot model's moving parts, robot frame, in the order of the Robot_BIOBUZZ asset's components:
-        // 0 = the turret and everything on it, about the turret axis
+        // 0 = the turret and everything on it, about the turret axis; 1 = the matchloader frame, about its pivot (a
+        // positive pitch swings its top forward and down)
         Logger.recordOutput("RobotModel/components3d", Pose3d.struct, new Pose3d[] {
                 new Pose3d(RobotConstants.Launcher.TURRET_OFFSET_X * FieldFrame.METERS_PER_INCH,
                         RobotConstants.Launcher.TURRET_OFFSET_Y * FieldFrame.METERS_PER_INCH, 0,
-                        new Rotation3d(0, 0, turretAngle()))});
+                        new Rotation3d(0, 0, turretAngle())),
+                new Pose3d(MATCHLOADER_PIVOT_X, 0, MATCHLOADER_PIVOT_Z, new Rotation3d(0, matchloaderAngle(), 0))});
         // The hive trays, for the "BIOBUZZ Sim (tilting hives)" field, which has no trays of its own; and the balls
         Logger.recordOutput("Hive/red/trayPose3d", Pose3d.struct,
                 SimHives.trayPose(false, field.getBodyAngleRad(SimHiveTrays.RED)));
@@ -671,6 +684,12 @@ public final class BiobuzzRobotSim {
         Logger.recordOutput("Sim/Camera/webcam", Pose3d.struct, FieldFrame.pose3d(webcam[0], webcam[1],
                 RobotConstants.BallVision.LENS_HEIGHT, RobotConstants.BallVision.ROLL, RobotConstants.BallVision.TILT,
                 heading() + RobotConstants.BallVision.YAW));
+    }
+
+    /** How far down the matchloader frame is swung, radians: straight from the servo's position, as a servo holds it. */
+    public double matchloaderAngle() {
+        double share = (matchloader.getPosition() - MATCHLOADER_UP) / (MATCHLOADER_DOWN - MATCHLOADER_UP);
+        return Math.max(0, Math.min(1, share)) * MATCHLOADER_DOWN_ANGLE;
     }
 
     /**
