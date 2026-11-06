@@ -6,6 +6,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import com.pedropathing.math.Pose;
 
 import org.firstinspires.ftc.teamcode.core.Alliance;
+import org.firstinspires.ftc.teamcode.core.Robot;
 import org.firstinspires.ftc.teamcode.opmodes.Auto;
 import org.firstinspires.ftc.teamcode.routines.Routines;
 import org.horizon36596.simloop.opmode.OpModePhase;
@@ -21,7 +22,7 @@ import java.util.stream.Stream;
 
 /**
  * The real Auto on the simulated robot, with a scripted alliance partner (SimPartner) and the match's staged balls:
- * every routine in the menu, each to its own build/sim/auto-&lt;routine&gt;-&lt;alliance&gt;.rlog. On red unless
+ * every routine in the menu, from its own startPose(), each to its own build/sim/auto-&lt;routine&gt;-&lt;alliance&gt;.rlog. On red unless
  * {@code -PsimAlliance=blue}; {@code -PsimRoutine=one_cycle_garden_park} runs just that one.
  * tools/advantagescope/replay_auto.py runs this and opens the result in AdvantageScope.
  */
@@ -29,9 +30,6 @@ class AutoSimTest {
     private static final Alliance ALLIANCE =
             "blue".equalsIgnoreCase(System.getProperty("simAlliance")) ? Alliance.BLUE : Alliance.RED;
     private static final String ONLY_ROUTINE = System.getProperty("simRoutine", "all");
-
-    // Where every menu routine starts on red (routines/FieldPoses: start). Checked against Auto's "Place robot at".
-    private static final Pose RED_START = new Pose(56, 8, Math.toRadians(90));
 
     // Auto's init() takes 25 ticks (the Pinpoint localizer's 500 ms sleep), so the menu is driven after that
     private static final int FIRST_PRESS_TICK = 30;
@@ -50,6 +48,11 @@ class AutoSimTest {
                 .map(routine -> DynamicTest.dynamicTest(routine.toString(), () -> autoDrivesAndThePinpointKeepsUp(routine)));
     }
 
+    /** The routine's startPose(), from the routine built on a sim robot of its own. */
+    private static Pose startOf(Routines routine) {
+        return routine.create(new Robot(new BiobuzzRobotSim().alliance(ALLIANCE).hardwareMap), ALLIANCE).startPose();
+    }
+
     private void autoDrivesAndThePinpointKeepsUp(Routines routine) {
         List<Routines> routines = Routines.enabled();
         int menuIndex = routines.indexOf(routine);
@@ -58,8 +61,9 @@ class AutoSimTest {
         // The same init length for every routine, so their Autos start at the same time in the logs
         int initTicks = FIRST_PRESS_TICK + 2 * routines.size() + 10;
 
-        Pose start = ALLIANCE.apply(RED_START);
-        BiobuzzRobotSim sim = new BiobuzzRobotSim().alliance(ALLIANCE).withPartner();
+        Pose start = startOf(routine);
+        // The drive like a real mecanum's: slower, strafing less well, slipping on the tiles
+        BiobuzzRobotSim sim = new BiobuzzRobotSim(true).alliance(ALLIANCE).withPartner();
         sim.placeAt(start.x(), start.y(), start.heading());
 
         String name = (routine + "-" + ALLIANCE).toLowerCase(Locale.US);
@@ -85,11 +89,12 @@ class AutoSimTest {
         List<List<String>> sent = result.telemetry().transmissions();
         String routineLine = SimTelemetry.lastLine(sent, "Routine");
         assertTrue(routineLine.contains(routine.toString()), "the menu didn't land on " + routine + ": " + routineLine);
+
         double[] place = SimTelemetry.placeRobotAt(sent);
-        assertEquals(start.x(), place[0], 0.1, "Auto's start isn't FieldPoses.start any more: update RED_START");
-        assertEquals(start.y(), place[1], 0.1, "Auto's start isn't FieldPoses.start any more: update RED_START");
+        assertEquals(start.x(), place[0], 0.1, "the sim placed the robot away from Auto's \"Place robot at\"");
+        assertEquals(start.y(), place[1], 0.1, "the sim placed the robot away from Auto's \"Place robot at\"");
         assertEquals(0, Math.IEEEremainder(Math.toDegrees(start.heading()) - place[2], 360), 0.5,
-                "Auto's start isn't FieldPoses.start any more: update RED_START");
+                "the sim placed the robot away from Auto's \"Place robot at\"");
 
         double moved = Math.hypot(sim.x() - start.x(), sim.y() - start.y());
         assertTrue(moved > 12, "Auto should drive off its start, moved " + moved + " in");

@@ -68,7 +68,7 @@
                     "logType": "Pose2d",
                     "visible": true,
                     "options": {
-                      "model": "Drive Base (Simple)"
+                      "model": "Drive Base"
                     }
                   },
                   {
@@ -369,7 +369,7 @@
                     "logType": "Pose2d",
                     "visible": true,
                     "options": {
-                      "model": "Drive Base (Simple)"
+                      "model": "Drive Base"
                     }
                   },
                   {

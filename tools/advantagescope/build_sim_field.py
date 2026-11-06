@@ -1,10 +1,12 @@
 """Builds the AdvantageScope assets for the sim's tilting hives, from simple shapes instead of the field CAD.
 
-Writes three custom assets:
+Writes these custom assets:
   Field3d_BIOBUZZSim         the field without the hive trays: tiles, walls, tape, flowers, the hive A-frame,
                              and Pollen / Nectar game-piece models for GamePieceTracker's positions3d
   Robot_BIOBUZZ Hive Red     the red tray (both cells, the arm, the AprilTags), posed by Hive/red/trayPose3d
   Robot_BIOBUZZ Hive Blue    the same in blue, posed by Hive/blue/trayPose3d
+  Robot_BIOBUZZ              our robot as a box with its camera, unless the CAD model is there already (AdvantageScope
+                             draws a missing model as the first robot it has: a hive tray)
 
 Dimensions are the Competition Manual's, as BiobuzzSim (the Roblox sim) has them in Config.lua and FieldBuilder.lua;
 the shapes are built the same way here. Inches throughout, written out in meters.
@@ -389,6 +391,20 @@ def build_piece(color, diameter):
     return m
 
 
+# ---------------------------------------------------------------- our robot, as a box
+ROBOT_LENGTH, ROBOT_WIDTH, ROBOT_HEIGHT = 16, 15.748, 12  # RobotConstants.Field; the height is a guess
+
+
+def build_robot_box():
+    """The robot frame: +x forward, +y left, +z up, origin on the floor under the robot's center."""
+    m = Model(np.eye(3))
+    x, y = ROBOT_LENGTH / 2, ROBOT_WIDTH / 2
+    m.box(DARK, -x, x, -y, y, 0.5, 3)                     # chassis
+    m.box(METAL, -x + 2, x - 2, -y + 2, y - 2, 3, ROBOT_HEIGHT)  # everything above it
+    m.box(YELLOW, x - 2, x, -y, y, 3, 6)                  # the front, where the intake is
+    return m
+
+
 # ---------------------------------------------------------------- write
 def main():
     assets = sys.argv[1] if len(sys.argv) > 1 else os.path.expanduser(
@@ -419,6 +435,13 @@ def main():
         with open(os.path.join(robot_dir, "config.json"), "w") as out:
             json.dump({"name": f"BIOBUZZ Hive {alliance}", "isFTC": True, "rotations": [], "position": [0, 0, 0],
                        "cameras": [], "components": []}, out, indent=2)
+    robot_dir = os.path.join(assets, "Robot_BIOBUZZ")
+    if not os.path.exists(os.path.join(robot_dir, "model.glb")):
+        build_robot_box().export(os.path.join(robot_dir, "model.glb"), "BIOBUZZ")
+        with open(os.path.join(os.path.dirname(os.path.abspath(__file__)), "Robot_BIOBUZZ.config.json")) as source:
+            config = json.load(source)  # the CAD model's, for its camera; the box has no turret to pose
+        with open(os.path.join(robot_dir, "config.json"), "w") as out:
+            json.dump(dict(config, components=[]), out, indent=2)
 
 
 if __name__ == "__main__":
