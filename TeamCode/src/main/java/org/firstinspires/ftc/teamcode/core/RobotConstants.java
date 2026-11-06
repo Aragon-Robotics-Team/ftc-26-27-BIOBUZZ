@@ -160,15 +160,15 @@ public class RobotConstants {
 
         // ---- Mount ----
         // On the printed mount (Part 36) at the front of the intake's right side (CAD "02 - Intake", Oct 27). The camera
-        // is tilted 30° down, then turned 20° in toward the center line about the vertical, so it looks 20° left of
-        // straight ahead, 30° down, and isn't rolled. Lens position from the robot center (between the wheels, on the
+        // is tilted 22° down, then turned 5° in toward the center line about the vertical, so it looks 5° left of
+        // straight ahead, 22° down, and isn't rolled. Lens position from the robot center (between the wheels, on the
         // tiles), inches: the front of the lens in goBILDA's camera CAD, 1 mm behind the case's front face. Rows run
         // along the case's long side (landscape), image up toward the top of the robot.
         public static double LENS_FORWARD = 6.17;
         public static double LENS_LEFT = -4.96;
         public static double LENS_HEIGHT = 8.93;
-        public static double YAW = Math.toRadians(20);  // + = turned left
-        public static double TILT = Math.toRadians(30); // below horizontal
+        public static double YAW = Math.toRadians(5);   // + = turned left
+        public static double TILT = Math.toRadians(22); // below horizontal
         public static double ROLL = 0;                  // + = the right side of the image is higher
 
         // ---- Pipeline ---- (BallPipeline; the rest of its settings are in BallPipeline.Settings)
