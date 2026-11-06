@@ -25,16 +25,18 @@ public class CeciliaRoutine extends AutoRoutine {
     }
 
 
+
     private final Pose path1 = poseFactory.of(29.5152, 23.9285, 180);
-    private final Pose path2 = poseFactory.of(10.0623, 9.3485, -90);
-    private final Pose path3Start = poseFactory.of(10.0623, 9.3485, 270);
+    private final Pose path2 = poseFactory.of(7.9407, 7.7356, -90);
+    private final Pose path3Start = poseFactory.of(7.9407, 7.7356, 270);
     private final Pose path3 = poseFactory.of(54.6833, 112.3942, 270);
     private final Pose path3Control1 = poseFactory.of(22.7898, 108.9377, 0);
     private final Pose path4Start = poseFactory.of(54.6833, 112.3942, 270);
-    private final Pose path4 = poseFactory.of(46.8544, 129.506, 90);
-    private final Pose path5Start = poseFactory.of(46.8544, 129.506, 90);
+    private final Pose path4 = poseFactory.of(46.6937, 127.9607, 90);
+    private final Pose path5Start = poseFactory.of(46.6937, 127.9607, 90);
     private final Pose path5 = poseFactory.of(53.5736, 106.8318, -90);
     private final Pose path6 = poseFactory.of(6.425, 98.7993, -170.3316);
+
 
 
     public Path path1() {
