@@ -47,6 +47,7 @@ import org.firstinspires.ftc.teamcode.util.PanelsDisplay;
  *   triangle        toggle intake        cross   toggle outtake
  *   R1              flywheel on          L1      flywheel off
  *   hold R2         open the gate and feed the shooter
+ *   square          toggle matchloader up / down
  * Gamepad 2 (operator):
  *   square / circle during init: blue / red alliance (until pressed, the alliance Auto ran as)
  *   dpad left/right nudge turret         dpad up/down  nudge flywheel speed
@@ -187,6 +188,8 @@ public class TeleOp extends OpMode {
         if (gamepad1.triangleWasPressed()) schedule(robot.intake.toggleIntake());
         if (gamepad1.crossWasPressed()) schedule(robot.intake.toggleOuttake());
 
+        if (gamepad1.squareWasPressed()) schedule(robot.matchloader.toggle());
+
         if (gamepad1.rightBumperWasPressed()) schedule(robot.enableFlywheel());
         if (gamepad1.leftBumperWasPressed()) schedule(robot.launcher.idle());
 
@@ -277,6 +280,7 @@ public class TeleOp extends OpMode {
         telemetry.addLine("Hive " + bold(color(MatchState.hive.toString(), MatchState.hive == Hive.LEFT ? PINK : CYAN)) + " " + hiveVisionWord());
         telemetry.addLine("Intake " + intakeWord(robot.intake.getMode()) + (robot.intake.isFeeding() ? " (feeding)" : ""));
         telemetry.addLine("Gate " + (robot.gate.isOpen() ? bold(color("open", GREEN)) : bold(color("closed", GRAY))));
+        telemetry.addLine("Matchloader " + (robot.matchloader.isDown() ? bold(color("down", GREEN)) : bold(color("up", GRAY))));
 
         // ---- 2. Numbers ----
         if (shot != null && shot.feasible) {

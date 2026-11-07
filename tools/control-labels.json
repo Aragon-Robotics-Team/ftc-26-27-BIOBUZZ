@@ -18,6 +18,7 @@
     "gamepad1.left_bumper": "Flywheel off",
     "gamepad1.triangle": "Toggle intake",
     "gamepad1.cross": "Toggle outtake",
+    "gamepad1.square": "Toggle matchloader up / down",
 
     "gamepad2.dpad_left": "Nudge turret left",
     "gamepad2.dpad_right": "Nudge turret right",

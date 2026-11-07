@@ -28,6 +28,7 @@ import org.firstinspires.ftc.teamcode.subsystems.HiveVision;
 import org.firstinspires.ftc.teamcode.subsystems.Intake;
 import org.firstinspires.ftc.teamcode.subsystems.Launcher;
 // import org.firstinspires.ftc.teamcode.subsystems.Led; // LED: commented out until it's on the robot
+import org.firstinspires.ftc.teamcode.subsystems.Matchloader;
 import org.firstinspires.ftc.teamcode.subsystems.Subsystem;
 import org.firstinspires.ftc.teamcode.util.MatchLog;
 import org.psilynx.psikit.core.Logger;
@@ -43,6 +44,7 @@ public class Robot {
     public final Drivetrain drivebase;
     public final Intake intake;
     public final Gate gate;
+    public final Matchloader matchloader;
     public final Launcher launcher;
     // public final Led led; // LED: commented out until it's on the robot
     public final HiveVision hiveVision;
@@ -59,6 +61,7 @@ public class Robot {
         drivebase = new Drivetrain(hardwareMap);
         intake = new Intake(hardwareMap);
         gate = new Gate(hardwareMap);
+        matchloader = new Matchloader(hardwareMap);
         launcher = new Launcher(hardwareMap);
         // led = new Led(hardwareMap, launcher); // LED: commented out until it's on the robot
         hiveVision = new HiveVision(hardwareMap); // off until an OpMode enables it
@@ -68,7 +71,7 @@ public class Robot {
 
         // Hive vision first, so this loop aims at the cell it just read; ball vision after the drivetrain, so it has
         // this loop's pose; launcher before Led, so the light shows this loop's launcher state
-        subsystems = new Subsystem[]{hiveVision, drivebase, ballVision, intake, gate, launcher /*, led */};
+        subsystems = new Subsystem[]{hiveVision, drivebase, ballVision, intake, gate, matchloader, launcher /*, led */};
     }
 
     // ---- Hive ----
@@ -258,6 +261,7 @@ public class Robot {
         Logger.recordOutput("Intake/mode", intake.getMode());
         Logger.recordOutput("Intake/feeding", intake.isFeeding());
         Logger.recordOutput("Gate/open", gate.isOpen());
+        Logger.recordOutput("Matchloader/down", matchloader.isDown());
         Logger.recordOutput("Vision/available", hiveVision.isAvailable());
         Logger.recordOutput("Vision/locked", hiveVision.isLocked());
         Logger.recordOutput("BallVision/balls", ballVision.getBalls().size());

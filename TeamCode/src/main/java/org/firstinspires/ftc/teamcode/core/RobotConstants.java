@@ -63,6 +63,13 @@ public class RobotConstants {
         public static double AUTO_SHOOT_MS = 2000; // how long Auto holds the gate open to empty the robot
     }
 
+    public static class Matchloader {
+        public static String SERVO_NAME = "matchloader";
+
+        public static double UP_POSITION = 0.0; // TODO: tune the value
+        public static double DOWN_POSITION = 0.5; // TODO: tune the value
+    }
+
     public static class Led {
         public static String SERVO_NAME = "led";
         public static double FLASH_MS = 300;
