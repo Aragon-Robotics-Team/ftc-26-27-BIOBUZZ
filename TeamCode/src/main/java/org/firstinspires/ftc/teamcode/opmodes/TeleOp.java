@@ -178,8 +178,9 @@ public class TeleOp extends OpMode {
         }
     }
 
+    /** Slow mode while LT is held, and while shooting (RT) so the robot stays steady for the shot. */
     private double driveScale() {
-        return gamepad1.left_trigger > 0.5 ? SLOW_MODE_SCALE : 1.0;
+        return gamepad1.left_trigger > 0.5 || robot.intake.isFeeding() ? SLOW_MODE_SCALE : 1.0;
     }
 
     /** Button presses schedule commands. */

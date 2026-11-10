@@ -13,7 +13,7 @@
     "gamepad1.left_stick": "Drive (field-centric: forward = away from our driver station)",
     "gamepad1.right_stick": "Turn (x). With TURN_MODE = TWIN_STICK: point the intake this way, holds that heading",
     "gamepad1.left_trigger": "Hold: slow mode (turning too, except with TWIN_STICK)",
-    "gamepad1.right_trigger": "Hold: open gate and feed the shooter",
+    "gamepad1.right_trigger": "Hold: open gate and feed the shooter (slow mode while held)",
     "gamepad1.right_bumper": "Flywheel on",
     "gamepad1.left_bumper": "Flywheel off",
     "gamepad1.triangle": "Toggle intake",

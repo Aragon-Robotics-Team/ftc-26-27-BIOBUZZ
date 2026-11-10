@@ -6,7 +6,7 @@ import com.qualcomm.robotcore.hardware.DcMotorSimple;
 /** Every robot tunable and hardware name in one place. Drivetrain / localizer config lives in pedro.Constants. */
 public class RobotConstants {
     public static class Drive {
-        public static double SLOW_MODE_SCALE = 0.4;
+        public static double SLOW_MODE_SCALE = 0.2; // Nov 9
 
         /** How the TeleOp right stick turns the robot. */
         public enum TurnMode {
@@ -49,8 +49,9 @@ public class RobotConstants {
 
         public static double INTAKE_POWER = 1.0;
         public static double OUTTAKE_POWER = -1.0;
-        // While shooting. The intake drives the transfer, so this sets how fast balls go into the flywheel (Oct 28)
-        public static double FEED_POWER = 1.0;
+        // While shooting. The intake drives the transfer, so this sets how fast balls go into the flywheel. Lowered from
+        // 1.0 (Nov 9): at full power balls came 0.13 s apart and the flywheel needs 0.2-0.5 s to recover from each one
+        public static double FEED_POWER = 0.6;
         public static double FLOWER_INTAKE_MS = 300; // how long Auto waits at a flower with the intake on TODO tune
         public static int CAPACITY = 4;              // balls the robot holds
     }
