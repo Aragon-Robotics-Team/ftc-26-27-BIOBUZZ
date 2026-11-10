@@ -66,8 +66,8 @@ public class RobotConstants {
     public static class Matchloader {
         public static String SERVO_NAME = "matchloader";
 
-        public static double UP_POSITION = 0.0; // TODO: tune the value
-        public static double DOWN_POSITION = 0.5; // TODO: tune the value
+        public static double UP_POSITION = 0.250; // TODO: tune the value
+        public static double DOWN_POSITION = 0.6; // TODO: tune the value
     }
 
     public static class Led {
