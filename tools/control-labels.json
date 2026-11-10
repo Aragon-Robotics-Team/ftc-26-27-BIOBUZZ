@@ -36,7 +36,8 @@
 
   "Auto": {
     "init.gamepad1.dpad_up": "Previous routine",
-    "init.gamepad1.dpad_down": "Next routine"
+    "init.gamepad1.dpad_down": "Next routine",
+    "init.gamepad1.triangle": "Camera Cycles: partner shoots its preloads, or not"
   },
 
   "Planned Path Test": {

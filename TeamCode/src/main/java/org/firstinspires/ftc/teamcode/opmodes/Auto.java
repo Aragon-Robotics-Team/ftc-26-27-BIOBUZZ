@@ -64,6 +64,7 @@ public class Auto extends OpMode {
         if (gamepad1.dpadUpWasPressed()) index = (index + routines.size() - 1) % routines.size();
         selected = routines.get(index);
         AutoRoutine routine = selected.create(robot, MatchState.alliance);
+        routine.initLoop(gamepad1, telemetry);
         if (routine.usesBallVision()) {
             robot.ballVision.enable(false); // the camera takes a moment to open
             robot.ballVision.prepare();
@@ -77,7 +78,7 @@ public class Auto extends OpMode {
         if (Math.abs(turret) > 2) {
             telemetry.addLine(Html.color(bold(String.format("Turret reads %.0f°: face it forward and INIT again", turret)), Html.RED));
         } else telemetry.addData("Turret", "%.0f°", turret);
-        // The pose leans on the hive's tags (and Solo Carry on them for which cell is up): check the Limelight sees them
+        // The pose leans on the hive's tags (and Camera Cycles on them for which cell is up): check the Limelight sees them
         int tags = robot.hiveVision.tagsInView();
         if (tags > 0) telemetry.addData("Limelight", "%d hive tags in view", tags);
         else if (tags < 0) telemetry.addLine(Html.color(bold("No Limelight in the configuration"), Html.YELLOW));
