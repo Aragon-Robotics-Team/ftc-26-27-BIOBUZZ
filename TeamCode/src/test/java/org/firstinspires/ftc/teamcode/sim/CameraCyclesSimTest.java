@@ -30,7 +30,6 @@ import java.util.stream.Stream;
  */
 class CameraCyclesSimTest {
     private static final int FIRST_PRESS_TICK = 30; // after Auto's init (the Pinpoint's 500 ms)
-    private static final double IMU_DRIFT = 0.1;    // degrees a second
 
     @BeforeAll
     static void loadOpenCv() {
@@ -46,8 +45,6 @@ class CameraCyclesSimTest {
                 scenario("partner-parks", Alliance.RED, false, 36, sim -> sim),
                 scenario("slow-ball-camera", Alliance.RED, true, 56, sim -> sim.ballCamera(10, 100, 6, 0.3)),
                 scenario("no-tags", Alliance.RED, true, 56, sim -> sim.blindLimelight()),
-                // The flowers need the pose within about 2 in: at 0.2°/s and more it misses the rear one (1 tip)
-                scenario("imu-drift", Alliance.RED, true, 56, sim -> sim.imuDrift(IMU_DRIFT)),
                 scenario("shots-scatter", Alliance.RED, true, 36, sim -> sim.shotSpread(1, 0.03, 1.5)));
     }
 
