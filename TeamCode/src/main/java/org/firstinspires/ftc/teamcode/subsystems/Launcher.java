@@ -225,6 +225,14 @@ public class Launcher implements Subsystem {
         return !turretTargetClipped && Math.abs(turretTargetAngle - getTurretAngle()) <= turretTolerance();
     }
 
+    /**
+     * The turret is held at a soft limit (TURRET_MIN_ANGLE / TURRET_MAX_ANGLE), usually because the shot needs it
+     * turned past one, so the drivetrain has to turn instead.
+     */
+    public boolean isTurretAtLimit() {
+        return turretTargetAngle == TURRET_MIN_ANGLE || turretTargetAngle == TURRET_MAX_ANGLE;
+    }
+
     private double turretTolerance() {
         if (turretShot == null || !turretShot.feasible) return TURRET_ANGLE_TOLERANCE;
         return turretShot.angleTolerance * READY_WINDOW_FRACTION;

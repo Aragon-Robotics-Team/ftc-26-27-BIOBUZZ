@@ -369,7 +369,7 @@ const HTML = { RED: "#FF5555", BLUE: "#5599FF", GREEN: "#55DD55", YELLOW: "#FFCC
 const NBSP = "&nbsp;";
 const GAP = NBSP + NBSP + NBSP;
 const FLYWHEEL_TICKS_PER_EXIT_SPEED = 8.0;
-const LED = { OFF: "#1b1f23", GREEN: "#35e05a", YELLOW: "#ffd23a", RED: "#ff4040" };
+const LED = { OFF: "#1b1f23", GREEN: "#35e05a", RED: "#ff4040", BLUE: "#3a7bff", ORANGE: "#ff8a1f" };
 
 // ---- util/Html.java ----
 const bold = t => `<b>${t}</b>`;
@@ -395,7 +395,8 @@ function launcher(s) {
   else if (ready) status = "READY";
   else if (!hasShot) status = "NO_SHOT";
   else status = atSpeed ? "AIMING" : "SPINNING_UP";
-  return { target, spinning, atSpeed, onTarget, hasShot, ready, status };
+  const atLimit = Math.abs(s.turretTarget) >= 90; // TURRET_MIN_ANGLE / TURRET_MAX_ANGLE
+  return { target, spinning, atSpeed, onTarget, hasShot, ready, status, atLimit };
 }
 
 // ---- util/FieldDiagram.java ----
@@ -534,7 +535,7 @@ function lines(s) {
       if (L.spinning) data("Calibration (ticks/sec per in/s)", f(L.target / exit, 2));
     }
   }
-  const ledPos = { READY: 0.5, NO_SHOT: 0.28, SPINNING_UP: 0.388, AIMING: 0.388, OFF: 0 }[L.status];
+  const ledPos = L.atLimit ? 0.333 : { READY: 0.5, NO_SHOT: 0, SPINNING_UP: 0.28, AIMING: 0.28, OFF: 0.611 }[L.status];
   data("LED position", f(ledPos, 3));
   return { out, tiers, L };
 }
@@ -555,6 +556,7 @@ const scenarios = [
   ["Turret catching up", { turret: 4.0, turretTarget: 18.5, pose: { x: 20, y: 30, h: 45 } }],
   ["Flywheel over speed", { actual: 2110, target: 1860, pose: { x: 36, y: 76, h: 0 } }],
   ["Too close to reach", { feasible: false, lead: 0, turret: -35, turretTarget: -35.5, pose: { x: 50, y: 40, h: 90 } }],
+  ["Turret at its limit", { turret: 89.6, turretTarget: 90, pose: { x: 30, y: 100, h: -120 } }],
   ["Flywheel off", { spinning: false, actual: 0, pose: { x: 100, y: 110, h: 180 } }],
   ["Turning to the right stick", { pose: { x: 30, y: 96, h: -30 }, headingTarget: 60 }],
   ["Operator nudged", { velNudge: 50, turNudge: -2, turretTarget: 10.9, turret: 10.6, actual: 2020, target: 1980 }],
@@ -594,10 +596,12 @@ function render() {
   $("telemetry").innerHTML = out.join("<br>");
   $("code").innerHTML = out.map((l, i) =>
     `<span class="ln${i >= tiers[1] ? " fold" : ""}"><span class="n">${i + 1}</span>${escapeHtml(l)}</span>`).join("");
-  const ledColor = { READY: LED.GREEN, NO_SHOT: LED.RED, SPINNING_UP: LED.YELLOW, AIMING: LED.YELLOW, OFF: LED.OFF }[L.status];
+  const ledColor = L.atLimit ? LED.ORANGE
+    : { READY: LED.GREEN, NO_SHOT: LED.OFF, SPINNING_UP: LED.RED, AIMING: LED.RED, OFF: LED.BLUE }[L.status];
   $("led").style.backgroundColor = ledColor;
-  $("led").style.boxShadow = L.status === "OFF" ? "none" : `0 0 12px 2px ${ledColor}`;
-  $("led-label").textContent = "LED " + { READY: "green", NO_SHOT: "red", SPINNING_UP: "yellow", AIMING: "yellow", OFF: "off" }[L.status];
+  $("led").style.boxShadow = ledColor === LED.OFF ? "none" : `0 0 12px 2px ${ledColor}`;
+  $("led-label").textContent = "LED " + (L.atLimit ? "orange"
+    : { READY: "green", NO_SHOT: "off", SPINNING_UP: "red", AIMING: "red", OFF: "blue" }[L.status]);
   document.querySelectorAll("#scenarios button").forEach((b, i) => b.setAttribute("aria-pressed", String(i === current)));
 }
 

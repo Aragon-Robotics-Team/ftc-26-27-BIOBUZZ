@@ -13,16 +13,18 @@ import org.firstinspires.ftc.robotcore.external.Telemetry;
 
 /**
  * goBILDA RGB Indicator Light (PWM). Shows whether a shot right now would go in the hive:
- * off = flywheel off, green = ready to shoot (there's a shot, flywheel at speed, turret on target),
- * yellow = spinning up or aiming, red = no shot from here.
+ * blue = flywheel off, green = ready to shoot (there's a shot, flywheel at speed, turret on target),
+ * red = spinning up or aiming, off = no shot from here.
+ * orange (over all of those) = the turret is held at a soft limit (±90°), so turn the robot.
  * flash() shows white briefly to confirm a button press.
  */
 public class Led implements Subsystem {
     // Servo positions from goBILDA's chart (default 600-2400 us servo range). Colors blend in between.
     private static final double OFF = 0.0;
     private static final double RED = 0.28; // chart says 0.277, which sits right on the "off" cutoff
-    private static final double YELLOW = 0.388;
+    private static final double ORANGE = 0.333;
     private static final double GREEN = 0.5;
+    private static final double BLUE = 0.611;
     private static final double WHITE = 1.0;
 
     private final Servo light;
@@ -53,12 +55,13 @@ public class Led implements Subsystem {
 
     private double color() {
         if (flashing) return WHITE;
+        if (launcher.isTurretAtLimit()) return ORANGE;
         switch (launcher.getStatus()) {
             case READY: return GREEN;
-            case NO_SHOT: return RED;
             case SPINNING_UP:
-            case AIMING: return YELLOW;
-            default: return OFF;
+            case AIMING: return RED;
+            case NO_SHOT: return OFF;
+            default: return BLUE;
         }
     }
 
