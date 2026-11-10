@@ -58,7 +58,7 @@ public class Auto extends OpMode {
     @Override
     public void init_loop() {
         telemetry.addLine(Html.color(bold("Did you remember to zero the turret? :-)"), Html.YELLOW));
-        MatchState.selectAlliance(gamepad1, telemetry);
+        MatchState.selectAlliance(gamepad1, 1, telemetry);
         int index = routines.indexOf(selected);
         if (gamepad1.dpadDownWasPressed()) index = (index + 1) % routines.size();
         if (gamepad1.dpadUpWasPressed()) index = (index + routines.size() - 1) % routines.size();

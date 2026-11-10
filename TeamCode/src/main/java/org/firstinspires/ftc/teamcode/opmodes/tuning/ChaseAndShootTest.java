@@ -36,7 +36,7 @@ import org.psilynx.psikit.core.Logger;
  * flywheel spinning up, shoots what it has, and chases again from there for the room left. It stops when a chase picks
  * up nothing, or when there's no shot from the launch spot. A test, not a menu Auto.
  *
- * During init pick the alliance (X / B) and the corner the robot starts in, back against the alliance wall (dpad left /
+ * During init pick the alliance (square / circle) and the corner the robot starts in, back against the alliance wall (dpad left /
  * right). The hive starts with the RIGHT cell up, as at the start of a match.
  */
 @Configurable
@@ -65,7 +65,7 @@ public class ChaseAndShootTest extends OpMode {
 
     @Override
     public void init_loop() {
-        MatchState.selectAlliance(gamepad1, telemetry);
+        MatchState.selectAlliance(gamepad1, 1, telemetry);
         if (gamepad1.dpadLeftWasPressed()) corner = RED_LEFT_CORNER;
         if (gamepad1.dpadRightWasPressed()) corner = RED_RIGHT_CORNER;
         telemetry.addData("Start", "%s corner, back to the alliance wall   (dpad ←→)",

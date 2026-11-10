@@ -13,11 +13,12 @@
     "gamepad1.left_stick": "Drive (field-centric: forward = away from our driver station)",
     "gamepad1.right_stick": "Turn (x). With TURN_MODE = TWIN_STICK: point the intake this way, holds that heading",
     "gamepad1.left_trigger": "Hold: slow mode (turning too, except with TWIN_STICK)",
-    "gamepad1.right_trigger": "Hold: open gate and feed the shooter",
+    "gamepad1.right_trigger": "Hold: open gate and feed the shooter (slow mode while held)",
     "gamepad1.right_bumper": "Flywheel on",
     "gamepad1.left_bumper": "Flywheel off",
     "gamepad1.triangle": "Toggle intake",
     "gamepad1.cross": "Toggle outtake",
+    "gamepad1.square": "Toggle matchloader up / down",
 
     "gamepad2.dpad_left": "Nudge turret left",
     "gamepad2.dpad_right": "Nudge turret right",
@@ -27,6 +28,8 @@
     "gamepad2.circle": "Tap: hive RIGHT cell is up. Hold 1 s: also lock / unlock auto hive",
     "gamepad2.share": "Reset pose: pushed into our LEFT corner, back to alliance wall",
     "gamepad2.options": "Reset pose: pushed into our RIGHT corner, back to alliance wall",
+    "init.gamepad2.square": "Blue alliance (until pressed: the alliance Auto ran as)",
+    "init.gamepad2.circle": "Red alliance (until pressed: the alliance Auto ran as)",
     "init.gamepad2.share": "Start pose: pushed into our LEFT corner, back to alliance wall",
     "init.gamepad2.options": "Start pose: pushed into our RIGHT corner, back to alliance wall"
   },
@@ -130,7 +133,9 @@
     "gamepad2.square": "Aim at hive LEFT cell",
     "gamepad2.circle": "Aim at hive RIGHT cell",
     "gamepad2.share": "Reset pose: pushed into our LEFT corner, back to alliance wall",
-    "gamepad2.options": "Reset pose: pushed into our RIGHT corner, back to alliance wall"
+    "gamepad2.options": "Reset pose: pushed into our RIGHT corner, back to alliance wall",
+    "init.gamepad2.share": "Start pose: pushed into our LEFT corner, back to alliance wall",
+    "init.gamepad2.options": "Start pose: pushed into our RIGHT corner, back to alliance wall"
   },
 
   "Motor Tester": {
@@ -165,5 +170,11 @@
     "gamepad1.right_stick": "Turn",
     "gamepad1.left_trigger": "Hold: slow mode",
     "gamepad1.cross": "Apply the mount values from Panels (reopens the camera)"
+  },
+
+  "Pose Helper": {
+    "gamepad1.circle": "Save the current pose",
+    "gamepad1.square": "Zero the pose (0, 0, 0°), keep saved poses",
+    "gamepad1.cross": "Zero the pose and clear saved poses"
   }
 }

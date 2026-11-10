@@ -15,7 +15,7 @@ import org.firstinspires.ftc.teamcode.vision.HiveReader;
  * Check and calibrate the Limelight's hive reading on the practice hive. Edit the values under
  * Configurables > HiveVisionTest in Panels; copy the final ones into RobotConstants.Vision.
  *
- * Pick the alliance during init (X blue, B red). Every tag in view is listed with its ID, which of our cells it's on,
+ * Pick the alliance during init (square blue, circle red). Every tag in view is listed with its ID, which of our cells it's on,
  * its camera-space position, its height above the tiles and how far off its face the camera is looking.
  * 1. Lens height: measure it and set lensHeight.
  * 2. Tilt: measure the height of one tag on the practice hive (tape to the tag's center) and set knownTagId and
@@ -44,7 +44,7 @@ public class HiveVisionTest extends OpMode {
 
     @Override
     public void init_loop() {
-        MatchState.selectAlliance(gamepad1, telemetry);
+        MatchState.selectAlliance(gamepad1, 1, telemetry);
         telemetry.addData("Limelight", vision.isAvailable() ? "found" : "NOT FOUND (check the configuration name)");
         telemetry.update();
     }

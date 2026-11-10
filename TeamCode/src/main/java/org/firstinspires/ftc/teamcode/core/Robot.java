@@ -27,7 +27,8 @@ import org.firstinspires.ftc.teamcode.subsystems.Gate;
 import org.firstinspires.ftc.teamcode.subsystems.HiveVision;
 import org.firstinspires.ftc.teamcode.subsystems.Intake;
 import org.firstinspires.ftc.teamcode.subsystems.Launcher;
-// import org.firstinspires.ftc.teamcode.subsystems.Led; // LED: commented out until it's on the robot
+import org.firstinspires.ftc.teamcode.subsystems.Led;
+import org.firstinspires.ftc.teamcode.subsystems.Matchloader;
 import org.firstinspires.ftc.teamcode.subsystems.Subsystem;
 import org.firstinspires.ftc.teamcode.util.MatchLog;
 import org.psilynx.psikit.core.Logger;
@@ -43,8 +44,9 @@ public class Robot {
     public final Drivetrain drivebase;
     public final Intake intake;
     public final Gate gate;
+    public final Matchloader matchloader;
     public final Launcher launcher;
-    // public final Led led; // LED: commented out until it's on the robot
+    public final Led led;
     public final HiveVision hiveVision;
     public final BallVision ballVision;
 
@@ -59,8 +61,9 @@ public class Robot {
         drivebase = new Drivetrain(hardwareMap);
         intake = new Intake(hardwareMap);
         gate = new Gate(hardwareMap);
+        matchloader = new Matchloader(hardwareMap);
         launcher = new Launcher(hardwareMap);
-        // led = new Led(hardwareMap, launcher); // LED: commented out until it's on the robot
+        led = new Led(hardwareMap, launcher);
         hiveVision = new HiveVision(hardwareMap); // off until an OpMode enables it
         ballVision = new BallVision(hardwareMap, drivebase::getPose); // off until an OpMode enables it
         // The hive's tags correct the pose (RobotConstants.Localization); the Limelight turns with the turret
@@ -68,7 +71,7 @@ public class Robot {
 
         // Hive vision first, so this loop aims at the cell it just read; ball vision after the drivetrain, so it has
         // this loop's pose; launcher before Led, so the light shows this loop's launcher state
-        subsystems = new Subsystem[]{hiveVision, drivebase, ballVision, intake, gate, launcher /*, led */};
+        subsystems = new Subsystem[]{hiveVision, drivebase, ballVision, intake, gate, matchloader, launcher, led};
     }
 
     // ---- Hive ----
@@ -88,12 +91,12 @@ public class Robot {
             MatchState.hive = side;
             hiveVision.manualSet();
             drivebase.getLocalizer().setHive(MatchState.alliance, side); // the tags' arm angle, for the pose
-        }) /*, led.flash() */);
+        }), led.flash());
     }
 
     /** After a tip, the other cell is up. */
     public Command flipHive() {
-        return parallel(instant(() -> MatchState.hive = MatchState.hive.flipped()) /*, led.flash() */);
+        return parallel(instant(() -> MatchState.hive = MatchState.hive.flipped()), led.flash());
     }
 
     /** Keep the turret on the hive's up cell, leading it while the robot moves. Runs until interrupted. */
@@ -124,7 +127,7 @@ public class Robot {
      */
     public Command shoot() {
         return sequential(
-                waitUntil(launcher::isReady).raceWith(waitMs(1500)),
+                waitUntil(launcher::isReady).raceWith(waitMs(2000)),
                 conditional(launcher::hasShot,
                         sequential(startShooting(), waitMs(AUTO_SHOOT_MS), stopShooting()),
                         instant(() -> {}))
@@ -193,7 +196,7 @@ public class Robot {
 
     /** Snap the pose to a known spot, e.g. with the robot pushed into a corner. Takes a red-side pose. */
     public Command resetPose(Pose redPose) {
-        return parallel(instant(() -> drivebase.setPose(MatchState.alliance.apply(redPose))) /*, led.flash() */);
+        return parallel(instant(() -> drivebase.setPose(MatchState.alliance.apply(redPose))), led.flash());
     }
 
     public void start() {
@@ -241,11 +244,14 @@ public class Robot {
         Logger.recordOutput("Drive/speed", Math.hypot(velocity.vx, velocity.vy));
         Logger.recordOutput("Drive/turnRateDeg", Math.toDegrees(velocity.omega));
         Logger.recordOutput("Drive/targetHeadingDeg", Math.toDegrees(drivebase.getTargetHeading()));
+        Logger.recordOutput("Drive/headingSnap", drivebase.isSnapping());
 
         Logger.recordOutput("Launcher/status", launcher.getStatus());
         Logger.recordOutput("Launcher/flywheelTarget", launcher.getTargetVelocity());
         Logger.recordOutput("Launcher/flywheelActual", launcher.getFlywheelVelocity());
         Logger.recordOutput("Launcher/flywheelNudge", launcher.getVelocityNudge());
+        Logger.recordOutput("Launcher/flywheelPower", launcher.getFlywheelPower());
+        Logger.recordOutput("Launcher/batteryVolts", launcher.getBatteryVolts());
         Logger.recordOutput("Launcher/ready", launcher.isReady());
         Logger.recordOutput("Turret/targetDeg", Math.toDegrees(launcher.getTurretTargetAngle()));
         Logger.recordOutput("Turret/actualDeg", Math.toDegrees(launcher.getTurretAngle()));
@@ -264,6 +270,7 @@ public class Robot {
         Logger.recordOutput("Intake/mode", intake.getMode());
         Logger.recordOutput("Intake/feeding", intake.isFeeding());
         Logger.recordOutput("Gate/open", gate.isOpen());
+        Logger.recordOutput("Matchloader/down", matchloader.isDown());
         Logger.recordOutput("Vision/available", hiveVision.isAvailable());
         Logger.recordOutput("Vision/locked", hiveVision.isLocked());
         Logger.recordOutput("BallVision/balls", ballVision.getBalls().size());

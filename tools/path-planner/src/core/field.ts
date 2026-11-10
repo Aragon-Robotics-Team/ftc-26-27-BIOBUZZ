@@ -6,9 +6,9 @@
  */
 import { convexHull, rect, vec, type Polygon, type Vec } from './geom.ts';
 
-/** Inner faces of the perimeter walls (the tiles span 1.4–142.6 in the Pedro frame). */
-export const WALL_MIN = 1.4;
-export const WALL_MAX = 142.6;
+/** Inner faces of the perimeter walls: 141.5 in apart, centered on 72 (RobotConstants.Field.WALL). */
+export const WALL_MIN = 1.25;
+export const WALL_MAX = 142.75;
 export const CENTERLINE_X = 72;
 
 /** What the turret aims at for the "turret can reach the hive" rule: the red hive's centre. */

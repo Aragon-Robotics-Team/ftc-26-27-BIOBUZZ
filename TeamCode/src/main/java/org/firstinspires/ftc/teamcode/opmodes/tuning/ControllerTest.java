@@ -58,8 +58,8 @@ public class ControllerTest extends OpMode {
         if (g.dpad_down) down.add("dpad down");
         if (g.dpad_left) down.add("dpad left");
         if (g.dpad_right) down.add("dpad right");
-        if (g.left_bumper) down.add("LB");
-        if (g.right_bumper) down.add("RB");
+        if (g.left_bumper) down.add("L1/LB");
+        if (g.right_bumper) down.add("R1/RB");
         if (g.left_stick_button) down.add("left stick button");
         if (g.right_stick_button) down.add("right stick button");
         if (g.back) down.add("back/share");

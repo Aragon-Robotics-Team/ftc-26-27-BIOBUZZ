@@ -297,7 +297,7 @@ pre .fold { color: var(--muted); }
 
       <fieldset>
         <legend>Flywheel</legend>
-        <div class="checks"><label><input type="checkbox" id="spinning"> Flywheel on (RB)</label></div>
+        <div class="checks"><label><input type="checkbox" id="spinning"> Flywheel on (R1)</label></div>
         <div class="row"><label for="target">Target</label><input type="range" id="target" min="500" max="2800" step="10"><output for="target" id="target-out"></output></div>
         <div class="row"><label for="actual">Actual</label><input type="range" id="actual" min="0" max="2800" step="10"><output for="actual" id="actual-out"></output></div>
         <div class="row"><label for="flyTol">Margin ±</label><input type="range" id="flyTol" min="10" max="150" step="5"><output for="flyTol" id="flyTol-out"></output></div>
@@ -306,8 +306,8 @@ pre .fold { color: var(--muted); }
 
       <fieldset>
         <legend>Turret (+ = left)</legend>
-        <div class="row"><label for="turret">Actual</label><input type="range" id="turret" min="-90" max="90" step="0.5"><output for="turret" id="turret-out"></output></div>
-        <div class="row"><label for="turretTarget">Target</label><input type="range" id="turretTarget" min="-90" max="90" step="0.5"><output for="turretTarget" id="turretTarget-out"></output></div>
+        <div class="row"><label for="turret">Actual</label><input type="range" id="turret" min="-112.5" max="112.5" step="0.5"><output for="turret" id="turret-out"></output></div>
+        <div class="row"><label for="turretTarget">Target</label><input type="range" id="turretTarget" min="-112.5" max="112.5" step="0.5"><output for="turretTarget" id="turretTarget-out"></output></div>
         <div class="row"><label for="turTol">Margin ±</label><input type="range" id="turTol" min="0.2" max="5" step="0.1"><output for="turTol" id="turTol-out"></output></div>
         <div class="row"><label for="turNudge">Nudge</label><input type="range" id="turNudge" min="-5" max="5" step="1"><output for="turNudge" id="turNudge-out"></output></div>
       </fieldset>
@@ -328,7 +328,7 @@ pre .fold { color: var(--muted); }
         <div class="row"><label for="hive">Hive up</label><select id="hive"><option>LEFT</option><option>RIGHT</option></select></div>
         <div class="row"><label for="intake">Intake</label><select id="intake"><option>OFF</option><option>INTAKE</option><option>OUTTAKE</option></select></div>
         <div class="checks">
-          <label><input type="checkbox" id="feeding"> Feeding (RT held)</label>
+          <label><input type="checkbox" id="feeding"> Feeding (R2 held)</label>
           <label><input type="checkbox" id="gate"> Gate open</label>
         </div>
         <div class="row"><label for="loopMs">Loop time</label><input type="range" id="loopMs" min="4" max="60" step="0.5"><output for="loopMs" id="loopMs-out"></output></div>
@@ -369,7 +369,7 @@ const HTML = { RED: "#FF5555", BLUE: "#5599FF", GREEN: "#55DD55", YELLOW: "#FFCC
 const NBSP = "&nbsp;";
 const GAP = NBSP + NBSP + NBSP;
 const FLYWHEEL_TICKS_PER_EXIT_SPEED = 8.0;
-const LED = { OFF: "#1b1f23", GREEN: "#35e05a", YELLOW: "#ffd23a", RED: "#ff4040" };
+const LED = { OFF: "#1b1f23", GREEN: "#35e05a", RED: "#ff4040", BLUE: "#3a7bff", ORANGE: "#ff8a1f" };
 
 // ---- util/Html.java ----
 const bold = t => `<b>${t}</b>`;
@@ -395,7 +395,8 @@ function launcher(s) {
   else if (ready) status = "READY";
   else if (!hasShot) status = "NO_SHOT";
   else status = atSpeed ? "AIMING" : "SPINNING_UP";
-  return { target, spinning, atSpeed, onTarget, hasShot, ready, status };
+  const atLimit = Math.abs(s.turretTarget) >= 112.5; // TURRET_MIN_ANGLE / TURRET_MAX_ANGLE
+  return { target, spinning, atSpeed, onTarget, hasShot, ready, status, atLimit };
 }
 
 // ---- util/FieldDiagram.java ----
@@ -506,7 +507,7 @@ function lines(s) {
   add(`Heading ${f(s.pose.h, 0)}° → ${f(s.headingTarget, 0)}°`);
   add(`Loop ${f(s.loopMs, 1)} ms ${f(1000 / s.loopMs, 0)} Hz`);
   add(`Gamepad 1 updated ${f(s.padAge, 0)} ms ago (stamp 412345)`);
-  add(`Gamepad 1 longest gap ${f(s.padGap, 0)} ms at ${f(s.padGapAt, 1)} s (${s.padGaps} over 200 ms)`);
+  add(`Gamepad 1 longest gap ${f(s.padGap, 0)} ms at ${f(s.padGapAt, 1)} s, slowest loop in it ${f(s.padGapLoop, 0)} ms (${s.padGaps} over 200 ms)`);
   add("Follower MANUAL");
   tiers.push(out.length);
 
@@ -534,7 +535,7 @@ function lines(s) {
       if (L.spinning) data("Calibration (ticks/sec per in/s)", f(L.target / exit, 2));
     }
   }
-  const ledPos = { READY: 0.5, NO_SHOT: 0.28, SPINNING_UP: 0.388, AIMING: 0.388, OFF: 0 }[L.status];
+  const ledPos = L.atLimit ? 0.333 : { READY: 0.5, NO_SHOT: 0, SPINNING_UP: 0.28, AIMING: 0.28, OFF: 0.611 }[L.status];
   data("LED position", f(ledPos, 3));
   return { out, tiers, L };
 }
@@ -546,7 +547,7 @@ const base = {
   aiming: true, feasible: true, sotm: true, lead: 3.1,
   alliance: "RED", hive: "RIGHT", intake: "INTAKE", feeding: false, gate: false, loopMs: 11.5,
   pose: { x: 26, y: 104, h: -30 }, headingTarget: -30,
-  padAge: 8, padGap: 60, padGapAt: 12.4, padGaps: 0,
+  padAge: 8, padGap: 60, padGapAt: 12.4, padGapLoop: 22, padGaps: 0,
 };
 const scenarios = [
   ["Ready to shoot", {}],
@@ -555,10 +556,11 @@ const scenarios = [
   ["Turret catching up", { turret: 4.0, turretTarget: 18.5, pose: { x: 20, y: 30, h: 45 } }],
   ["Flywheel over speed", { actual: 2110, target: 1860, pose: { x: 36, y: 76, h: 0 } }],
   ["Too close to reach", { feasible: false, lead: 0, turret: -35, turretTarget: -35.5, pose: { x: 50, y: 40, h: 90 } }],
+  ["Turret at its limit", { turret: 112.1, turretTarget: 112.5, pose: { x: 30, y: 100, h: -120 } }],
   ["Flywheel off", { spinning: false, actual: 0, pose: { x: 100, y: 110, h: 180 } }],
   ["Turning to the right stick", { pose: { x: 30, y: 96, h: -30 }, headingTarget: 60 }],
   ["Operator nudged", { velNudge: 50, turNudge: -2, turretTarget: 10.9, turret: 10.6, actual: 2020, target: 1980 }],
-  ["Gamepad went quiet", { padGap: 420, padGapAt: 63.2, padGaps: 1 }],
+  ["Gamepad went quiet", { padGap: 420, padGapAt: 63.2, padGapLoop: 25, padGaps: 1 }],
 ];
 let state = structuredClone(base);
 let current = 0;
@@ -594,10 +596,12 @@ function render() {
   $("telemetry").innerHTML = out.join("<br>");
   $("code").innerHTML = out.map((l, i) =>
     `<span class="ln${i >= tiers[1] ? " fold" : ""}"><span class="n">${i + 1}</span>${escapeHtml(l)}</span>`).join("");
-  const ledColor = { READY: LED.GREEN, NO_SHOT: LED.RED, SPINNING_UP: LED.YELLOW, AIMING: LED.YELLOW, OFF: LED.OFF }[L.status];
+  const ledColor = L.atLimit ? LED.ORANGE
+    : { READY: LED.GREEN, NO_SHOT: LED.OFF, SPINNING_UP: LED.RED, AIMING: LED.RED, OFF: LED.BLUE }[L.status];
   $("led").style.backgroundColor = ledColor;
-  $("led").style.boxShadow = L.status === "OFF" ? "none" : `0 0 12px 2px ${ledColor}`;
-  $("led-label").textContent = "LED " + { READY: "green", NO_SHOT: "red", SPINNING_UP: "yellow", AIMING: "yellow", OFF: "off" }[L.status];
+  $("led").style.boxShadow = ledColor === LED.OFF ? "none" : `0 0 12px 2px ${ledColor}`;
+  $("led-label").textContent = "LED " + (L.atLimit ? "orange"
+    : { READY: "green", NO_SHOT: "off", SPINNING_UP: "red", AIMING: "red", OFF: "blue" }[L.status]);
   document.querySelectorAll("#scenarios button").forEach((b, i) => b.setAttribute("aria-pressed", String(i === current)));
 }
 

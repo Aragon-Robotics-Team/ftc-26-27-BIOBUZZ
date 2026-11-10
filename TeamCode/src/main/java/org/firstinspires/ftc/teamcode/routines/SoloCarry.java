@@ -76,7 +76,7 @@ public class SoloCarry extends AutoRoutine {
 
     public SoloCarry(Robot robot, Alliance alliance) {
         super(robot, alliance);
-        park = poseFactory.of(9, 96 + 1.5 - RobotConstants.Field.ROBOT_LENGTH / 2, 90);
+        park = poseFactory.of(RobotConstants.Field.WALL + 9, 96 + 1.5 - RobotConstants.Field.ROBOT_LENGTH / 2, 90);
         approach = poseFactory.of(20, 80, 90);
         ourHive = alliance == Alliance.RED ? HiveTags.RED : HiveTags.BLUE;
     }

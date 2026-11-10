@@ -15,10 +15,13 @@ public class MatchState {
     public static Pose pose = null;
     public static double turretAngle = 0;
 
-    /** Call from init_loop. X picks blue, B picks red (square / circle on PlayStation). */
-    public static void selectAlliance(Gamepad gamepad, Telemetry telemetry) {
-        if (gamepad.xWasPressed()) alliance = Alliance.BLUE;
-        if (gamepad.bWasPressed()) alliance = Alliance.RED;
-        telemetry.addData("Alliance", "%s   (X = blue, B = red)", alliance);
+    /**
+     * Call from init_loop. Square picks blue, circle red. Until one is pressed it stays what it was: what Auto ran
+     * as, in TeleOp after an Auto. number is the gamepad's, for the hint.
+     */
+    public static void selectAlliance(Gamepad gamepad, int number, Telemetry telemetry) {
+        if (gamepad.squareWasPressed()) alliance = Alliance.BLUE;
+        if (gamepad.circleWasPressed()) alliance = Alliance.RED;
+        telemetry.addData("Alliance", "%s   (gamepad %d: square = blue, circle = red)", alliance, number);
     }
 }

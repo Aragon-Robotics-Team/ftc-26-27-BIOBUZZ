@@ -20,7 +20,8 @@ import org.firstinspires.ftc.teamcode.subsystems.Drivetrain;
  * The robot starts at heading 0, so stick forward is the way it faces at start.
  * 1. Raise kP until the robot turns to the target quickly, then back off if it overshoots.
  * 2. Add kD to damp any overshoot. Add kI only if it stops just short of the target.
- * X / A / B (gamepad 1) jump the target left / center / right by stepDegrees, Y turns it around (the hardest case).
+ * Square / cross / circle (gamepad 1) jump the target left / center / right by stepDegrees, triangle turns it around
+ * (the hardest case).
  * The sticks drive like TeleOp's twin stick drive, to check it holds the heading while driving.
  */
 @Configurable
@@ -64,17 +65,17 @@ public class HeadingTuner extends OpMode {
         RobotConstants.Drive.HEADING_MAX_POWER = maxPower;
 
         // Positive heading is counter-clockwise, i.e. to the left
-        if (gamepad1.xWasPressed()) drivetrain.setTargetHeading(Math.toRadians(stepDegrees));
-        if (gamepad1.aWasPressed()) drivetrain.setTargetHeading(0);
-        if (gamepad1.bWasPressed()) drivetrain.setTargetHeading(Math.toRadians(-stepDegrees));
-        if (gamepad1.yWasPressed()) drivetrain.setTargetHeading(drivetrain.getTargetHeading() + Math.PI);
+        if (gamepad1.squareWasPressed()) drivetrain.setTargetHeading(Math.toRadians(stepDegrees));
+        if (gamepad1.crossWasPressed()) drivetrain.setTargetHeading(0);
+        if (gamepad1.circleWasPressed()) drivetrain.setTargetHeading(Math.toRadians(-stepDegrees));
+        if (gamepad1.triangleWasPressed()) drivetrain.setTargetHeading(drivetrain.getTargetHeading() + Math.PI);
 
         drivetrain.update();
         Scheduler.execute();
 
         double target = Math.toDegrees(drivetrain.getTargetHeading());
         double actual = Math.toDegrees(Angle.normalizeSigned(drivetrain.getPose().heading()));
-        panels.addLine("X left, A center, B right, Y turn around");
+        panels.addLine("Square left, cross center, circle right, triangle turn around");
         panels.addData("Target (deg)", target);
         panels.addData("Actual (deg)", actual);
         panels.addData("Error (deg)", Math.toDegrees(Angle.normalizeSigned(Math.toRadians(target - actual))));
