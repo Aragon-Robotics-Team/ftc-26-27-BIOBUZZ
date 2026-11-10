@@ -42,8 +42,8 @@ class AutoSimTest {
     @TestFactory
     Stream<DynamicTest> everyRoutineDrivesAndThePinpointKeepsUp() {
         return Routines.enabled().stream()
-                // Solo Carry starts elsewhere and has its own test (SoloCarrySimTest)
-                .filter(routine -> routine != Routines.SOLO_CARRY)
+                // Camera Cycles has its own test (CameraCyclesSimTest)
+                .filter(routine -> routine != Routines.CAMERA_CYCLES)
                 .filter(routine -> ONLY_ROUTINE.equalsIgnoreCase("all") || ONLY_ROUTINE.equalsIgnoreCase(routine.name()))
                 .map(routine -> DynamicTest.dynamicTest(routine.toString(), () -> autoDrivesAndThePinpointKeepsUp(routine)));
     }

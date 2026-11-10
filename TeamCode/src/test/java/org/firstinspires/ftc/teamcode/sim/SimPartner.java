@@ -17,7 +17,8 @@ import java.util.Collections;
  * A scripted alliance partner: an 18 in robot that drives from its wall to a spot in front of the up cell's opening
  * (which faces away from the hive, toward the rear or the audience wall), shoots its 4 preload pollen into it (each at
  * the speed that goes in), then parks in the loading zone. Or, parkOnly, it starts in the alliance's LEFT corner and
- * just parks. Balls bounce off it. It doesn't intake, and it ignores our
+ * just parks. Or, afterFirstTip, it waits by its wall until our hive first tips, then shoots into the cell that came
+ * up and parks at the audience end of the loading zone (doc/auto-pathing.md's partner). Balls bounce off it. It doesn't intake, and it ignores our
  * robot: the two can drive through each other.
  *
  * The script is written for red in Pedro coordinates and turned for blue with Alliance.apply, like our routines.
@@ -37,23 +38,32 @@ final class SimPartner {
     private static final Pose PARK = new Pose(14, 110, Math.PI);
     private final Pose shootFrom;
     private double parkShift; // parkShift(): inches along the zone from PARK, red's +y
+    private double parkBase;  // where along the zone its script parks, before parkShift
 
     final SimMatch.Robot robot;
     private final Alliance alliance;
     private final GamePieceTracker field;
     private double x, y, heading; // Pedro
-    private int stage;            // 0 drive to SHOOT, 1 shoot, 2 drive to PARK, 3 parked
+    private int stage;            // -1 waiting for the first tip, 0 drive to SHOOT, 1 shoot, 2 drive to PARK, 3 parked
+    private String tray;
+    private double startTilt;
     private int shotsLeft = PRELOAD;
     private double wait;
 
     /** @param parkOnly start in the alliance's LEFT corner (back to its wall) and only park: no shots */
     SimPartner(Alliance alliance, GamePieceTracker field, boolean parkOnly) {
+        this(alliance, field, parkOnly, false);
+    }
+
+    /** @param afterFirstTip wait for our hive's first tip, then shoot into the cell that came up */
+    SimPartner(Alliance alliance, GamePieceTracker field, boolean parkOnly, boolean afterFirstTip) {
         this.alliance = alliance;
         this.field = field;
         this.robot = new SimMatch.Robot(alliance);
         // In red's view: the rear cell (LEFT) opens toward +y, the audience cell toward -y
-        String tray = alliance == Alliance.BLUE ? SimHiveTrays.BLUE : SimHiveTrays.RED;
-        boolean rearUp = (field.getBodyAngleRad(tray) > 0) != (alliance == Alliance.BLUE);
+        tray = alliance == Alliance.BLUE ? SimHiveTrays.BLUE : SimHiveTrays.RED;
+        startTilt = Math.signum(field.getBodyAngleRad(tray));
+        boolean rearUp = (field.getBodyAngleRad(tray) > 0) != (alliance == Alliance.BLUE) != afterFirstTip;
         Pose cell = rearUp ? RobotConstants.Field.RED_HIVE_LEFT_CELL : RobotConstants.Field.RED_HIVE_RIGHT_CELL;
         double shootY = cell.y() + (rearUp ? SHOOT_OUT : -SHOOT_OUT);
         shootFrom = new Pose(SHOOT_X, shootY, 0);
@@ -65,12 +75,16 @@ final class SimPartner {
             stage = 2;
             shotsLeft = 0;
         }
+        if (parkOnly || afterFirstTip) parkBase = parkShift = -6; // the audience end of the zone, the rear end ours
+        if (afterFirstTip) {
+            stage = -1;
+        }
         report();
     }
 
-    /** Parks this far along the zone from flush at its rear end (red's +y; negative is short, toward us). */
+    /** Parks this far along the zone from where its script parks (red's +y; negative is toward the audience). */
     void parkShift(double inches) {
-        parkShift = inches;
+        parkShift = parkBase + inches;
     }
 
     /** What we bump into: its 18 in square where it is now, field frame (the turns ignored: it drives square). */
@@ -87,6 +101,10 @@ final class SimPartner {
     /** One tick, before the field advances. */
     void update(double deltaTime) {
         switch (stage) {
+            case -1:
+                double tilt = field.getBodyAngleRad(tray);
+                if (Math.signum(tilt) != startTilt && SimHiveTrays.up(alliance == Alliance.BLUE, tilt) != null) stage = 0;
+                break;
             case 0:
                 if (driveTo(alliance.apply(shootFrom), deltaTime)) {
                     stage = 1;

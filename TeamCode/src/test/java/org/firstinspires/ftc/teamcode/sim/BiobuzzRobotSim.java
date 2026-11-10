@@ -172,6 +172,7 @@ public final class BiobuzzRobotSim {
     public final FakeMotor intake = new FakeMotor(INTAKE_MAX_TICKS_PER_SECOND, 10);
     public final FakeServo gate = new FakeServo();
     public final FakeServo matchloader = new FakeServo();
+    public final FakeServo led = new FakeServo(); // the goBILDA RGB light, colored by servo position
     public final SimWebcam webcam = new SimWebcam();
     public final FakeVoltageSensor battery = new FakeVoltageSensor(); // 12 V
     public final FakeLimelight3A limelight;
@@ -267,6 +268,7 @@ public final class BiobuzzRobotSim {
         hardwareMap.register(RobotConstants.Intake.MOTOR_NAME, intake);
         hardwareMap.register(RobotConstants.Gate.SERVO_NAME, gate);
         hardwareMap.register(MATCHLOADER_SERVO, matchloader);
+        hardwareMap.register(RobotConstants.Led.SERVO_NAME, led);
         hardwareMap.register(RobotConstants.BallVision.WEBCAM_NAME, webcam);
         // The Launcher's FlywheelController scales its power by the battery voltage
         hardwareMap.register("Control Hub", battery);
@@ -414,11 +416,21 @@ public final class BiobuzzRobotSim {
     }
 
     /**
-     * Adds a partner that only starts in our LEFT corner (back to the alliance wall) and parks in the loading zone:
-     * no shots. After alliance().
+     * Adds a partner that only starts in our LEFT corner (back to the alliance wall) and parks at the audience end of the
+     * loading zone: no shots. After alliance().
      */
     public BiobuzzRobotSim withParkingPartner() {
         partner = new SimPartner(us.alliance, field, true);
+        robots.add(partner.robot);
+        return this;
+    }
+
+    /**
+     * Adds a partner that waits by its wall until our hive first tips, then shoots its 4 preloads into the cell that
+     * came up and parks at the audience end of the loading zone (doc/auto-pathing.md's plan). After alliance().
+     */
+    public BiobuzzRobotSim withPartnerAfterTip() {
+        partner = new SimPartner(us.alliance, field, false, true);
         robots.add(partner.robot);
         return this;
     }
