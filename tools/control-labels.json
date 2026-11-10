@@ -133,7 +133,9 @@
     "gamepad2.square": "Aim at hive LEFT cell",
     "gamepad2.circle": "Aim at hive RIGHT cell",
     "gamepad2.share": "Reset pose: pushed into our LEFT corner, back to alliance wall",
-    "gamepad2.options": "Reset pose: pushed into our RIGHT corner, back to alliance wall"
+    "gamepad2.options": "Reset pose: pushed into our RIGHT corner, back to alliance wall",
+    "init.gamepad2.share": "Start pose: pushed into our LEFT corner, back to alliance wall",
+    "init.gamepad2.options": "Start pose: pushed into our RIGHT corner, back to alliance wall"
   },
 
   "Motor Tester": {

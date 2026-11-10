@@ -33,8 +33,9 @@ import java.util.List;
  * - DRAG_COEFFICIENT: if far shots need a different ticks / exit speed than near ones, the model's drag is off.
  *   Too little drag in the model shows up as the ratio rising with distance.
  *
- * <p>Localize first (gamepad 2 share / options with the robot pushed into a corner), and check the robot sits in the
- * right place on Panels' Field tab, with the turret line through the hive cell. Then for each spot:
+ * <p>Localize first (gamepad 2 share / options with the robot pushed into a corner, during init or after start), and
+ * check the robot sits in the right place on Panels' Field tab, with the turret line through the hive cell. Hive vision
+ * picks the up cell like in TeleOp. Then for each spot:
  * 1. Drive there and stop, facing roughly at the hive. Flywheel on (gamepad 1 RB); turret and flywheel aim at the
  *    up cell for a standing shot.
  * 2. Shoot (hold gamepad 1 RT) and nudge the flywheel (gamepad 2 dpad up / down) until balls go through the middle.
@@ -103,12 +104,15 @@ public class ShotCalibration extends OpMode {
     private Result current; // at the DRAG_COEFFICIENT in RobotConstants
     private Result fitted;  // at the best drag, or null
     private String message = "";
+    /** Red-side corner picked during init, or null. Turned into a pose at start, once the alliance is final. */
+    private Pose initCorner = null;
 
     @Override
     public void init() {
         Scheduler.reset();
 
         robot = new Robot(hardwareMap);
+        robot.hiveVision.setEnabled(true); // the up cell, like TeleOp
         panels = PanelsTelemetry.INSTANCE.getTelemetry();
         panelsDisplay = new PanelsDisplay();
         if (MatchState.pose != null) {
@@ -120,13 +124,19 @@ public class ShotCalibration extends OpMode {
     @Override
     public void init_loop() {
         MatchState.selectAlliance(gamepad1, 1, telemetry);
+        if (gamepad2.shareWasPressed()) initCorner = RED_LEFT_CORNER;
+        if (gamepad2.optionsWasPressed()) initCorner = RED_RIGHT_CORNER;
         telemetry.addData("Saved spots", samples.size());
-        telemetry.addLine("Turret must face forward at init. Localize after start: gamepad 2 share / options in a corner");
+        telemetry.addData("Start pose", (initCorner == null ? "none"
+                : initCorner == RED_LEFT_CORNER ? "LEFT corner" : "RIGHT corner")
+                + "   (gamepad 2 share / options, now or after start)");
+        telemetry.addLine("Turret must face forward at init");
         telemetry.update();
     }
 
     @Override
     public void start() {
+        if (initCorner != null) robot.drivebase.setPose(MatchState.alliance.apply(initCorner));
         robot.start();
         double headingOffset = MatchState.alliance == Alliance.BLUE ? Math.PI : 0;
         // Standing shots: zero velocity for both, so they share one solve per loop
