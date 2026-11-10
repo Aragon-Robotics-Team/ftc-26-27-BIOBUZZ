@@ -79,7 +79,7 @@ public class RobotConstants {
     public static class Logging {
         // Write an .rlog of every TeleOp and Auto run to the Control Hub (FIRST/data/logs). Off until TeleOp testing:
         // it costs loop time and nothing reads the logs yet. The sim logs the robot's state whatever this says.
-        public static boolean ENABLED = false;
+        public static boolean ENABLED = true; // on for flywheel debugging (Nov 9)
     }
 
     /** Hive state from the Limelight 3A on the turret (HiveVision). */

@@ -191,6 +191,11 @@ public class Launcher implements Subsystem {
         return flywheelPower;
     }
 
+    /** Battery volts the flywheel feedforward used this loop (read a few times a second while spinning). */
+    public double getBatteryVolts() {
+        return batteryVolts;
+    }
+
     public double getTargetVelocity() {
         return targetVelocity;
     }
