@@ -15,7 +15,7 @@ import org.firstinspires.ftc.robotcore.external.Telemetry;
  * goBILDA RGB Indicator Light (PWM). Shows whether a shot right now would go in the hive:
  * blue = flywheel off, green = ready to shoot (there's a shot, flywheel at speed, turret on target),
  * red = spinning up or aiming, off = no shot from here.
- * orange (over all of those) = the turret is held at a soft limit (±90°), so turn the robot.
+ * orange (over all of those) = the turret is held at a soft limit (±112.5°), so turn the robot.
  * flash() shows white briefly to confirm a button press.
  */
 public class Led implements Subsystem {

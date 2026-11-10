@@ -38,7 +38,7 @@ The sim takes these from the same constants as the code, so it can't catch them:
 
 - **Turret direction:** command +30° and it should turn left (counterclockwise from above) and read +30°. The
   comment by `Launcher.TURRET_DIRECTION` and the setting disagree.
-- **Turret limits:** turn it by hand to ±90° (`TURRET_MIN_ANGLE`/`MAX`, a TODO from CAD): no hard stop, no pulled
+- **Turret limits:** turn it by hand to ±112.5° (`TURRET_MIN_ANGLE`/`MAX`, a TODO from CAD): no hard stop, no pulled
   Limelight cable. It swings to both in every 360° search turn.
 - **Turret encoder:** after a run, face it forward; it should read 0° ± 1. If it drifts, move the Through Bore to a
   hub port that keeps up with its count rate.

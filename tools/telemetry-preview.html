@@ -306,8 +306,8 @@ pre .fold { color: var(--muted); }
 
       <fieldset>
         <legend>Turret (+ = left)</legend>
-        <div class="row"><label for="turret">Actual</label><input type="range" id="turret" min="-90" max="90" step="0.5"><output for="turret" id="turret-out"></output></div>
-        <div class="row"><label for="turretTarget">Target</label><input type="range" id="turretTarget" min="-90" max="90" step="0.5"><output for="turretTarget" id="turretTarget-out"></output></div>
+        <div class="row"><label for="turret">Actual</label><input type="range" id="turret" min="-112.5" max="112.5" step="0.5"><output for="turret" id="turret-out"></output></div>
+        <div class="row"><label for="turretTarget">Target</label><input type="range" id="turretTarget" min="-112.5" max="112.5" step="0.5"><output for="turretTarget" id="turretTarget-out"></output></div>
         <div class="row"><label for="turTol">Margin ±</label><input type="range" id="turTol" min="0.2" max="5" step="0.1"><output for="turTol" id="turTol-out"></output></div>
         <div class="row"><label for="turNudge">Nudge</label><input type="range" id="turNudge" min="-5" max="5" step="1"><output for="turNudge" id="turNudge-out"></output></div>
       </fieldset>
@@ -395,7 +395,7 @@ function launcher(s) {
   else if (ready) status = "READY";
   else if (!hasShot) status = "NO_SHOT";
   else status = atSpeed ? "AIMING" : "SPINNING_UP";
-  const atLimit = Math.abs(s.turretTarget) >= 90; // TURRET_MIN_ANGLE / TURRET_MAX_ANGLE
+  const atLimit = Math.abs(s.turretTarget) >= 112.5; // TURRET_MIN_ANGLE / TURRET_MAX_ANGLE
   return { target, spinning, atSpeed, onTarget, hasShot, ready, status, atLimit };
 }
 
@@ -556,7 +556,7 @@ const scenarios = [
   ["Turret catching up", { turret: 4.0, turretTarget: 18.5, pose: { x: 20, y: 30, h: 45 } }],
   ["Flywheel over speed", { actual: 2110, target: 1860, pose: { x: 36, y: 76, h: 0 } }],
   ["Too close to reach", { feasible: false, lead: 0, turret: -35, turretTarget: -35.5, pose: { x: 50, y: 40, h: 90 } }],
-  ["Turret at its limit", { turret: 89.6, turretTarget: 90, pose: { x: 30, y: 100, h: -120 } }],
+  ["Turret at its limit", { turret: 112.1, turretTarget: 112.5, pose: { x: 30, y: 100, h: -120 } }],
   ["Flywheel off", { spinning: false, actual: 0, pose: { x: 100, y: 110, h: 180 } }],
   ["Turning to the right stick", { pose: { x: 30, y: 96, h: -30 }, headingTarget: 60 }],
   ["Operator nudged", { velNudge: 50, turNudge: -2, turretTarget: 10.9, turret: 10.6, actual: 2020, target: 1980 }],

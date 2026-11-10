@@ -289,8 +289,8 @@ public class RobotConstants {
         // so changing TURRET_DIRECTION means checking this again.
         public static boolean TURRET_ENCODER_REVERSED = false; // Oct 26
         // TODO: set turret soft limits from CAD
-        public static double TURRET_MIN_ANGLE = -Math.PI / 2;
-        public static double TURRET_MAX_ANGLE = Math.PI / 2;
+        public static double TURRET_MIN_ANGLE = Math.toRadians(-112.5); // ±90° plus 22.5° each side (Nov 9)
+        public static double TURRET_MAX_ANGLE = Math.toRadians(112.5);
         // Turret pivot relative to the robot center (inches, +x forward, +y left): the ring gear's axis (CAD, Oct 26)
         public static double TURRET_OFFSET_X = 1.02;
         public static double TURRET_OFFSET_Y = 0;
