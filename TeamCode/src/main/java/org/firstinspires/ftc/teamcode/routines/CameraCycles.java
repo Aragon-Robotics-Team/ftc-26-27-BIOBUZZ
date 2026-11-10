@@ -15,10 +15,8 @@ import com.qualcomm.robotcore.util.ElapsedTime;
 import org.firstinspires.ftc.robotcore.external.Telemetry;
 import org.firstinspires.ftc.teamcode.core.Alliance;
 import org.firstinspires.ftc.teamcode.core.Hive;
-import org.firstinspires.ftc.teamcode.core.HiveTags;
 import org.firstinspires.ftc.teamcode.core.MatchState;
 import org.firstinspires.ftc.teamcode.core.PollenChase;
-import org.firstinspires.ftc.teamcode.core.PoseFilter;
 import org.firstinspires.ftc.teamcode.core.Robot;
 import org.firstinspires.ftc.teamcode.core.RobotConstants;
 import org.firstinspires.ftc.teamcode.pedro.FusedLocalizer;
@@ -74,7 +72,6 @@ public class CameraCycles extends AutoRoutine {
     private static final double LOOSE_RADIUS = 40, LOOSE_S = 4;
 
     private final ElapsedTime clock = new ElapsedTime();
-    private final int ourHive;
     private final Pose park;
     private final List<Source> sources = new ArrayList<>();
 
@@ -104,7 +101,6 @@ public class CameraCycles extends AutoRoutine {
 
     public CameraCycles(Robot robot, Alliance alliance) {
         super(robot, alliance);
-        ourHive = alliance == Alliance.RED ? HiveTags.RED : HiveTags.BLUE;
         park = poses.topPark;
 
         sources.add(flower("rear flower", poses.flowerIntake));
@@ -132,6 +128,7 @@ public class CameraCycles extends AutoRoutine {
     @Override
     public void setUp() {
         robot.hiveVision.setEnabled(true);
+        robot.hiveVision.fuseTags(false); // the pose is the Pinpoint's alone: the tags pulled it off (to sort out later)
         robot.ballVision.keepToHalf(alliance); // G402: our side of the field in AUTO
         MatchState.hive = Hive.RIGHT;
         clock.reset(); // the match starts now
@@ -315,15 +312,11 @@ public class CameraCycles extends AutoRoutine {
     }
 
     private boolean tagsEverSeen() {
-        return filter().lastSeen(ourHive) > Double.NEGATIVE_INFINITY;
+        return robot.hiveVision.ourTagsSeenAt() > Double.NEGATIVE_INFINITY;
     }
 
     private boolean tagsSince(double time) {
-        return filter().lastSeen(ourHive) > time;
-    }
-
-    private PoseFilter filter() {
-        return robot.drivebase.getLocalizer().getFilter();
+        return robot.hiveVision.ourTagsSeenAt() > time;
     }
 
     // ---- Time ----

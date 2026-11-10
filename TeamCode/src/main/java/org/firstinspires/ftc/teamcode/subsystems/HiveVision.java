@@ -73,6 +73,8 @@ public class HiveVision implements Subsystem {
     private int switches = 0;
 
     private FusedLocalizer localizer;   // null: tags don't go to the pose
+    private boolean fuse = true;        // fuseTags(): off for an OpMode that keeps the pose to odometry
+    private double ourTagsAt = Double.NEGATIVE_INFINITY; // when one of our hive's tags was last in a frame
     // Turret angle each loop (a ring of the last TURRET_HISTORY), to look up where it was when a frame was taken
     private final double[] turretTimes = new double[TURRET_HISTORY], turretAngles = new double[TURRET_HISTORY];
     private int turretCount, turretNext;
@@ -101,8 +103,24 @@ public class HiveVision implements Subsystem {
         this.localizer = localizer;
     }
 
+    /**
+     * Whether this OpMode's pose takes the tags (when Localization.FUSE_HIVE_TAGS allows it at all). Off: the pose is
+     * odometry's alone. Before start().
+     */
+    public void fuseTags(boolean fuse) {
+        this.fuse = fuse;
+    }
+
     private boolean fusing() {
-        return localizer != null && RobotConstants.Localization.FUSE_HIVE_TAGS;
+        return localizer != null && fuse && RobotConstants.Localization.FUSE_HIVE_TAGS;
+    }
+
+    /**
+     * When one of our hive's tags was last in a frame, seconds on System.nanoTime's clock (NEGATIVE_INFINITY: never).
+     * Only while enabled.
+     */
+    public double ourTagsSeenAt() {
+        return ourTagsAt;
     }
 
     public boolean isAvailable() {
@@ -197,6 +215,7 @@ public class HiveVision implements Subsystem {
                     HiveReader.cellOf(id, MatchState.alliance)));
         }
         lastSeen = seen;
+        for (Seen s : seen) if (s.cell != null) ourTagsAt = now();
         lastFrame = HiveReader.read(tags, MatchState.alliance, LENS_HEIGHT, TILT, HEIGHT_THRESHOLD);
 
         Hive next = tracker.onFrame(now(), frameId, lastFrame.up, lastFrame.conflict, MatchState.hive);

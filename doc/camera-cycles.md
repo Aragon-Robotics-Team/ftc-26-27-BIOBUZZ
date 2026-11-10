@@ -18,6 +18,9 @@ they're counted into the cell that comes up at our first tip. Hive vision correc
 tags. Arriving at a launch spot and seeing none of our tags (after seeing them earlier) means that cell is down: it
 goes to the other one.
 
+The pose is the Pinpoint's alone: this auto doesn't fuse the hive's tags into it (`hiveVision.fuseTags(false)`),
+whatever `Localization.FUSE_HIVE_TAGS` says. The Limelight is used only to tell which cell is up.
+
 ## Before every match
 
 - **Partner:** in init, gamepad1 **triangle** toggles "partner shoots its preloads after our first tip" or "doesn't
@@ -30,7 +33,7 @@ goes to the other one.
 
 | What | Where | Now |
 |---|---|---|
-| Flower pickup: all 4 out? | `FLOWER_PUSH_S`, `FLOWER_S`, `FieldPoses.flowerIntake` | 1 s push + 0.8 s. The sim gets all 4. It needs the pose within about 2 in |
+| Flower pickup: all 4 out? | `FLOWER_PUSH_S`, `FLOWER_S`, `FieldPoses.flowerIntake` | 1 s push + 0.8 s. The sim gets all 4. It needs the pose within about 2 in of the tuned spot |
 | Alliance-wall flower spot | `FieldPoses.wallFlowerIntake` (worked out from the rear one) | untested on the robot |
 | Gate open long enough for 4 | `Gate.AUTO_SHOOT_MS` | 2000 ms; at 0.6 feed power, time 4 leaving and cut it to that plus a little |
 | Drive time estimates | `DRIVE_SPEED`, `DRIVE_MARGIN_S` | 30 in/s + 0.5 s |
@@ -42,14 +45,13 @@ The driver station's "Doing" line shows the stage, the time, what it holds, the 
 
 `CameraCyclesSimTest` (realistic drive). With a partner that shoots after our first tip: 2 tips by about 15 s,
 then 4 more pollen held for TeleOp, parked: 56 AUTO points. The same in blue, with a slow ball camera, no tags,
-0.1°/s IMU drift, scattered shots, and 9 of 10 varied matches (the 10th tips once). With a partner that only parks,
+scattered shots, and 9 of 10 varied matches (the 10th tips once). `./replay-auto.sh camera_cycles` runs it
+(AutoSimTest, with that partner) and opens it in AdvantageScope. With a partner that only parks,
 it tips twice alone (preloads, then both flowers into the rear cell) and parks at about 28 s.
 
 ## Known limits
 
 - Three tips don't fit. After the second, the third needs two more loads into the cell that came up.
-- The flowers need an accurate pose. Facing the rear flower, the hive is behind the robot, out of the turret's
-  ±112.5°, so no tags correct the pose there. With the IMU drifting 0.2°/s or more, the sim misses the rear flower
-  and scores 1 tip.
+- The flowers need the pose within about 2 in: an off pose misses the bottom pollen.
 - Nothing counts the balls inside the robot. A missed flower still counts 4. The launch-spot tag check catches the
   wrong count on the next shot, at the cost of a drive.
