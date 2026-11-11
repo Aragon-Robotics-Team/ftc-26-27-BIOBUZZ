@@ -80,6 +80,24 @@ public class FlywheelControllerTest {
     }
 
     @Test
+    public void hybridRecoversLikeBangBangAndHoldsLikePidf() {
+        double dip = 0.85 * TARGET;
+        RobotConstants.Launcher.FLYWHEEL_CONTROL = FlywheelControl.PIDF;
+        double pidf = run(new FlywheelController(), dip, 12.5, 0.02, 0.15);
+        RobotConstants.Launcher.FLYWHEEL_CONTROL = FlywheelControl.HYBRID;
+        double hybrid = run(new FlywheelController(), dip, 12.5, 0.02, 0.15);
+        assertTrue("PIDF " + pidf + ", hybrid " + hybrid, hybrid > pidf);
+        // Full power only well below target; near it, the same power as PIDF
+        FlywheelController controller = new FlywheelController();
+        assertEquals(1, controller.power(TARGET, TARGET - 2 * RobotConstants.Launcher.FLYWHEEL_FULL_POWER_ERROR, 12, 0.02), 0);
+        double near = new FlywheelController().power(TARGET, TARGET - 10, 12, 0.02);
+        RobotConstants.Launcher.FLYWHEEL_CONTROL = FlywheelControl.PIDF;
+        assertEquals(new FlywheelController().power(TARGET, TARGET - 10, 12, 0.02), near, 1e-9);
+        RobotConstants.Launcher.FLYWHEEL_CONTROL = FlywheelControl.HYBRID;
+        assertEquals(TARGET, run(new FlywheelController(), 0, 12.5, 0.02, 3), 5);
+    }
+
+    @Test
     public void neverRunsBackwardsAndStopsAtZeroTarget() {
         RobotConstants.Launcher.FLYWHEEL_CONTROL = FlywheelControl.PIDF;
         FlywheelController controller = new FlywheelController();

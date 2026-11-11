@@ -51,7 +51,7 @@ public class RobotConstants {
         public static double OUTTAKE_POWER = -1.0;
         // While shooting. The intake drives the transfer, so this sets how fast balls go into the flywheel. Lowered from
         // 1.0 (Nov 9): at full power balls came 0.13 s apart and the flywheel needs 0.2-0.5 s to recover from each one
-        public static double FEED_POWER = 0.6;
+        public static double FEED_POWER = 0.75;
         public static double FLOWER_INTAKE_MS = 300; // how long Auto waits at a flower with the intake on TODO tune
         public static int CAPACITY = 4;              // balls the robot holds
     }
@@ -269,9 +269,15 @@ public class RobotConstants {
         /** How the flywheel holds its speed. Both run in our own loop (subsystems.FlywheelController), not the hub's. */
         public enum FlywheelControl {
             PIDF,     // battery-compensated feedforward plus PID on the speed error
-            BANG_BANG // full power below target, the feedforward at or above it
+            BANG_BANG, // full power below target, the feedforward at or above it
+            HYBRID     // full power while more than FLYWHEEL_FULL_POWER_ERROR below target, PIDF closer in
         }
-        public static FlywheelControl FLYWHEEL_CONTROL = FlywheelControl.BANG_BANG;
+        // Nov 10 logs: bang-bang overshot ~+8-10% after each ball (the speed reading lags ~0.1 s) and PIDF recovered too
+        // slowly for the next ball. Hybrid gets bang-bang's recovery from a ball and PIDF's hold
+        public static FlywheelControl FLYWHEEL_CONTROL = FlywheelControl.HYBRID;
+        // HYBRID: ticks/sec below target where full power hands over to PIDF. Lower recovers harder but overshoots more
+        // (the reading lags); 40 was best in a sim of balls 0.17 s apart (FEED_POWER 0.75). TODO: check in the logs
+        public static double FLYWHEEL_FULL_POWER_ERROR = 40;
         // Feedforward: power at 12 V to hold a speed, scaled by 12 / battery volts so it holds the same on a tired battery.
         // The Flywheel Auto Tuner prints KV. A little low is fine; too high and the flywheel settles above target.
         public static double FLYWHEEL_KV = 0.000525; // power per tick/sec (Nov 9)
