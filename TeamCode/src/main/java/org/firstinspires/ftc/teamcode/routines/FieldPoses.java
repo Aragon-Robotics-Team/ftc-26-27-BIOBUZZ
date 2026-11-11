@@ -50,7 +50,24 @@ public class FieldPoses {
     /** Out from our garden corner, the ball camera on the garden's row of pollen. */
     public final Pose gardenLook;
 
-
+    // Clearing the flowers (OneCycleGardenParkWithFlowers): slide back and forth along the wall beside each flower to
+    // knock its pollen out
+    /** Out from the garden toward the alliance-wall flower. Heading is the direction of travel from adjustToPark. */
+    public final Pose allianceFlowerApproach;
+    /** Against the alliance wall, on the audience side of its flower, facing the wall. */
+    public final Pose allianceFlowerLow;
+    /** Slid 5 in along the alliance wall toward the flower. */
+    public final Pose allianceFlowerHigh;
+    /** Backed off the alliance wall, ready to head for the rear. */
+    public final Pose allianceFlowerBackOff;
+    /** Partway to the rear-wall flower. Heading is the direction of travel from allianceFlowerBackOff. */
+    public final Pose rearFlowerApproach;
+    /** Against the rear wall, on the alliance-wall side of its flower, facing the wall. */
+    public final Pose rearFlowerLeft;
+    /** Slid 5 in along the rear wall toward the flower. */
+    public final Pose rearFlowerRight;
+    /** Backed off the rear wall. */
+    public final Pose rearFlowerBackOff;
 
     /** Where to shoot into a cell from (rightLaunch / leftLaunch). */
     public Pose launch(Hive cell) {
@@ -78,7 +95,12 @@ public class FieldPoses {
         // The camera looks 20° left of the intake (RobotConstants.BallVision.YAW): heading = where to look - 20°
         allianceWallStart = poseFactory.of(RobotConstants.Field.WALL + RobotConstants.Field.ROBOT_LENGTH / 2, 36, 0);
         gardenLook = poseFactory.of(30, 16, 190);
-
-
-    }
+        allianceFlowerApproach = poseFactory.of(17, 35, 153.6048);
+        allianceFlowerLow = poseFactory.of(10, 35, 180);
+        allianceFlowerHigh = poseFactory.of(10, 40, 180);
+        allianceFlowerBackOff = poseFactory.of(16.3053, 40, 180);
+        rearFlowerApproach = poseFactory.of(34, 118.764, 77.3384);
+        rearFlowerLeft = poseFactory.of(35, 132, 90);
+        rearFlowerRight = poseFactory.of(40, 132, 90);
+        rearFlowerBackOff = poseFactory.of(40, 125, 90);    }
 }

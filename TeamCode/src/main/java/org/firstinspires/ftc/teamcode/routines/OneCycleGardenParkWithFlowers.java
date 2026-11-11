@@ -6,8 +6,6 @@ import static com.pedropathing.ivy.groups.Groups.deadline;
 import static com.pedropathing.ivy.groups.Groups.sequential;
 import static com.pedropathing.ivy.pedro.PedroCommands.follow;
 
-import com.pedropathing.api.Paths;
-import com.pedropathing.api.PoseFactory;
 import com.pedropathing.ivy.Command;
 import com.pedropathing.math.Pose;
 import com.pedropathing.paths.Path;
@@ -16,95 +14,11 @@ import org.firstinspires.ftc.teamcode.core.Alliance;
 import org.firstinspires.ftc.teamcode.core.Robot;
 
 /**
- * 1 Cycle + Garden + Park (doc/auto-pathing.md, doc/autoPP/red_1cycle_park.pp): shoot the preloads, collect the
- * garden pollen, then park on the bottom side of the loading zone with it still on board.
+ * 1 Cycle + Garden + Flowers + Park: {@link OneCycleGardenPark}, then instead of parking straight away, knock the
+ * pollen out of the alliance-wall flower and the rear-wall flower by sliding back and forth against each, then park
+ * on the top side of the loading zone with the intake still running.
  */
 public class OneCycleGardenParkWithFlowers extends AutoRoutine {
-    private final PoseFactory poseFactory = PoseFactory.degrees();
-
-    private final Pose start = poseFactory.of(38.561, 24.2993, 90);
-    private final Pose point1 = poseFactory.of(17, 35, 153.6048);
-    private final Pose point2Start = poseFactory.of(17, 35, 180);
-    private final Pose point2 = poseFactory.of(10, 35, 180);
-    private final Pose point3Start = poseFactory.of(10, 35, 180);
-    private final Pose point3 = poseFactory.of(10, 40, 180);
-    private final Pose point4Start = poseFactory.of(10, 40, 180);
-    private final Pose point4 = poseFactory.of(10, 35, 180);
-    private final Pose point5 = poseFactory.of(16.3053, 40, 180);
-    private final Pose point6 = poseFactory.of(34, 118.764, 77.3384);
-    private final Pose point7Start = poseFactory.of(34, 118.764, 90);
-    private final Pose point7 = poseFactory.of(35, 132, 90);
-    private final Pose point8Start = poseFactory.of(35, 132, 90);
-    private final Pose point8 = poseFactory.of(40, 132.125, 90);
-    private final Pose point9Start = poseFactory.of(40, 132.125, 90);
-    private final Pose point9 = poseFactory.of(35, 132, 90);
-    private final Pose point10Start = poseFactory.of(35, 132, 90);
-    private final Pose point10 = poseFactory.of(40, 132, 90);
-    private final Pose point11Start = poseFactory.of(40, 132, 90);
-    private final Pose point11 = poseFactory.of(35, 132, 90);
-    private final Pose point12Start = poseFactory.of(35, 132, 90);
-    private final Pose point12 = poseFactory.of(40, 132, 90);
-    private final Pose point13 = poseFactory.of(40, 125, 90);
-    private final Pose point14Start = poseFactory.of(40, 125, 90);
-    private final Pose point14 = poseFactory.of(10, 118, 90);
-
-    public Path path1() {
-        return Paths.line(start, point1).tangent();
-    }
-
-    public Path path2() {
-        return Paths.line(point2Start, point2).linear(point2Start, point2);
-    }
-
-    public Path path3() {
-        return Paths.line(point3Start, point3).linear(point3Start, point3);
-    }
-
-    public Path path4() {
-        return Paths.line(point4Start, point4).linear(point4Start, point4);
-    }
-
-    public Path path8() {
-        return Paths.line(point7, point8).reverseTangent();
-    }
-
-    public Path path9() {
-        return Paths.line(point8, point9).tangent();
-    }
-
-    public Path path10() {
-        return Paths.line(point10Start, point10).linear(point10Start, point10);
-    }
-
-    public Path path11() {
-        return Paths.line(point11Start, point11).linear(point11Start, point11);
-    }
-
-    public Path path12() {
-        return Paths.line(point12Start, point12).linear(point12Start, point12);
-    }
-
-    public Path path13() {
-        return Paths.line(point13Start, point13).linear(point13Start, point13);
-    }
-
-    public Path path14() {
-        return Paths.line(point14Start, point14).linear(point14Start, point14);
-    }
-
-    public Path path15() {
-        return Paths.line(point15Start, point15).linear(point15Start, point15);
-    }
-
-    public Path path16() {
-        return Paths.line(point15, point16).reverseTangent();
-    }
-
-    public Path path17() {
-        return Paths.line(point17Start, point17).linear(point17Start, point17);
-    } //end of flower code
-
-
     public OneCycleGardenParkWithFlowers(Robot robot, Alliance alliance) {
         super(robot, alliance);
     }
@@ -139,8 +53,48 @@ public class OneCycleGardenParkWithFlowers extends AutoRoutine {
         return line(poses.gardenIntake, poses.adjustToPark).linear(poses.gardenIntake, poses.adjustToPark);
     }
 
+    private Path toAllianceFlower() {
+        return line(poses.adjustToPark, poses.allianceFlowerApproach).tangent();
+    }
+
+    private Path allianceFlowerIn() {
+        return line(poses.allianceFlowerApproach, poses.allianceFlowerLow).linear(poses.allianceFlowerApproach, poses.allianceFlowerLow);
+    }
+
+    private Path allianceFlowerUp() {
+        return line(poses.allianceFlowerLow, poses.allianceFlowerHigh).linear(poses.allianceFlowerLow, poses.allianceFlowerHigh);
+    }
+
+    private Path allianceFlowerDown() {
+        return line(poses.allianceFlowerHigh, poses.allianceFlowerLow).linear(poses.allianceFlowerHigh, poses.allianceFlowerLow);
+    }
+
+    private Path allianceFlowerOut() {
+        return line(poses.allianceFlowerLow, poses.allianceFlowerBackOff).linear(poses.allianceFlowerLow, poses.allianceFlowerBackOff);
+    }
+
+    private Path toRearFlower() {
+        return line(poses.allianceFlowerBackOff, poses.rearFlowerApproach).tangent();
+    }
+
+    private Path rearFlowerIn() {
+        return line(poses.rearFlowerApproach, poses.rearFlowerLeft).linear(poses.rearFlowerApproach, poses.rearFlowerLeft);
+    }
+
+    private Path rearFlowerSlideRight() {
+        return line(poses.rearFlowerLeft, poses.rearFlowerRight).linear(poses.rearFlowerLeft, poses.rearFlowerRight);
+    }
+
+    private Path rearFlowerSlideLeft() {
+        return line(poses.rearFlowerRight, poses.rearFlowerLeft).linear(poses.rearFlowerRight, poses.rearFlowerLeft);
+    }
+
+    private Path rearFlowerOut() {
+        return line(poses.rearFlowerRight, poses.rearFlowerBackOff).linear(poses.rearFlowerRight, poses.rearFlowerBackOff);
+    }
+
     private Path park() {
-        return line(poses.adjustToPark, poses.bottomPark).linear(poses.adjustToPark, poses.bottomPark);
+        return line(poses.rearFlowerBackOff, poses.topPark).linear(poses.rearFlowerBackOff, poses.topPark);
     }
 
     @Override
@@ -161,7 +115,24 @@ public class OneCycleGardenParkWithFlowers extends AutoRoutine {
                 follow(follower, gardenIntakeBack()),
                 follow(follower, gardenIntake2()).raceWith(waitMs(1500)),
                 waitMs(1000),
-                follow(follower, adjustBeforePark())
+                follow(follower, adjustBeforePark()),
+
+                // Alliance-wall flower: slide along the wall and back to knock its pollen out (intake still on)
+                follow(follower, toAllianceFlower()),
+                follow(follower, allianceFlowerIn()),
+                follow(follower, allianceFlowerUp()),
+                follow(follower, allianceFlowerDown()),
+                follow(follower, allianceFlowerOut()),
+
+                // Rear-wall flower: slide back and forth three times to get all of its pollen out
+                follow(follower, toRearFlower()),
+                follow(follower, rearFlowerIn()),
+                follow(follower, rearFlowerSlideRight()),
+                follow(follower, rearFlowerSlideLeft()),
+                follow(follower, rearFlowerSlideRight()),
+                follow(follower, rearFlowerSlideLeft()),
+                follow(follower, rearFlowerSlideRight()),
+                follow(follower, rearFlowerOut())
         );
 
         return sequential(

@@ -16,6 +16,7 @@ import java.util.List;
 //super advanced reflection stuff wow!
 public enum Routines {
     ONE_CYCLE_GARDEN_PARK(OneCycleGardenPark.class),
+    ONE_CYCLE_GARDEN_PARK_WITH_FLOWERS(OneCycleGardenParkWithFlowers.class),
     TWO_CYCLE_GARDEN_PARK(TwoCycleGardenPark.class),
     ONE_CYCLE_FLOWER_PARK(OneCycleFlowerPark.class),
     TWO_CYCLE_FLOWER_PARK(TwoCycleFlowerPark.class),
