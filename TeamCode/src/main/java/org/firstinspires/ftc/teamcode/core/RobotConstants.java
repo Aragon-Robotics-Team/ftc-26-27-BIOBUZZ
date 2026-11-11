@@ -346,6 +346,21 @@ public class RobotConstants {
         public static double SCORING_MARGIN = 0.5; // inches the ball's edge must clear each side of the opening by
         // Ready to shoot once flywheel and turret errors are within this fraction of what the shot can take
         public static double READY_WINDOW_FRACTION = 0.5;
+
+        // ---- Shot table (core.ShotTable) ----
+        // Flywheel speed from measured spots instead of the shot model: the model's speeds were inconsistent (Nov 10).
+        // The turret still aims with the model (it leads the target on the move). Fill the table with the Shot Table
+        // Calibration OpMode; it lives in /sdcard/FIRST/data/shot_table.csv on the robot. The repo's copy,
+        // TeamCode/src/main/assets/shot_table.csv, is used when the robot has no file of its own.
+        // With the table empty (or this false) the flywheel goes back to the model.
+        public static boolean USE_SHOT_TABLE = true;
+        // How far past the nearest / farthest entry (inches) the table still extrapolates and calls it a shot
+        public static double SHOT_TABLE_EXTRAPOLATE = 12;
+        // Entries within this many inches of each other are averaged into one point before interpolating, so repeat
+        // saves at about the same distance smooth out noise rather than zig-zag. 0 interpolates through every entry
+        public static double SHOT_TABLE_MERGE = 3;
+        // Flywheel at-speed window with the table when the model has no margin for this shot (ticks/sec either way)
+        public static double SHOT_TABLE_TOLERANCE = 40;
     }
 
     /** Red-side poses in Pedro coordinates (inches). Blue is rotated 180° with Alliance.apply; never write blue poses. */

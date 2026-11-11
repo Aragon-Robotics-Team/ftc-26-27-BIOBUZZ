@@ -243,6 +243,8 @@ public class Robot {
         Logger.recordOutput("Launcher/flywheelTarget", launcher.getTargetVelocity());
         Logger.recordOutput("Launcher/flywheelActual", launcher.getFlywheelVelocity());
         Logger.recordOutput("Launcher/flywheelNudge", launcher.getVelocityNudge());
+        Logger.recordOutput("Launcher/usingShotTable", launcher.isUsingShotTable());
+        Logger.recordOutput("Launcher/tableDistance", launcher.getTableDistance());
         Logger.recordOutput("Launcher/flywheelPower", launcher.getFlywheelPower());
         Logger.recordOutput("Launcher/batteryVolts", launcher.getBatteryVolts());
         Logger.recordOutput("Launcher/ready", launcher.isReady());
