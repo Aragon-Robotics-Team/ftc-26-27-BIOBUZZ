@@ -61,6 +61,7 @@ public class OneCycleGardenPark extends AutoRoutine {
         Command cycle = sequential(
                 // Preloads
                 follow(follower, startToLaunch()),
+                waitMs(2000),
                 robot.shoot(),
                 // Tip
                 robot.flipHive(),
