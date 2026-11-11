@@ -73,15 +73,15 @@ public class OneCycleGardenPark extends AutoRoutine {
                 follow(follower, gardenIntakeBack()),
                 follow(follower, gardenIntake2()).raceWith(waitMs(1500)),
                 waitMs(1000),
-                follow(follower, adjustBeforePark()),
-                waitMs(3000),
-                robot.intake.off()
+                follow(follower, adjustBeforePark())
         );
 
         return sequential(
                 // Keep the turret on the hive and the flywheel at the right speed while cycling
                 deadline(cycle, robot.aimAtHive(), robot.enableFlywheel()),
-                follow(follower, park())
+                follow(follower, park()),
+                waitMs(3000),
+                robot.intake.off()
         );
     }
 }
