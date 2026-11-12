@@ -14,7 +14,9 @@ import org.firstinspires.ftc.robotcore.external.Telemetry;
 import org.firstinspires.ftc.teamcode.core.Hive;
 import org.firstinspires.ftc.teamcode.core.MatchState;
 import org.firstinspires.ftc.teamcode.core.Robot;
+import org.firstinspires.ftc.teamcode.pedro.FusedLocalizer;
 import org.firstinspires.ftc.teamcode.routines.AutoRoutine;
+import org.firstinspires.ftc.teamcode.routines.FieldPoses;
 import org.firstinspires.ftc.teamcode.routines.Routines;
 import org.firstinspires.ftc.teamcode.util.Html;
 import org.firstinspires.ftc.teamcode.util.MatchLog;
@@ -28,6 +30,10 @@ import java.util.List;
 public class Auto extends OpMode {
     // Static so the last pick is remembered between runs
     private static Routines selected = null;
+    // Lined up on the routine's INIT spot and dragged to the start (else placed at the start pose). Gamepad 1 cross
+    private static boolean fromInitSpot = true;
+    // The Pinpoint settles (and calibrates its gyro) after INIT: the INIT spot is read this long after
+    private static final double INIT_SPOT_READ_S = 0.5;
 
     private Robot robot;
     private Follower follower;
@@ -36,6 +42,8 @@ public class Auto extends OpMode {
     private AutoRoutine running; // the one start() scheduled
     private PanelsDisplay panelsDisplay;
     private final ElapsedTime loopTimer = new ElapsedTime();
+    private final ElapsedTime sinceInit = new ElapsedTime();
+    private Pose initSpotRaw = null; // the Pinpoint's pose with the robot on the INIT spot, null until read
 
     @Override
     public void init() {
@@ -53,6 +61,7 @@ public class Auto extends OpMode {
         routines = Routines.enabled();
         if (routines.isEmpty()) throw new IllegalStateException("Every routine is @Disabled");
         if (!routines.contains(selected)) selected = routines.get(0);
+        sinceInit.reset();
     }
 
     @Override
@@ -70,8 +79,7 @@ public class Auto extends OpMode {
         } else robot.ballVision.stop(); // opened scrolling past one that does: its pipeline would eat loop time
 
         telemetry.addData("Routine", "%s   (%d/%d, dpad ↑↓)", bold(selected.toString()), index + 1, routines.size());
-        Pose start = routine.startPose();
-        telemetry.addData("Place robot at", "x %.1f  y %.1f  h %.0f°", start.x(), start.y(), Math.toDegrees(start.heading()));
+        showStart(routine);
         // The turret was zeroed at INIT: if it's been turned since, the aim and the fused heading are off by as much
         double turret = Math.toDegrees(robot.launcher.readTurretAngle());
         if (Math.abs(turret) > 2) {
@@ -92,7 +100,7 @@ public class Auto extends OpMode {
     public void start() {
         // Alliance and routine are picked in init_loop, so the routine is built here instead of init()
         AutoRoutine routine = selected.create(robot, MatchState.alliance);
-        follower.setPose(routine.startPose());
+        follower.setPose(startPose(routine));
         routine.setUp();
 
         robot.start();
@@ -101,6 +109,50 @@ public class Auto extends OpMode {
         schedule(routine.autoRoutine());
         running = routine;
         loopTimer.reset();
+    }
+
+    /** The INIT spot (read once the Pinpoint has settled, or again on triangle), the drag so far, and where that puts us. */
+    private void showStart(AutoRoutine routine) {
+        FusedLocalizer localizer = robot.drivebase.getLocalizer();
+        localizer.update(); // only reads the Pinpoint: nothing moves
+        Pose raw = localizer.getOdometryPose();
+        if (initSpotRaw == null && sinceInit.seconds() > INIT_SPOT_READ_S) initSpotRaw = raw;
+        if (gamepad1.triangleWasPressed()) initSpotRaw = raw;
+        if (gamepad1.crossWasPressed()) fromInitSpot = !fromInitSpot;
+
+        Pose start = routine.startPose();
+        FieldPoses.InitSpot spot = routine.initSpot();
+        if (spot == null || !fromInitSpot) {
+            telemetry.addData("Place robot at", "x %.1f  y %.1f  h %.0f°", start.x(), start.y(), Math.toDegrees(start.heading()));
+            if (spot != null) telemetry.addLine("(cross: line up on the INIT spot and drag it there instead)");
+            return;
+        }
+        telemetry.addLine(bold("INIT spot: ") + spot.hint + "   (cross: placed at the start instead)");
+        if (initSpotRaw == null) {
+            telemetry.addLine(Html.color(bold("Hold still: reading the INIT spot"), Html.YELLOW));
+            return;
+        }
+        Pose now = spot.afterDrag(initSpotRaw, raw);
+        double dragged = Math.hypot(raw.x() - initSpotRaw.x(), raw.y() - initSpotRaw.y());
+        double turned = Math.toDegrees(Math.abs(Math.atan2(Math.sin(now.heading() - spot.pose.heading()),
+                Math.cos(now.heading() - spot.pose.heading()))));
+        telemetry.addData("Dragged", "%.1f in, turned %.1f°  ->  start x %.1f  y %.1f  h %.0f°   (triangle: it's on the INIT spot now)",
+                dragged, turned, now.x(), now.y(), Math.toDegrees(now.heading()));
+        double off = Math.hypot(now.x() - start.x(), now.y() - start.y());
+        if (dragged < 3) {
+            telemetry.addLine(Html.color(bold("Not dragged yet: drag it to the wall"), Html.YELLOW));
+        } else if (off > 6) {
+            telemetry.addLine(Html.color(bold(String.format("%.0f in from where the route starts: check the INIT spot", off)), Html.RED));
+        }
+    }
+
+    /** The routine's start pose, or with an INIT spot, that spot plus the drag the Pinpoint measured since. */
+    private Pose startPose(AutoRoutine routine) {
+        FieldPoses.InitSpot spot = routine.initSpot();
+        if (spot == null || !fromInitSpot || initSpotRaw == null) return routine.startPose();
+        FusedLocalizer localizer = robot.drivebase.getLocalizer();
+        localizer.update();
+        return spot.afterDrag(initSpotRaw, localizer.getOdometryPose());
     }
 
     @Override

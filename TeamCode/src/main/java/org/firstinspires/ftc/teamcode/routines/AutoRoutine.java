@@ -39,6 +39,14 @@ public abstract class AutoRoutine {
     /** Where the robot is placed at the start of the match. */
     public abstract Pose startPose();
 
+    /**
+     * Where to line the robot up at INIT before dragging it to startPose(), or null to place it at startPose() directly.
+     * Auto takes the start pose from this spot plus the drag the Pinpoint measured.
+     */
+    public FieldPoses.InitSpot initSpot() {
+        return null;
+    }
+
     /** The whole auto as one command. */
     public abstract Command autoRoutine();
 

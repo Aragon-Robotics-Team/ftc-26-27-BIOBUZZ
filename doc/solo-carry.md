@@ -14,8 +14,10 @@ drifting. All tip and park: 36 points, 2 to 4 pollen in the up cell.
 
 ## Before every match
 
-- **Start pose:** back against the alliance wall on tile A2, facing the field (`FieldPoses.allianceWallStart`; the init
-  screen shows the numbers). Set down within an inch or two: the sim's off-by-1.5 in, 5° runs still scored 49.
+- **Start pose:** back against the alliance wall on tile A2, facing the field (`FieldPoses.allianceWallStart`). Line
+  up on the INIT spot first (`FieldPoses.allianceWallInitSpot`, one tile out, edges on tile lines; the init screen
+  says how), INIT, then drag it back to the wall: the Pinpoint measures the drag, so the start pose doesn't lean on
+  the wall. Within an inch or two of A2's middle is plenty: the sim's off-by-1.5 in, 5° runs still scored 49.
 - **Turret facing forward at INIT, and not touched after:** INIT zeroes it where it is, and a zero error goes
   straight into the aim and the fused heading. The init screen shows its angle, red if it's more than 2° off: face
   it forward and INIT again.

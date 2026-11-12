@@ -29,6 +29,11 @@ public class TwoCycleFlowerPark extends AutoRoutine {
         return poses.start;
     }
 
+    @Override
+    public FieldPoses.InitSpot initSpot() {
+        return poses.startInitSpot;
+    }
+
     // Path methods
     private Path startToLaunch() {
         return line(poses.start, poses.startLaunch).linear(poses.start, poses.startLaunch);

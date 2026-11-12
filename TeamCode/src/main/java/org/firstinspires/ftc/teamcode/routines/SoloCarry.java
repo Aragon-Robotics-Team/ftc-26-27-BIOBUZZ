@@ -87,6 +87,11 @@ public class SoloCarry extends AutoRoutine {
     }
 
     @Override
+    public FieldPoses.InitSpot initSpot() {
+        return poses.allianceWallInitSpot;
+    }
+
+    @Override
     public boolean usesBallVision() {
         return true;
     }

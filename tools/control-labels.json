@@ -36,7 +36,9 @@
 
   "Auto": {
     "init.gamepad1.dpad_up": "Previous routine",
-    "init.gamepad1.dpad_down": "Next routine"
+    "init.gamepad1.dpad_down": "Next routine",
+    "init.gamepad1.triangle": "The robot is on the INIT spot now (re-read it before dragging)",
+    "init.gamepad1.cross": "Start from: INIT spot + drag / placed at the start pose"
   },
 
   "Planned Path Test": {
