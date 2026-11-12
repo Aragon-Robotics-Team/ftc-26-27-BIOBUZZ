@@ -395,6 +395,8 @@ public class RobotConstants {
         // Robot frame, inches: width side to side, length front to back.
         public static double ROBOT_WIDTH = 15.748; //see below (incldues number sign) Oct 26
         public static double ROBOT_LENGTH = 16; // Oct 30
+        // Drivetrain side to side, without the number plate: what we line up on tile edges by (Nov 12)
+        public static double DRIVETRAIN_WIDTH = 15.30315;
 
         // Pose resets: robot pushed into the corner, back against the alliance wall, so the center is half the
         // length off the alliance wall and half the width off the side wall.

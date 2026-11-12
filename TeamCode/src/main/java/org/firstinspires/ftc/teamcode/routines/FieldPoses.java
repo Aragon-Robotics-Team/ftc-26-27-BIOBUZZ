@@ -86,11 +86,11 @@ public class FieldPoses {
     public final Pose gardenLook;
 
     /**
-     * The poses from start to flowerShoot were tuned with the robot's side on the tile edge at x = 48 while the code had
-     * it at x = 56.8946, this much further out; they're written as tuned and moved back by it, so the robot drives the
+     * The poses from start to flowerShoot were tuned with the drivetrain's side on the tile edge at x = 48 while the code
+     * had it at x = 56.8946, this much further out; they're written as tuned and moved back by it, so the robot drives the
      * same moves now that the start pose is where the robot really is (Nov 10).
      */
-    private static final double TUNED_X_BIAS = 56.8946 - (48 + 15.748 / 2);
+    private static final double TUNED_X_BIAS = 56.8946 - (48 + 15.30315 / 2);
 
 
 
@@ -100,8 +100,9 @@ public class FieldPoses {
     }
 
     public FieldPoses(PoseFactory poseFactory) {
-        double width = RobotConstants.Field.ROBOT_WIDTH, length = RobotConstants.Field.ROBOT_LENGTH;
-        // Back against the audience wall, the side nearest our driver station on the tile edge at x = 48. The poses down
+        // Lined up on tile edges by the drivetrain's sides (not the number plate)
+        double width = RobotConstants.Field.DRIVETRAIN_WIDTH, length = RobotConstants.Field.ROBOT_LENGTH;
+        // Back against the audience wall, the drivetrain's side nearest our driver station on the tile edge at x = 48. The poses down
         // to topPark were tuned on the robot (Oct 30) from a start of y = 5.0366, 4.2134 in short of where the robot
         // really sits, so they're all 4.2134 in up from what was tuned: the same moves on the field
         start = poseFactory.of(48 + width / 2, RobotConstants.Field.WALL + length / 2, 90);
