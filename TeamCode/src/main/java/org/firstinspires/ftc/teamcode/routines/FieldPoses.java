@@ -95,7 +95,7 @@ public class FieldPoses {
         adjustToPark = poseFactory.of(38.561, 24.2993, -90);
         bottomPark = poseFactory.of(10.5389, 96.1701, 0);
         topPark = poseFactory.of(11.4049, 124.6458, 0);
-        gardenCenterLine = poseFactory.of(60, 40, 90);
+        gardenCenterLine = poseFactory.of(60, 40, 90); // TODO: tune position
         flowerReady = poseFactory.of(10, 60, 180);
         flowerKnock = poseFactory.of(10, 55, 180);
         flowerOut = poseFactory.of(30, 60, 180);
@@ -108,10 +108,10 @@ public class FieldPoses {
         allianceWallStart = poseFactory.of(RobotConstants.Field.WALL + RobotConstants.Field.ROBOT_LENGTH / 2, 36, 0);
         gardenLook = poseFactory.of(30, 16, 190);
         redLeftFlowerApproach = poseFactory.of(23,60.8,180);
-        redLeftFlowerIn = poseFactory.of(13.1, 59.2, 180);
-        redLeftFlowerOut = poseFactory.of(17.4, 60.8, 180);
+        redLeftFlowerIn = poseFactory.of(12.1, 60.2, 180);
+        redLeftFlowerOut = poseFactory.of(12.1, 62.2, 180);
         redLeftFlowerBackout = poseFactory.of(20.3, 60.8, 180);
-        redFarFlowerIn = poseFactory.of(61.5, 133, 90);
-        redFarFlowerOut = poseFactory.of(66.1, 133, 90);
+        redFarFlowerIn = poseFactory.of(58, 134, 90);
+        redFarFlowerOut = poseFactory.of(60.1, 134, 90);
         redFarFlowerBackout = poseFactory.of(66.1, 121.8, 90);    }
 }
