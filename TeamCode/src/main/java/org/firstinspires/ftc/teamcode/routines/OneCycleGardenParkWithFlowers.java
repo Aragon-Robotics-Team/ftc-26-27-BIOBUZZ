@@ -61,8 +61,12 @@ public class OneCycleGardenParkWithFlowers extends AutoRoutine {
     }
 
     // Left flower: arrive at the Out spot facing the wall, slide In / Out / In, then back off the wall
+    private Path approachLeftFlower() {
+        return line(poses.adjustToPark, poses.redLeftFlowerApproach).linear(poses.adjustToPark, poses.redLeftFlowerApproach);
+    }
+
     private Path toLeftFlower() {
-        return line(poses.adjustToPark, poses.redLeftFlowerOut).linear(poses.adjustToPark, poses.redLeftFlowerOut);
+        return line(poses.redLeftFlowerApproach, poses.redLeftFlowerOut).linear(poses.redLeftFlowerApproach, poses.redLeftFlowerOut);
     }
 
     private Path leftFlowerIn() {
@@ -123,6 +127,7 @@ public class OneCycleGardenParkWithFlowers extends AutoRoutine {
                 follow(follower, adjustBeforePark()),
 
                 // Left flower: slide in and out against it to knock its pollen out (intake still on)
+                follow(follower, approachLeftFlower()),
                 follow(follower, toLeftFlower()),
                 follow(follower, leftFlowerIn()).raceWith(waitMs(1500)),
                 waitMs(500),

@@ -62,6 +62,8 @@ public class FieldPoses {
     /**
      * Knock out the balls from flowers
      * */
+    /** Adjust so don't hit flower. */
+    public final Pose redLeftFlowerApproach;
     /** Go in to flower by red alliance side. */
     public final Pose redLeftFlowerIn;
     /** Back out slightly of flower by red alliance side. */
@@ -105,10 +107,11 @@ public class FieldPoses {
         // The camera looks 20° left of the intake (RobotConstants.BallVision.YAW): heading = where to look - 20°
         allianceWallStart = poseFactory.of(RobotConstants.Field.WALL + RobotConstants.Field.ROBOT_LENGTH / 2, 36, 0);
         gardenLook = poseFactory.of(30, 16, 190);
+        redLeftFlowerApproach = poseFactory.of(23,60.8,180);
         redLeftFlowerIn = poseFactory.of(13.1, 59.2, 180);
-        redLeftFlowerOut = poseFactory.of(13.4, 60.8, 180);
+        redLeftFlowerOut = poseFactory.of(17.4, 60.8, 180);
         redLeftFlowerBackout = poseFactory.of(20.3, 60.8, 180);
-        redFarFlowerIn = poseFactory.of(61.5, 132, 90);
-        redFarFlowerOut = poseFactory.of(66.1, 132, 90);
+        redFarFlowerIn = poseFactory.of(61.5, 133, 90);
+        redFarFlowerOut = poseFactory.of(66.1, 133, 90);
         redFarFlowerBackout = poseFactory.of(66.1, 121.8, 90);    }
 }
