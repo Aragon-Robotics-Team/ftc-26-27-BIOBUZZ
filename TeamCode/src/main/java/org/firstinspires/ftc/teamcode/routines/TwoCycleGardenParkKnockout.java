@@ -56,15 +56,15 @@ public class TwoCycleGardenParkKnockout extends AutoRoutine {
     }
 
     private Path launchToFlower(){
-        return line(poses.flowerLaunch, poses.rearFlowerRight).linear(poses.flowerLaunch, poses.rearFlowerRight);
+        return line(poses.flowerLaunch, poses.redFarFlowerIn).linear(poses.flowerLaunch, poses.redFarFlowerIn);
     }
 
     private Path flowerToBack(){
-        return line(poses.rearFlowerRight, poses.rearFlowerBackOff).linear(poses.rearFlowerRight, poses.rearFlowerBackOff);
+        return line(poses.redFarFlowerIn, poses.redFarFlowerBackout).linear(poses.redFarFlowerIn, poses.redFarFlowerBackout);
     }
 
     private Path backToFlower(){
-        return line(poses.rearFlowerBackOff, poses.rearFlowerRight).linear(poses.rearFlowerBackOff, poses.rearFlowerRight);
+        return line(poses.redFarFlowerBackout, poses.redFarFlowerIn).linear(poses.redFarFlowerBackout, poses.redFarFlowerIn);
     }
 
     private Path park() {
