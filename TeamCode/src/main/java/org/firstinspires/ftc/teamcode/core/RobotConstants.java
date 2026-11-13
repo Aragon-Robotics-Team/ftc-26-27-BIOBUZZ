@@ -398,9 +398,14 @@ public class RobotConstants {
 
         // Pose resets: robot pushed into the corner, back against the alliance wall, so the center is half the
         // length off the alliance wall and half the width off the side wall.
+        // START_X/Y_OFFSET: measured correction, inches, in red-side coordinates (Alliance.apply mirrors it for blue).
+        // With START_X_OFFSET = 1, a robot placed at the real 72, 72 read 74.6, 70.7 on telemetry, so x moves
+        // 2.6 in down (1 - 2.6 = -1.6) and y 1.3 in up.
+        public static double START_X_OFFSET = -1.6;
+        public static double START_Y_OFFSET = 1.3;
         public static Pose RED_LEFT_CORNER =  // tile A6, alliance wall x rear wall
-                new Pose(WALL + ROBOT_LENGTH / 2, 144 - WALL - ROBOT_WIDTH / 2, 0);
+                new Pose(WALL + ROBOT_LENGTH / 2 + START_X_OFFSET, 144 - WALL - ROBOT_WIDTH / 2 + START_Y_OFFSET, 0);
         public static Pose RED_RIGHT_CORNER = // tile A1, alliance wall x audience wall
-                new Pose(WALL + ROBOT_LENGTH / 2, WALL + ROBOT_WIDTH / 2, 0);
+                new Pose(WALL + ROBOT_LENGTH / 2 + START_X_OFFSET, WALL + ROBOT_WIDTH / 2 + START_Y_OFFSET, 0);
     }
 }

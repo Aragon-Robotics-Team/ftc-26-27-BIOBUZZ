@@ -15,10 +15,17 @@ import org.firstinspires.ftc.teamcode.core.Robot;
 
 /**
  * 1 Cycle + Garden + Flowers + Park: {@link OneCycleGardenPark}, then instead of parking straight away, knock the
- * pollen out of the alliance-wall flower and the rear-wall flower by sliding back and forth against each, then park
- * on the top side of the loading zone with the intake still running.
+ * pollen out of the left (alliance-wall) flower and the far (rear-wall) flower by sliding in and out against each,
+ * then park on the top side of the loading zone with the intake still running.
  */
 public class OneCycleGardenParkWithFlowers extends AutoRoutine {
+    /**
+     * Partway to the far flower, so the drive there stays clear of the end of our hive's foot (a straight line from
+     * redLeftFlowerBackout to the far flower would brush it). Only this routine uses it, so it lives here; it's the
+     * old rear-flower approach spot (Nov 10), already facing the rear wall.
+     */
+    private final Pose farFlowerAdjust = poseFactory.of(34, 118.764, 90);
+
     public OneCycleGardenParkWithFlowers(Robot robot, Alliance alliance) {
         super(robot, alliance);
     }
@@ -53,48 +60,46 @@ public class OneCycleGardenParkWithFlowers extends AutoRoutine {
         return line(poses.gardenIntake, poses.adjustToPark).linear(poses.gardenIntake, poses.adjustToPark);
     }
 
-    private Path toAllianceFlower() {
-        return line(poses.adjustToPark, poses.allianceFlowerApproach).tangent();
+    // Left flower: arrive at the Out spot facing the wall, slide In / Out / In, then back off the wall
+    private Path toLeftFlower() {
+        return line(poses.adjustToPark, poses.redLeftFlowerOut).linear(poses.adjustToPark, poses.redLeftFlowerOut);
     }
 
-    private Path allianceFlowerIn() {
-        return line(poses.allianceFlowerApproach, poses.allianceFlowerLow).linear(poses.allianceFlowerApproach, poses.allianceFlowerLow);
+    private Path leftFlowerIn() {
+        return line(poses.redLeftFlowerOut, poses.redLeftFlowerIn).linear(poses.redLeftFlowerOut, poses.redLeftFlowerIn);
     }
 
-    private Path allianceFlowerUp() {
-        return line(poses.allianceFlowerLow, poses.allianceFlowerHigh).linear(poses.allianceFlowerLow, poses.allianceFlowerHigh);
+    private Path leftFlowerOut() {
+        return line(poses.redLeftFlowerIn, poses.redLeftFlowerOut).linear(poses.redLeftFlowerIn, poses.redLeftFlowerOut);
     }
 
-    private Path allianceFlowerDown() {
-        return line(poses.allianceFlowerHigh, poses.allianceFlowerLow).linear(poses.allianceFlowerHigh, poses.allianceFlowerLow);
+    private Path leftFlowerBackout() {
+        return line(poses.redLeftFlowerIn, poses.redLeftFlowerBackout).linear(poses.redLeftFlowerIn, poses.redLeftFlowerBackout);
     }
 
-    private Path allianceFlowerOut() {
-        return line(poses.allianceFlowerLow, poses.allianceFlowerBackOff).linear(poses.allianceFlowerLow, poses.allianceFlowerBackOff);
+    // Far flower: around the hive's foot to the adjust spot, Out, In, Out, In, then back off the wall
+    private Path toFarFlowerAdjust() {
+        return line(poses.redLeftFlowerBackout, farFlowerAdjust).linear(poses.redLeftFlowerBackout, farFlowerAdjust);
     }
 
-    private Path toRearFlower() {
-        return line(poses.allianceFlowerBackOff, poses.rearFlowerApproach).tangent();
+    private Path toFarFlower() {
+        return line(farFlowerAdjust, poses.redFarFlowerOut).linear(farFlowerAdjust, poses.redFarFlowerOut);
     }
 
-    private Path rearFlowerIn() {
-        return line(poses.rearFlowerApproach, poses.rearFlowerLeft).linear(poses.rearFlowerApproach, poses.rearFlowerLeft);
+    private Path farFlowerIn() {
+        return line(poses.redFarFlowerOut, poses.redFarFlowerIn).linear(poses.redFarFlowerOut, poses.redFarFlowerIn);
     }
 
-    private Path rearFlowerSlideRight() {
-        return line(poses.rearFlowerLeft, poses.rearFlowerRight).linear(poses.rearFlowerLeft, poses.rearFlowerRight);
+    private Path farFlowerOut() {
+        return line(poses.redFarFlowerIn, poses.redFarFlowerOut).linear(poses.redFarFlowerIn, poses.redFarFlowerOut);
     }
 
-    private Path rearFlowerSlideLeft() {
-        return line(poses.rearFlowerRight, poses.rearFlowerLeft).linear(poses.rearFlowerRight, poses.rearFlowerLeft);
-    }
-
-    private Path rearFlowerOut() {
-        return line(poses.rearFlowerRight, poses.rearFlowerBackOff).linear(poses.rearFlowerRight, poses.rearFlowerBackOff);
+    private Path farFlowerBackout() {
+        return line(poses.redFarFlowerIn, poses.redFarFlowerBackout).linear(poses.redFarFlowerIn, poses.redFarFlowerBackout);
     }
 
     private Path park() {
-        return line(poses.rearFlowerBackOff, poses.topPark).linear(poses.rearFlowerBackOff, poses.topPark);
+        return line(poses.redFarFlowerBackout, poses.topPark).linear(poses.redFarFlowerBackout, poses.topPark);
     }
 
     @Override
@@ -108,7 +113,7 @@ public class OneCycleGardenParkWithFlowers extends AutoRoutine {
                 // Tip
                 robot.flipHive(),
 
-                // Garden: intake on the way in, stop once back out
+                // Garden: drive in twice, backing up between, so the corner ball can roll out for the second try
                 follow(follower, prepareGardenIntake()),
                 follow(follower, gardenIntake1()).raceWith(waitMs(1500)),
                 waitMs(1000),
@@ -117,22 +122,24 @@ public class OneCycleGardenParkWithFlowers extends AutoRoutine {
                 waitMs(1000),
                 follow(follower, adjustBeforePark()),
 
-                // Alliance-wall flower: slide along the wall and back to knock its pollen out (intake still on)
-                follow(follower, toAllianceFlower()),
-                follow(follower, allianceFlowerIn()),
-                follow(follower, allianceFlowerUp()),
-                follow(follower, allianceFlowerDown()),
-                follow(follower, allianceFlowerOut()),
+                // Left flower: slide in and out against it to knock its pollen out (intake still on)
+                follow(follower, toLeftFlower()),
+                follow(follower, leftFlowerIn()).raceWith(waitMs(1500)),
+                waitMs(500),
+                follow(follower, leftFlowerOut()),
+                follow(follower, leftFlowerIn()).raceWith(waitMs(1500)),
+                waitMs(500),
+                follow(follower, leftFlowerBackout()),
 
-                // Rear-wall flower: slide back and forth three times to get all of its pollen out
-                follow(follower, toRearFlower()),
-                follow(follower, rearFlowerIn()),
-                follow(follower, rearFlowerSlideRight()),
-                follow(follower, rearFlowerSlideLeft()),
-                follow(follower, rearFlowerSlideRight()),
-                follow(follower, rearFlowerSlideLeft()),
-                follow(follower, rearFlowerSlideRight()),
-                follow(follower, rearFlowerOut())
+                // Far flower: arrive at the Out spot, slide In / Out / In, then back off the wall
+                follow(follower, toFarFlowerAdjust()),
+                follow(follower, toFarFlower()),
+                follow(follower, farFlowerIn()).raceWith(waitMs(1500)),
+                waitMs(500),
+                follow(follower, farFlowerOut()),
+                follow(follower, farFlowerIn()).raceWith(waitMs(1500)),
+                waitMs(500),
+                follow(follower, farFlowerBackout())
         );
 
         return sequential(
