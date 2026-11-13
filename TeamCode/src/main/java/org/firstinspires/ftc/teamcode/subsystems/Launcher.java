@@ -58,6 +58,7 @@ public class Launcher implements Subsystem {
     private double turretTargetAngle = 0;
     private double turretTargetRate = 0; // rad/s the target is moving at, for the feedforward
     private boolean turretTargetClipped = false; // the wanted angle is past a soft limit
+    private double turretWantedAngle = 0; // where the shot wants the turret, before clipping to the soft limits
     private double turretAngle = 0;
     private double turretAngleOffset = 0;
 
@@ -223,11 +224,12 @@ public class Launcher implements Subsystem {
     }
 
     /**
-     * Within the angle error the current shot can take (TURRET_ANGLE_TOLERANCE when not aiming at a target).
-     * Never while the wanted angle is past a soft limit: parked on the limit, the turret points the wrong way.
+     * Within the angle error the current shot can take (TURRET_ANGLE_TOLERANCE when not aiming at a target) of where
+     * the shot wants the turret, before clipping. A target just past a soft limit, with the turret parked on it, still
+     * counts when it's that close; one deep in the blind zone behind the robot is far off and doesn't.
      */
     public boolean isTurretOnTarget() {
-        return !turretTargetClipped && Math.abs(turretTargetAngle - getTurretAngle()) <= turretTolerance();
+        return Math.abs(Angle.normalizeSigned(turretWantedAngle - getTurretAngle())) <= turretTolerance();
     }
 
     /**
@@ -275,13 +277,16 @@ public class Launcher implements Subsystem {
     }
 
     /**
-     * Clamped to [TURRET_MIN_ANGLE, TURRET_MAX_ANGLE], so targets past the limits need the drivetrain to turn.
+     * Kept to [TURRET_MIN_ANGLE, TURRET_MAX_ANGLE], so targets past the limits need the drivetrain to turn. Past
+     * them, the turret parks on the limit the target left through and stays there until the target is back in range
+     * (TurretLimits), rather than swinging between the limits as the target crosses straight behind the robot.
      * @param rate how fast the target is moving (radians/sec), for the feedforward
      */
     private void setTurretTarget(double angle, double rate) {
-        double normalized = Angle.normalizeSigned(angle);
-        turretTargetAngle = Range.clip(normalized, TURRET_MIN_ANGLE, TURRET_MAX_ANGLE);
-        turretTargetClipped = turretTargetAngle != normalized;
+        turretWantedAngle = Angle.normalizeSigned(angle);
+        turretTargetAngle = TurretLimits.target(turretWantedAngle, turretTargetAngle, turretTargetClipped,
+                TURRET_MIN_ANGLE, TURRET_MAX_ANGLE);
+        turretTargetClipped = turretTargetAngle != turretWantedAngle;
         // Parked on a soft limit: don't push into it
         turretTargetRate = turretTargetClipped ? 0 : rate;
     }
@@ -352,6 +357,9 @@ public class Launcher implements Subsystem {
         telemetry.addData("Flywheel power (" + FLYWHEEL_CONTROL + ")", "%.2f at %.1f V", flywheelPower, batteryVolts);
         telemetry.addData("Turret target / actual (deg)", "%.1f / %.1f",
                 Math.toDegrees(turretTargetAngle), Math.toDegrees(getTurretAngle()));
+        if (turretTargetClipped) {
+            telemetry.addData("Turret wanted (deg)", "%.1f, past its limit", Math.toDegrees(turretWantedAngle));
+        }
         telemetry.addData("Turret turn speed target / actual (deg/s)", "%.0f / %.0f",
                 Math.toDegrees(turretTargetRate), Math.toDegrees(turretVelocity));
         telemetry.addData("Turret power", "%.2f", turret.getPower());

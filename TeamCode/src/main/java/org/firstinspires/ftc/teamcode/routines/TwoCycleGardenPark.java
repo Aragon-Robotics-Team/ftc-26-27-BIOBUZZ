@@ -1,6 +1,7 @@
 package org.firstinspires.ftc.teamcode.routines;
 
 import static com.pedropathing.api.Paths.line;
+import static com.pedropathing.ivy.commands.Commands.waitMs;
 import static com.pedropathing.ivy.groups.Groups.deadline;
 import static com.pedropathing.ivy.groups.Groups.sequential;
 import static com.pedropathing.ivy.pedro.PedroCommands.follow;
@@ -36,8 +37,14 @@ public class TwoCycleGardenPark extends AutoRoutine {
         return line(poses.startLaunch, poses.gardenBorder).linear(poses.startLaunch, poses.gardenBorder);
     }
 
-    private Path gardenIntake() {
+    private Path gardenIntake1() {
         return line(poses.gardenBorder, poses.gardenIntake).linear(poses.gardenBorder, poses.gardenIntake);
+    }
+    private Path gardenIntakeBack() {
+        return line(poses.gardenIntake, poses.gardenIntakeBack).linear(poses.gardenIntake, poses.gardenIntakeBack);
+    }
+    private Path gardenIntake2() {
+        return line(poses.gardenIntakeBack, poses.gardenIntake).linear(poses.gardenIntakeBack, poses.gardenIntake);
     }
 
     private Path gardenToCenterLine() {
@@ -64,9 +71,12 @@ public class TwoCycleGardenPark extends AutoRoutine {
                 // Garden: intake on the way in, stop once out at the center line
                 robot.intake.intake(),
                 follow(follower, prepareGardenIntake()),
-                follow(follower, gardenIntake()),
+                follow(follower, gardenIntake1()),
+                waitMs(1000),
+                follow(follower, gardenIntakeBack()),
+                follow(follower, gardenIntake2()).raceWith(waitMs(1500)),
+                waitMs(1000),
                 follow(follower, gardenToCenterLine()),
-                robot.intake.off(),
 
                 // Up the middle to the other side and shoot the garden pollen
                 follow(follower, centerLineToFlowerLaunch()),
@@ -78,7 +88,9 @@ public class TwoCycleGardenPark extends AutoRoutine {
         return sequential(
                 // Keep the turret on the hive and the flywheel at the right speed while cycling
                 deadline(cycles, robot.aimAtHive(), robot.enableFlywheel()),
-                follow(follower, park())
+                follow(follower, park()),
+                waitMs(3000),
+                robot.intake.off()
         );
     }
 }
