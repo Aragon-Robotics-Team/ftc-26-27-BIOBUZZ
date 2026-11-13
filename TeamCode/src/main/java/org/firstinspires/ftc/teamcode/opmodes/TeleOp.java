@@ -274,7 +274,7 @@ public class TeleOp extends OpMode {
 
         // ---- 1. Field + what the drivers need mid-match ----
         for (String row : FieldDiagram.draw(pose, MatchState.alliance, MatchState.hive)) telemetry.addLine(mono(row));
-        telemetry.addLine(reachLine(shot));
+        telemetry.addLine(reachLine(launcher, shot));
         telemetry.addLine(flywheelLine(launcher));
         telemetry.addLine(turretLine(launcher));
         telemetry.addLine("Alliance " + Html.alliance(MatchState.alliance));
@@ -319,12 +319,16 @@ public class TeleOp extends OpMode {
         return value != 0 ? String.format(" (%+.0f%s)", value, unit) : "";
     }
 
-    /** Whether the simulated shot (on the move, if SHOOT_ON_THE_MOVE) can get the ball into the hive from here. */
-    private static String reachLine(Shot shot) {
-        String label = SHOOT_ON_THE_MOVE ? "SOTM " : "Shot (standing) ";
+    /**
+     * Whether the ball can get into the hive from here: inside the shot table's range when the flywheel uses it,
+     * else the simulated shot (on the move, if SHOOT_ON_THE_MOVE).
+     */
+    private static String reachLine(Launcher launcher, Shot shot) {
+        String label = (SHOOT_ON_THE_MOVE ? "SOTM " : "Shot (standing) ") + (launcher.isUsingShotTable() ? "[table] " : "");
         if (shot == null) return label + color("not aiming", GRAY);
-        String verdict = shot.feasible ? bold(color("can reach", GREEN)) : bold(color("can't reach", RED));
-        return label + verdict + String.format(" %.0f in", shot.distance);
+        String verdict = launcher.hasShot() ? bold(color("can reach", GREEN)) : bold(color("can't reach", RED));
+        double distance = launcher.isUsingShotTable() ? launcher.getTableDistance() : shot.distance;
+        return label + verdict + String.format(" %.0f in", distance);
     }
 
     private String hiveVisionWord() {
