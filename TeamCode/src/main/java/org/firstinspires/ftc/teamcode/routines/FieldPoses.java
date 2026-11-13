@@ -15,6 +15,9 @@ import org.firstinspires.ftc.teamcode.core.RobotConstants;
 public class FieldPoses {
     /** Where the robot is placed at the start of the match. */
     public final Pose start;
+
+    /** Robot starting at far corner of red alliance*/
+    public final Pose farStart;
     /** Launch spot just in front of the start, where the preloads are shot. */
     public final Pose startLaunch;
     /** Edge of the garden, where the robot lines up to drive in and intake. */
@@ -82,6 +85,7 @@ public class FieldPoses {
         // y = 5.0366, 4.2134 in short of where the robot really sits, so they're all 4.2134 in up from what was tuned:
         // the same moves on the field
         start = poseFactory.of(56.8946, RobotConstants.Field.WALL + RobotConstants.Field.ROBOT_LENGTH / 2, 90);
+        farStart = poseFactory.of(15.9528, 132.7395, 90);
         startLaunch = poseFactory.of(59.808, 15.1732, 90);
         gardenBorder = poseFactory.of(9.577, 28.2910, -90);
         gardenIntake = poseFactory.of(9.561, 13.2993, -90);
