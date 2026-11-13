@@ -33,6 +33,12 @@ public class FieldPoses {
     /** Lines up to travel through the middle of the hive on the garden side of red. **/
     public final Pose gardenCenterLine;
     /** Flower side launch zone on red. **/
+    public final Pose flowerReady;
+    /** Position right before pollen from flower is knocked out. **/
+    public final Pose flowerKnock;
+    /** Position after pollen from flower is knocked out. **/
+    public final Pose flowerOut;
+    /** Position to exit after pollen from flower is knocked out. **/
     public final Pose flowerLaunch;
     /** At the rear-wall flower, where the intake picks up its pollen. */
     public final Pose flowerIntake;
@@ -87,6 +93,9 @@ public class FieldPoses {
         bottomPark = poseFactory.of(10.5389, 96.1701, 0);
         topPark = poseFactory.of(11.4049, 124.6458, 0);
         gardenCenterLine = poseFactory.of(60, 40, 90);
+        flowerReady = poseFactory.of(10, 60, 180);
+        flowerKnock = poseFactory.of(10, 55, 180);
+        flowerOut = poseFactory.of(30, 60, 180);
         flowerLaunch = poseFactory.of(60, 119.7, 90);
         flowerIntake = poseFactory.of(51, 131, 95);
         flowerShoot = poseFactory.of(56, 121, 95);
