@@ -272,9 +272,12 @@ public class RobotConstants {
         // goBILDA 6000 RPM: 28 ticks/rev, about 2800 ticks/sec flat out. The counter-rollers are geared off this motor.
         public static double FLYWHEEL_MAX_VELOCITY = 2081; // ticks/sec (Nov 13)
         // Highest speed the flywheel is sent to while aiming at the hive (ticks/sec): we never score from anywhere that
-        // needs more, and spinning up past it only costs time. A shot that needs more counts as no shot. The tuners and
-        // the Shot Table Calibration's hand-set speed aren't capped
+        // needs more, and spinning up past it only costs time. A shot that needs more counts as no shot, and the
+        // flywheel holds the last speed it had for one within the cap. The tuners and the Shot Table Calibration's
+        // hand-set speed aren't capped
         public static double FLYWHEEL_SPEED_CAP = 1100;
+        // What it holds out of range before there's been a shot within the cap (ticks/sec): a typical shot's speed
+        public static double FLYWHEEL_OUT_OF_RANGE_VELOCITY = 830;
         // Fixed speed for spinUp() and the Flywheel Tuner
         public static double TARGET_VELOCITY = 1609;  // ticks/sec (Oct 26)
         public static double VELOCITY_TOLERANCE = 50; // ticks/sec, when not aiming with ShotSolver. TODO: tune
@@ -370,7 +373,8 @@ public class RobotConstants {
         // Calibration OpMode; it lives in /sdcard/FIRST/data/shot_table.csv on the robot. The repo's copy,
         // TeamCode/src/main/assets/shot_table.csv, is used when the robot has no file of its own.
         // With the table empty (or this false) the flywheel goes back to the model.
-        public static boolean USE_SHOT_TABLE = true;
+        // Off Nov 14: the model sets the flywheel speed
+        public static boolean USE_SHOT_TABLE = false;
         // How far past the nearest / farthest entry (inches) the table still extrapolates and calls it a shot
         public static double SHOT_TABLE_EXTRAPOLATE = 12;
         // Entries within this many inches of each other are averaged into one point before interpolating, so repeat

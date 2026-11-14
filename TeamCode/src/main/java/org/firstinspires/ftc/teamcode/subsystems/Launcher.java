@@ -87,8 +87,10 @@ public class Launcher implements Subsystem {
     private boolean usingTable = false;
     private double tableDistance = 0;
     private double tableVelocity = 0;
-    // The shot needs more than FLYWHEEL_SPEED_CAP, so the flywheel is held at the cap and there's no shot
+    // The shot needs more than FLYWHEEL_SPEED_CAP: there's no shot, and the flywheel holds lastInRange instead
     private boolean overCap = false;
+    // The last flywheel speed (before the nudge) for a shot within the cap, NaN before the first
+    private double lastInRange = Double.NaN;
 
     public Launcher(HardwareMap hardwareMap) {
         flywheel = hardwareMap.get(DcMotorEx.class, FLYWHEEL_MOTOR_NAME);
@@ -131,8 +133,15 @@ public class Launcher implements Subsystem {
             } else {
                 targetVelocity = flywheelShot.flywheelVelocity + velocityNudge;
             }
+            // Too far to score: hold a shooting speed rather than spin up for it, so stopping to shoot doesn't wait
+            // for the flywheel to coast back down (it can't brake)
             overCap = targetVelocity > FLYWHEEL_SPEED_CAP;
-            if (overCap) targetVelocity = FLYWHEEL_SPEED_CAP;
+            if (overCap) {
+                double hold = Double.isNaN(lastInRange) ? FLYWHEEL_OUT_OF_RANGE_VELOCITY : lastInRange;
+                targetVelocity = Math.min(hold + velocityNudge, FLYWHEEL_SPEED_CAP);
+            } else {
+                lastInRange = targetVelocity - velocityNudge;
+            }
         }).setEnd(end -> {
             flywheelShot = null;
             usingTable = false;
@@ -441,7 +450,8 @@ public class Launcher implements Subsystem {
     public void telemetry(Telemetry telemetry) {
         telemetry.addData("Launcher ready", isReady());
         telemetry.addData("Flywheel target / actual", "%.0f / %.0f", targetVelocity, flywheelVelocity);
-        if (overCap) telemetry.addData("Flywheel", "held at the %.0f cap: too far to score", FLYWHEEL_SPEED_CAP);
+        if (overCap) telemetry.addData("Flywheel", "too far to score (needs over %.0f): holding %.0f",
+                FLYWHEEL_SPEED_CAP, targetVelocity);
         telemetry.addData("Flywheel power (" + FLYWHEEL_CONTROL + ")", "%.2f at %.1f V", flywheelPower, batteryVolts);
         telemetry.addData("Turret target / actual (deg)", "%.1f / %.1f",
                 Math.toDegrees(turretTargetAngle), Math.toDegrees(getTurretAngle()));
