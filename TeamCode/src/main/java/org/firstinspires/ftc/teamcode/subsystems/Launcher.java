@@ -452,8 +452,8 @@ public class Launcher implements Subsystem {
                 Math.toDegrees(turretTargetRate), Math.toDegrees(turretVelocity));
         telemetry.addData("Turret power", "%.2f", turret.getPower());
         if (usingTable) {
-            telemetry.addData("Shot table", "%.0f in → %.0f ticks/s%s   [%d points]", tableDistance, tableVelocity,
-                    ShotTable.covers(tableDistance) ? "" : " (out of range)", ShotTable.size());
+            telemetry.addData("Shot table", "%.0f in → %.0f ticks/s%s   [%s]", tableDistance, tableVelocity,
+                    ShotTable.covers(tableDistance) ? "" : " (out of range)", ShotTable.getSource());
         } else if (USE_SHOT_TABLE) {
             telemetry.addLine("Shot table empty: flywheel speed from the shot model");
         }
