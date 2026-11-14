@@ -299,7 +299,7 @@ public class RobotConstants {
         public static double TURRET_MIN_ANGLE = Math.toRadians(-112.5); // ±90° plus 22.5° each side (Nov 9)
         public static double TURRET_MAX_ANGLE = Math.toRadians(112.5);
         // Turret pivot relative to the robot center (inches, +x forward, +y left): the ring gear's axis (CAD, Oct 26)
-        public static double TURRET_OFFSET_X = 1.02;
+        public static double TURRET_OFFSET_X = 0;
         public static double TURRET_OFFSET_Y = 0;
         // TODO: tune from turret tuner opmode
         public static double TURRET_KP = 1.9;         // power per radian of error (Oct 26)
