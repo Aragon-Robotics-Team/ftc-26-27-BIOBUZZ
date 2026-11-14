@@ -14,6 +14,7 @@ import com.pedropathing.math.Velocity;
 import com.qualcomm.robotcore.eventloop.opmode.OpMode;
 import com.qualcomm.robotcore.eventloop.opmode.TeleOp;
 import com.qualcomm.robotcore.util.Range;
+import com.qualcomm.robotcore.util.RobotLog;
 
 import org.firstinspires.ftc.teamcode.core.Alliance;
 import org.firstinspires.ftc.teamcode.core.Hive;
@@ -26,6 +27,7 @@ import org.firstinspires.ftc.teamcode.util.PanelsDisplay;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Locale;
 
 /**
  * Fill the shot table (core.ShotTable): the flywheel speed that scores from each distance. No model involved: you set
@@ -38,17 +40,14 @@ import java.util.List;
  *    one (gamepad 2 left stick button jumps back to it), else the last speed you used.
  * 2. Shoot (hold gamepad 1 RT) and change the speed (gamepad 2 dpad up / down small steps, RB / LB big steps) until
  *    balls go through the middle of the opening.
- * 3. Gamepad 2 cross saves the pose and speed. Every save is kept, even at the same distance as another: saves within
- *    SHOT_TABLE_MERGE inches of each other are averaged when looking up, so several per spot smooth out the noise.
- * Gamepad 2 triangle undoes this run's last save (with none left, deletes the entry nearest the robot's current
- * distance); hold it to clear the whole table.
+ * 3. Gamepad 2 cross saves the distance and speed.
+ * Gamepad 2 triangle undoes the last save; hold it to clear them all.
  *
- * Hold gamepad 2 right stick button to throw away the robot's table and go back to the repo's copy.
- *
- * <p>Every change is written to /sdcard/FIRST/data/shot_table.csv at once, and TeleOp and Auto use it from their next
- * init: no redeploy. Cover from the closest shot you'll take to the farthest, every 6 to 12 in, and closer together
- * where the speed changes fast. To get it into the repo, copy the robot's file to
- * TeamCode/src/main/assets/shot_table.csv (see core.ShotTable) and commit it.
+ * <p>The table lives in code (core.ShotTable), so saving doesn't change what TeleOp and Auto use. Each save is listed
+ * as a {@code {distance, speed},} line on Panels and in the robot log (tag ShotTable): paste them into
+ * ShotTable.POINTS, pick one speed per spot where saves disagree, and redeploy. The saves are kept until the robot
+ * app restarts, so stopping and re-running this OpMode doesn't lose them. Cover from the closest shot you'll take to
+ * the farthest, every 6 to 12 in, and closer together where the speed changes fast.
  *
  * <p>Gamepad 1 drives like TeleOp (left stick field-centric, right stick x turns, hold LT slow), triangle / cross
  * toggle intake / outtake. Gamepad 2 dpad left / right nudge the turret, square / circle pick the LEFT / RIGHT cell.
@@ -72,9 +71,31 @@ public class ShotTableCalibration extends OpMode {
     private Robot robot;
     private TelemetryManager panels;
     private PanelsDisplay panelsDisplay; // Field tab only
+    /** One save: the distance and speed, and where the robot was, for the comment on its line. */
+    private static final class Save {
+        final double distance, velocity;
+        final Pose pose;
+        final String alliance, hive;
+
+        Save(double distance, double velocity, Pose pose, String alliance, String hive) {
+            this.distance = distance;
+            this.velocity = velocity;
+            this.pose = pose;
+            this.alliance = alliance;
+            this.hive = hive;
+        }
+
+        /** The line to paste into ShotTable.POINTS. */
+        String line() {
+            return String.format(Locale.US, "{%.1f, %.0f}, // %s %s, robot %.0f, %.0f, %.0f°", distance, velocity,
+                    alliance, hive, pose.x(), pose.y(), Math.toDegrees(pose.heading()));
+        }
+    }
+
+    // Static so the saves survive stopping and re-running the OpMode; newest last
+    private static final List<Save> saves = new ArrayList<>();
+
     private final HoldButton deleteButton = new HoldButton(1.5);
-    private final HoldButton revertButton = new HoldButton(1.5);
-    private final List<ShotTable.Entry> savedThisRun = new ArrayList<>(); // for undo, newest last
     private String message = "";
     /** Red-side corner picked during init, or null. Turned into a pose at start, once the alliance is final. */
     private Pose initCorner = null;
@@ -87,7 +108,6 @@ public class ShotTableCalibration extends OpMode {
         robot.hiveVision.setEnabled(true); // the up cell, like TeleOp
         panels = PanelsTelemetry.INSTANCE.getTelemetry();
         panelsDisplay = new PanelsDisplay();
-        ShotTable.reload(); // pick up a hand-edited file
         if (MatchState.pose != null) {
             robot.drivebase.setPose(MatchState.pose);
             robot.launcher.setCurrentTurretAngle(MatchState.turretAngle);
@@ -99,7 +119,7 @@ public class ShotTableCalibration extends OpMode {
         MatchState.selectAlliance(gamepad1, 1, telemetry);
         if (gamepad2.shareWasPressed()) initCorner = RED_LEFT_CORNER;
         if (gamepad2.optionsWasPressed()) initCorner = RED_RIGHT_CORNER;
-        telemetry.addData("Shot table", ShotTable.getSource());
+        telemetry.addData("Shot table", ShotTable.size() + " points in code, " + saves.size() + " saves this session");
         telemetry.addData("Start pose", (initCorner == null ? "none"
                 : initCorner == RED_LEFT_CORNER ? "LEFT corner" : "RIGHT corner")
                 + "   (gamepad 2 share / options, now or after start)");
@@ -143,7 +163,7 @@ public class ShotTableCalibration extends OpMode {
         return gamepad1.left_trigger > 0.5 ? SLOW_MODE_SCALE : 1.0;
     }
 
-    /** The table's speed for where the robot is now, or NaN if the table is empty. */
+    /** The table's speed for where the robot is now (the one in code), or NaN if it's empty. */
     private double tableVelocityHere() {
         return ShotTable.velocityAt(robot.distanceToHive());
     }
@@ -191,26 +211,19 @@ public class ShotTableCalibration extends OpMode {
         if (gamepad2.crossWasPressed()) save();
         switch (deleteButton.update(gamepad2.triangle, getRuntime())) {
             case TAP:
-                // Undo this run's saves newest first; with none left, the entry nearest where the robot is
-                ShotTable.Entry removed = null;
-                while (!savedThisRun.isEmpty() && removed == null) {
-                    ShotTable.Entry last = savedThisRun.remove(savedThisRun.size() - 1);
-                    if (ShotTable.remove(last)) removed = last;
+                if (saves.isEmpty()) {
+                    message = "No saves to undo";
+                } else {
+                    Save removed = saves.remove(saves.size() - 1);
+                    message = String.format("Undid %.1f in → %.0f ticks/s", removed.distance, removed.velocity);
                 }
-                if (removed == null) removed = ShotTable.removeNearest(robot.distanceToHive());
-                message = removed == null ? "Table is already empty"
-                        : String.format("Deleted %.1f in → %.0f ticks/s", removed.distance, removed.velocity);
                 break;
             case HOLD:
-                ShotTable.clear();
-                message = "Cleared the whole table";
+                saves.clear();
+                message = "Cleared every save";
                 break;
             default:
                 break;
-        }
-        if (revertButton.update(gamepad2.right_stick_button, getRuntime()) == HoldButton.Event.HOLD) {
-            ShotTable.revertToRepoCopy();
-            message = "Back to the repo's table: " + ShotTable.getSource();
         }
     }
 
@@ -238,14 +251,23 @@ public class ShotTableCalibration extends OpMode {
             message = "Not saved: " + reason;
             return;
         }
-        Pose pose = robot.drivebase.getPose();
         double distance = robot.distanceToHive();
         double ticks = robot.launcher.getTargetVelocity();
-        ShotTable.Entry entry = new ShotTable.Entry(distance, ticks, pose.x(), pose.y(), pose.heading(),
-                MatchState.alliance.toString(), MatchState.hive.toString());
-        ShotTable.add(entry);
-        savedThisRun.add(entry);
-        message = String.format("Saved %.1f in → %.0f ticks/s  [%s]", distance, ticks, ShotTable.getSource());
+        Save save = new Save(distance, ticks, robot.drivebase.getPose(), MatchState.alliance.toString(),
+                MatchState.hive.toString());
+        saves.add(save);
+        // The whole list each time, so the newest log line always has everything to copy
+        StringBuilder all = new StringBuilder("Shot table saves, paste into ShotTable.POINTS:");
+        for (Save s : sorted()) all.append('\n').append(s.line());
+        RobotLog.ii("ShotTable", all.toString());
+        message = String.format("Saved %.1f in → %.0f ticks/s (%d saves)", distance, ticks, saves.size());
+    }
+
+    /** The saves, nearest first. */
+    private static List<Save> sorted() {
+        List<Save> list = new ArrayList<>(saves);
+        list.sort((a, b) -> Double.compare(a.distance, b.distance));
+        return list;
     }
 
     private void showTelemetry() {
@@ -267,23 +289,17 @@ public class ShotTableCalibration extends OpMode {
         panels.addData("Save (G2 cross)", reason == null ? "ready" : reason);
         if (!message.isEmpty()) panels.addLine(message);
 
-        List<ShotTable.Entry> entries = ShotTable.getEntries();
+        double[][] points = new double[saves.size()][];
+        for (int i = 0; i < points.length; i++) points[i] = new double[] {saves.get(i).distance, saves.get(i).velocity};
+        double fromSaves = new ShotTable.Table(points).velocityAt(distance);
+        if (!Double.isNaN(fromSaves)) panels.addData("Saves say here", String.format("%.0f", fromSaves));
+
         panels.addLine("");
-        panels.addLine(String.format("== TABLE: %d entries, %s ==", entries.size(), ShotTable.getSource()));
-        for (ShotTable.Entry e : entries) {
-            panels.addLine(String.format("%.1f in   %.0f ticks/s   (pose %.0f, %.0f, %.0f°  %s %s)", e.distance,
-                    e.velocity, e.x, e.y, Math.toDegrees(e.heading), e.alliance, e.hive));
-        }
-        List<double[]> curve = ShotTable.getCurve();
-        if (curve.size() < entries.size()) {
-            panels.addLine(String.format("== USED: %d points (saves within %.0f in averaged) ==", curve.size(),
-                    RobotConstants.Launcher.SHOT_TABLE_MERGE));
-            for (double[] p : curve) {
-                panels.addLine(String.format("%.1f in   %.0f ticks/s   (%d saves)", p[0], p[1], (int) p[2]));
-            }
-        }
-        panels.addLine("Robot file: /sdcard/FIRST/data/shot_table.csv (also http://192.168.43.1:8080/shottable.csv)."
-                + " Hold G2 R-stick: back to the repo's table");
+        panels.addLine(String.format("== %d SAVES: paste into ShotTable.POINTS (core/ShotTable.java), also in the robot"
+                + " log, tag ShotTable ==", saves.size()));
+        for (Save s : sorted()) panels.addLine(s.line());
+        panels.addLine(String.format("(The table in code has %d points; saves don't change it until pasted and"
+                + " redeployed)", ShotTable.size()));
         panels.update(telemetry);
         panelsDisplay.drawField(robot);
     }
