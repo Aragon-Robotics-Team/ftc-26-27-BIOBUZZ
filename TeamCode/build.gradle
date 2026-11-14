@@ -80,6 +80,8 @@ dependencies {
     // PsiKit (Dairy Foundation): logs the robot's state for AdvantageScope (util/MatchLog). Off on the robot until
     // RobotConstants.Logging.ENABLED
     implementation 'org.psilynx.psikit:core:0.2.0-beta2'
+    // SolversLib (Seattle Solvers, from FTCLib): its InterpLUT holds the shot table (core.ShotTable)
+    implementation 'org.solverslib:core:0.3.6'
 
     // Unit tests for the hardware-free logic (src/test): ./gradlew :TeamCode:testDebugUnitTest
     testImplementation 'junit:junit:4.13.2'
