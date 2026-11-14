@@ -177,7 +177,7 @@ public class ShotCalibration extends OpMode {
         if (gamepad1.crossWasPressed()) schedule(robot.intake.toggleOuttake());
 
         if (gamepad1.rightBumperWasPressed()) {
-            schedule(robot.launcher.enableFlywheel(robot.drivebase::getPose, Velocity::zero, robot::hiveTarget));
+            schedule(robot.launcher.enableFlywheel(robot.drivebase::getPose, Velocity::zero, robot::hiveCell));
         }
         if (gamepad1.leftBumperWasPressed()) schedule(robot.launcher.idle());
 
@@ -222,7 +222,7 @@ public class ShotCalibration extends OpMode {
             return;
         }
         Pose pose = robot.drivebase.getPose();
-        Pose target = robot.hiveTarget();
+        Pose target = robot.hiveCell(); // the flywheel's distance, like TeleOp
         samples.add(new Sample(pose, target, robot.launcher.distanceTo(pose, target),
                 robot.launcher.getTargetVelocity()));
         message = String.format("Saved spot %d", samples.size());

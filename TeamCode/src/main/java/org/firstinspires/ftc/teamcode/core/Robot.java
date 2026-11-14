@@ -78,14 +78,24 @@ public class Robot {
 
     /**
      * Center of the opening of our hive's up cell, moved by where the Limelight last saw that cell's tags against where
-     * the pose puts them (Vision.AIM_FROM_TAGS, HiveVision.aimTarget).
+     * the pose puts them (Vision.AIM_FROM_TAGS, HiveVision.aimTarget). For the turret's aim.
      */
     public Pose hiveTarget() {
-        return hiveVision.aimTarget(MatchState.hive.cell(MatchState.alliance), MatchState.hive);
+        return hiveVision.aimTarget(hiveCell(), MatchState.hive);
     }
 
+    /**
+     * Center of the opening of our hive's up cell where the field constants put it, not moved by the Limelight. The
+     * flywheel's speed comes from the distance to this (the odometry distance): the tags' correction made the LEFT
+     * cell read about 7 in closer than it is, and its shots fell short (TeleOp logs, Nov 14).
+     */
+    public Pose hiveCell() {
+        return MatchState.hive.cell(MatchState.alliance);
+    }
+
+    /** Inches from the turret pivot to the up cell, by odometry (hiveCell), as the flywheel uses it. */
     public double distanceToHive() {
-        return launcher.distanceTo(drivebase.getPose(), hiveTarget());
+        return launcher.distanceTo(drivebase.getPose(), hiveCell());
     }
 
     /** The operator says which cell is up. Hive vision gives a hand-set state a moment before it overrules it. */
@@ -107,9 +117,12 @@ public class Robot {
         return launcher.aimAt(drivebase::getPose, drivebase::getVelocity, this::hiveTarget);
     }
 
-    /** Flywheel speed follows the simulated shot into the hive's up cell. Runs until launcher.idle(). */
+    /**
+     * Flywheel speed follows the simulated shot into the hive's up cell, at the odometry distance (hiveCell, not the
+     * Limelight's correction). Runs until launcher.idle().
+     */
     public Command enableFlywheel() {
-        return launcher.enableFlywheel(drivebase::getPose, drivebase::getVelocity, this::hiveTarget);
+        return launcher.enableFlywheel(drivebase::getPose, drivebase::getVelocity, this::hiveCell);
     }
 
     // ---- Shooting ----
