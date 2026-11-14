@@ -70,6 +70,9 @@ public class FieldPoses {
     public final Pose redLeftFlowerOut;
     /** Backed off the alliance wall. */
     public final Pose redLeftFlowerBackout;
+    /** Approach far flower. */
+    public final Pose redFarFlowerApproach;
+    public final Pose redFarFlowerAdjust;
     /** Go in to far flower by red alliance side. */
     public final Pose redFarFlowerIn;
     /** Back out slightly of far flower by red alliance side. */
@@ -95,7 +98,7 @@ public class FieldPoses {
         adjustToPark = poseFactory.of(38.561, 24.2993, -90);
         bottomPark = poseFactory.of(10.5389, 96.1701, 0);
         topPark = poseFactory.of(11.4049, 124.6458, 0);
-        gardenCenterLine = poseFactory.of(60, 40, 90); // TODO: tune position
+        gardenCenterLine = poseFactory.of(63, 25, 90);
         flowerReady = poseFactory.of(10, 60, 180);
         flowerKnock = poseFactory.of(10, 55, 180);
         flowerOut = poseFactory.of(30, 60, 180);
@@ -111,7 +114,9 @@ public class FieldPoses {
         redLeftFlowerIn = poseFactory.of(12.1, 60.2, 180);
         redLeftFlowerOut = poseFactory.of(12.1, 62.2, 180);
         redLeftFlowerBackout = poseFactory.of(20.3, 60.8, 180);
-        redFarFlowerIn = poseFactory.of(58, 134, 90);
-        redFarFlowerOut = poseFactory.of(60.1, 134, 90);
+        redFarFlowerApproach = poseFactory.of(48,110,90);
+        redFarFlowerAdjust = poseFactory.of(62,115,90);
+        redFarFlowerIn = poseFactory.of(58, 135, 90);
+        redFarFlowerOut = poseFactory.of(62.1, 135, 90);
         redFarFlowerBackout = poseFactory.of(66.1, 121.8, 90);    }
 }

@@ -89,8 +89,9 @@ public class TwoCycleGardenPark extends AutoRoutine {
                 // Keep the turret on the hive and the flywheel at the right speed while cycling
                 deadline(cycles, robot.aimAtHive(), robot.enableFlywheel()),
                 follow(follower, park()),
-                waitMs(3000),
-                robot.intake.off()
+                waitMs(2000),
+                robot.intake.off(),
+                robot.launcher.idle()
         );
     }
 }

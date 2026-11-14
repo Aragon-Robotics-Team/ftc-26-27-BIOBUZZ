@@ -29,24 +29,24 @@ public class OneCycleGardenParkWithM extends AutoRoutine {
     }
 
     // Path methods
-    private Path startToFlowerReady() {
-        return line(poses.topPark, poses.flowerReady).linear(poses.topPark, poses.flowerReady);
+    private Path toLeftFlower() {
+        return line(poses.topPark, poses.redLeftFlowerOut).linear(poses.topPark, poses.redLeftFlowerOut);
     }
 
-    private Path flowerKnock() {
-        return line(poses.flowerReady, poses.flowerKnock).linear(poses.startLaunch, poses.gardenBorder);
+    private Path leftFlowerIn() {
+        return line(poses.redLeftFlowerOut, poses.redLeftFlowerIn).linear(poses.redLeftFlowerOut, poses.redLeftFlowerIn);
     }
 
-    private Path flowerBack() {
-        return line(poses.flowerKnock, poses.flowerReady).linear(poses.flowerKnock, poses.flowerReady);
+    private Path leftFlowerOut() {
+        return line(poses.redLeftFlowerIn, poses.redLeftFlowerOut).linear(poses.redLeftFlowerIn, poses.redLeftFlowerOut);
     }
 
-    private Path flowerKnockExit() {
-        return line(poses.flowerReady, poses.flowerOut).reverseTangent();
+    private Path leftFlowerBackout() {
+        return line(poses.redLeftFlowerIn, poses.redLeftFlowerBackout).linear(poses.redLeftFlowerIn, poses.redLeftFlowerBackout);
     }
 
     private Path adjustBeforeShoot() {
-        return line(poses.flowerOut, poses.adjustToPark);
+        return line(poses.redLeftFlowerBackout, poses.adjustToPark);
     }
     private Path outToShoot() {
         return line(poses.adjustToPark, poses.startLaunch).linear(poses.adjustToPark, poses.startLaunch);
@@ -66,14 +66,14 @@ public class OneCycleGardenParkWithM extends AutoRoutine {
                 // Preloads
                 waitMs(15000),
                 robot.intake.intake(),
-                follow(follower, startToFlowerReady()),
-                follow(follower, flowerKnock()).raceWith(waitMs(1500)),
-                waitMs(1000),
-                follow(follower, flowerBack()),
-                follow(follower, flowerKnock()).raceWith(waitMs(1500)),
-                waitMs(1000),
-                follow(follower, flowerBack()),
-                follow(follower, flowerKnockExit()),
+                follow(follower, toLeftFlower()),
+                follow(follower, leftFlowerIn()).raceWith(waitMs(1000)),
+                waitMs(500),
+                follow(follower, leftFlowerOut()),
+                follow(follower, leftFlowerIn()).raceWith(waitMs(1000)),
+                waitMs(500),
+                follow(follower, leftFlowerOut()),
+                follow(follower, leftFlowerBackout()),
                 follow(follower, adjustBeforeShoot()),
                 follow(follower, outToShoot()),
                 waitMs(1000),
@@ -85,8 +85,9 @@ public class OneCycleGardenParkWithM extends AutoRoutine {
                 // Keep the turret on the hive and the flywheel at the right speed while cycling
                 deadline(cycle, robot.aimAtHive(), robot.enableFlywheel()),
                 follow(follower, park()),
-                waitMs(3000),
-                robot.intake.off()
+                waitMs(2000),
+                robot.intake.off(),
+                robot.launcher.idle()
         );
     }
 }
