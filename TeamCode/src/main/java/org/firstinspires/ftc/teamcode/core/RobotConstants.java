@@ -271,6 +271,10 @@ public class RobotConstants {
         // ---- Flywheel ----
         // goBILDA 6000 RPM: 28 ticks/rev, about 2800 ticks/sec flat out. The counter-rollers are geared off this motor.
         public static double FLYWHEEL_MAX_VELOCITY = 2081; // ticks/sec (Nov 13)
+        // Highest speed the flywheel is sent to while aiming at the hive (ticks/sec): we never score from anywhere that
+        // needs more, and spinning up past it only costs time. A shot that needs more counts as no shot. The tuners and
+        // the Shot Table Calibration's hand-set speed aren't capped
+        public static double FLYWHEEL_SPEED_CAP = 1100;
         // Fixed speed for spinUp() and the Flywheel Tuner
         public static double TARGET_VELOCITY = 1609;  // ticks/sec (Oct 26)
         public static double VELOCITY_TOLERANCE = 50; // ticks/sec, when not aiming with ShotSolver. TODO: tune
@@ -343,6 +347,10 @@ public class RobotConstants {
         public static double FLYWHEEL_TICKS_PER_EXIT_SPEED = 3.4;
         // The ball keeps the robot's velocity when it leaves; false simulates every shot from a standstill
         public static boolean SHOOT_ON_THE_MOVE = true;
+        // Fastest robot speed (in/s) the flywheel's speed allows for. Driving faster, it's set as if the robot were
+        // moving this fast, so a fast drive in to stop and shoot doesn't spin it way up (it can't brake, only coast
+        // down). The turret still leads the full speed. 0: the flywheel always plans a standing shot
+        public static double FLYWHEEL_MOVE_LIMIT = 0;
         // Pollen, from the AndyMark product page. Nectar is bigger and heavier in proportion, so it flies the same.
         public static double BALL_DIAMETER = 2.8; // inches
         public static double BALL_MASS = 0.0249;  // kg
