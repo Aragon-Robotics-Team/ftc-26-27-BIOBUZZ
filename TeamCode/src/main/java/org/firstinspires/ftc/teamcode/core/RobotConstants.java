@@ -106,6 +106,13 @@ public class RobotConstants {
         // Operator: hold square / circle this long to set that cell and lock (or unlock) automatic hive detection
         public static double HOLD_TO_LOCK_S = 1;
         public static int LOCK_RUMBLE_MS = 250;
+
+        // Aim from the up cell's tags (core.AimCorrection): where the Limelight sees them against where the pose puts
+        // them moves the aim target by the difference. The pose itself isn't changed. Off: aim from the pose alone
+        public static boolean AIM_FROM_TAGS = true;
+        public static double AIM_SMOOTHING = 0.3;         // share of each new frame's offset taken (1: latest frame only)
+        public static double MAX_AIM_CORRECTION = 12;     // inches: a frame saying the pose is further off is a misread
+        public static double AIM_HEIGHT_TOLERANCE = 6;    // inches: an up-cell tag further off in height = hive tipped
     }
 
     /**
@@ -114,7 +121,9 @@ public class RobotConstants {
      * grow, and log the Limelight's tag positions with the robot standing still.
      */
     public static class Localization {
-        // Correct the pose from the hive's tags. Off: the pose is the Pinpoint's alone, as before
+        // Correct the pose from the hive's tags. Off: the pose is the Pinpoint's alone, as before.
+        // Keep off: on the robot this Kalman fusion made localization less accurate, not more. Vision.AIM_FROM_TAGS
+        // corrects only the aim from the tags instead
         public static boolean FUSE_HIVE_TAGS = false;
         // Odometry: how far off it gets
         public static double TRANSLATION_DRIFT = 0.1;                 // inches per √inch driven

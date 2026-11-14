@@ -76,9 +76,12 @@ public class Robot {
 
     // ---- Hive ----
 
-    /** Center of the opening of our hive's up cell. */
+    /**
+     * Center of the opening of our hive's up cell, moved by where the Limelight last saw that cell's tags against where
+     * the pose puts them (Vision.AIM_FROM_TAGS, HiveVision.aimTarget).
+     */
     public Pose hiveTarget() {
-        return MatchState.hive.cell(MatchState.alliance);
+        return hiveVision.aimTarget(MatchState.hive.cell(MatchState.alliance), MatchState.hive);
     }
 
     public double distanceToHive() {
@@ -200,8 +203,8 @@ public class Robot {
     public void update() {
         for (LynxModule hub : hubs) hub.clearBulkCache();
         for (Subsystem subsystem : subsystems) subsystem.update();
-        // Where the turret was when this loop's pose was read: both from this loop's reads
-        hiveVision.recordTurret(drivebase.getLocalizer().getLastUpdateTime(), launcher.getTurretAngle());
+        // Where the turret and the robot were when this loop's pose was read: both from this loop's reads
+        hiveVision.record(drivebase.getLocalizer().getLastUpdateTime(), launcher.getTurretAngle(), drivebase.getPose());
     }
 
     public void stop() {
@@ -233,6 +236,12 @@ public class Robot {
         Logger.recordOutput("Localization/tagsRejected", filter.getRejected());
         Logger.recordOutput("Localization/redArmDeg", Math.toDegrees(filter.arm(HiveTags.RED)));
         Logger.recordOutput("Localization/blueArmDeg", Math.toDegrees(filter.arm(HiveTags.BLUE)));
+        AimCorrection aim = hiveVision.getAimCorrection();
+        Logger.recordOutput("Aim/fromTags", aim.has(MatchState.hive));
+        Logger.recordOutput("Aim/dx", aim.dx(MatchState.hive));
+        Logger.recordOutput("Aim/dy", aim.dy(MatchState.hive));
+        Logger.recordOutput("Aim/tags", aim.tags(MatchState.hive));
+        Logger.recordOutput("Aim/skipped", aim.getRejected());
         Velocity velocity = drivebase.getVelocity();
         Logger.recordOutput("Drive/speed", Math.hypot(velocity.vx, velocity.vy));
         Logger.recordOutput("Drive/turnRateDeg", Math.toDegrees(velocity.omega));
