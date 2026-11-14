@@ -120,7 +120,7 @@ public class PoseFilterTest {
             if (!Double.isNaN(tipTo) && t > 15) truth[3] = tipTo;
             // Around a circle 30 in across centred 36 in out from the hive's audience side, facing along it
             double a = t * 0.4;
-            double nx = 50 + 15 * Math.cos(a), ny = 30 + 15 * Math.sin(a), nh = a + Math.PI / 2;
+            double nx = HiveTags.pivotX(HiveTags.RED) - 9.25 + 15 * Math.cos(a), ny = 30 + 15 * Math.sin(a), nh = a + Math.PI / 2;
             double c = Math.cos(h), s = Math.sin(h);
             double dx = (nx - x) * c + (ny - y) * s, dy = -(nx - x) * s + (ny - y) * c;
             double dh = Math.atan2(Math.sin(nh - h), Math.cos(nh - h));

@@ -375,10 +375,11 @@ public class RobotConstants {
     /** Red-side poses in Pedro coordinates (inches). Blue is rotated 180° with Alliance.apply; never write blue poses. */
     public static class Field {
         // Center of each cell's opening, from the red driver station's point of view, with the heading pointing out of
-        // the opening. The hive is 12.75 in from field center toward our wall, and the up cell's
-        // opening is centered 15.7 in out from the hive center. Checked Oct 28
-        public static Pose RED_HIVE_LEFT_CELL = new Pose(59.25, 87.7, Math.toRadians(90));   // rear cell
-        public static Pose RED_HIVE_RIGHT_CELL = new Pose(59.25, 56.3, Math.toRadians(-90)); // audience cell
+        // the opening. The hive is 15.75 in from field center toward our wall, and the up cell's
+        // opening is centered 15.7 in out from the hive center. Checked Oct 28 at 12.75 in; moved 3 in toward the
+        // alliance wall Nov 13 (aim was off, the field geometry may not match), with HiveTags.PIVOT_FROM_CENTER
+        public static Pose RED_HIVE_LEFT_CELL = new Pose(56.25, 87.7, Math.toRadians(90));   // rear cell
+        public static Pose RED_HIVE_RIGHT_CELL = new Pose(56.25, 56.3, Math.toRadians(-90)); // audience cell
         // The up cell's opening (Competition Manual 9.6): 20 in wide, 14 in tall, centered 59.6 in
         // above the tiles, and leaning back 30° with the arm, so its face points outward and 30° up
         public static double HIVE_OPENING_CENTER_Z = 59.6;
