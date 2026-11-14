@@ -37,6 +37,7 @@ public class FieldPoses {
     public final Pose gardenCenterLine;
     /** Position to exit after pollen from flower is knocked out. **/
     public final Pose flowerLaunch;
+    public final Pose flowerLaunchHeading;
     /** At the rear-wall flower, where the intake picks up its pollen. */
     public final Pose flowerIntake;
     /** Backed off the rear-wall flower, where the flower pollen is shot. */
@@ -92,8 +93,9 @@ public class FieldPoses {
         adjustToPark = poseFactory.of(38.561, 24.2993, -90);
         bottomPark = poseFactory.of(10.5389, 96.1701, 0);
         topPark = poseFactory.of(11.4049, 124.6458, 0);
-        gardenCenterLine = poseFactory.of(63, 25, 90);
-        flowerLaunch = poseFactory.of(60, 119.7, 90);
+        gardenCenterLine = poseFactory.of(63.5, 25, 90);
+        flowerLaunch = poseFactory.of(63.5, 120, 90);
+        flowerLaunchHeading = poseFactory.of(59.808, 125, 0);
         flowerIntake = poseFactory.of(51, 131, 95);
         flowerShoot = poseFactory.of(56, 121, 95);
         rightLaunch = poseFactory.of(56, 20.219975, 90);

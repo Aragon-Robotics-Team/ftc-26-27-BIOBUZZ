@@ -55,8 +55,12 @@ public class TwoCycleGardenPark extends AutoRoutine {
         return line(poses.gardenCenterLine, poses.flowerLaunch).linear(poses.gardenCenterLine, poses.flowerLaunch);
     }
 
+    private Path adjustFarLaunch() {
+        return line(poses.flowerLaunch, poses.flowerLaunchHeading).linear(poses.flowerLaunch, poses.flowerLaunchHeading);
+    }
+
     private Path park() {
-        return line(poses.flowerLaunch, poses.topPark).linear(poses.flowerLaunch, poses.topPark);
+        return line(poses.flowerLaunchHeading, poses.topPark).linear(poses.flowerLaunchHeading, poses.topPark);
     }
 
     @Override
@@ -71,7 +75,7 @@ public class TwoCycleGardenPark extends AutoRoutine {
                 // Garden: intake on the way in, stop once out at the center line
                 robot.intake.intake(),
                 follow(follower, prepareGardenIntake()),
-                follow(follower, gardenIntake1()),
+                follow(follower, gardenIntake1()).raceWith(waitMs(1500)),
                 waitMs(1000),
                 follow(follower, gardenIntakeBack()),
                 follow(follower, gardenIntake2()).raceWith(waitMs(1500)),
@@ -80,6 +84,7 @@ public class TwoCycleGardenPark extends AutoRoutine {
 
                 // Up the middle to the other side and shoot the garden pollen
                 follow(follower, centerLineToFlowerLaunch()),
+                follow(follower, adjustFarLaunch()),
                 robot.shoot(),
                 // Second tip
                 robot.flipHive()
