@@ -270,7 +270,7 @@ public class RobotConstants {
 
         // ---- Flywheel ----
         // goBILDA 6000 RPM: 28 ticks/rev, about 2800 ticks/sec flat out. The counter-rollers are geared off this motor.
-        public static double FLYWHEEL_MAX_VELOCITY = 2079; // ticks/sec (Nov 9)
+        public static double FLYWHEEL_MAX_VELOCITY = 2081; // ticks/sec (Nov 13)
         // Fixed speed for spinUp() and the Flywheel Tuner
         public static double TARGET_VELOCITY = 1609;  // ticks/sec (Oct 26)
         public static double VELOCITY_TOLERANCE = 50; // ticks/sec, when not aiming with ShotSolver. TODO: tune
@@ -289,11 +289,11 @@ public class RobotConstants {
         public static double FLYWHEEL_FULL_POWER_ERROR = 40;
         // Feedforward: power at 12 V to hold a speed, scaled by 12 / battery volts so it holds the same on a tired battery.
         // The Flywheel Auto Tuner prints KV. A little low is fine; too high and the flywheel settles above target.
-        public static double FLYWHEEL_KV = 0.000525; // power per tick/sec (Nov 9)
+        public static double FLYWHEEL_KV = 0.000541; // power per tick/sec (Nov 13)
         public static double FLYWHEEL_KS = 0.003244;        // power to overcome friction
         // PID on the speed error. KP = KV is about the hub PIDF that rapid-fired well on Oct 28 (P = F = 16.84 in the
         // hub's units). The Flywheel Auto Tuner finds KP.
-        public static double FLYWHEEL_KP = 0.003149; // power per tick/sec of error (Nov 9)
+        public static double FLYWHEEL_KP = 0.002164; // power per tick/sec of error (Nov 13)
         public static double FLYWHEEL_KI = 0;        // power per tick of accumulated error
         public static double FLYWHEEL_KD = 0;        // power per tick/sec²; leave 0: the speed reading is too noisy to differentiate
 
