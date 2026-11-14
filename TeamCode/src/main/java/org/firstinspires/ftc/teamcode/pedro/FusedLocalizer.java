@@ -25,14 +25,12 @@ public class FusedLocalizer implements Localizer {
     private Pose lastRaw;
     private double lastTime = Double.NaN;
     private MotionState state = MotionState.zero();
+    private double lastReset = Double.NEGATIVE_INFINITY;
 
     public FusedLocalizer(Localizer odometry) {
         this.odometry = odometry;
         lastRaw = odometry.pose();
-        filter = new PoseFilter(new PoseFilter.Camera(RobotConstants.Launcher.TURRET_OFFSET_X,
-                RobotConstants.Launcher.TURRET_OFFSET_Y, RobotConstants.Vision.LENS_AHEAD,
-                RobotConstants.Vision.LENS_HEIGHT, RobotConstants.Vision.TILT),
-                lastRaw.x(), lastRaw.y(), lastRaw.heading(),
+        filter = new PoseFilter(camera(), lastRaw.x(), lastRaw.y(), lastRaw.heading(),
                 // Both hives start a match with their RIGHT cell up
                 HiveTags.restAngle(Alliance.RED, Hive.RIGHT), HiveTags.restAngle(Alliance.BLUE, Hive.RIGHT));
         state = MotionState.ofVelocity(lastRaw, Velocity.zero());
@@ -66,7 +64,8 @@ public class FusedLocalizer implements Localizer {
     public void setPose(Pose pose) {
         odometry.setPose(pose);
         lastRaw = odometry.pose();
-        filter.setPose(now(), pose.x(), pose.y(), pose.heading());
+        lastReset = now();
+        filter.setPose(lastReset, pose.x(), pose.y(), pose.heading());
         publish();
     }
 
@@ -90,6 +89,17 @@ public class FusedLocalizer implements Localizer {
     /** The operator (or a new match) says which cell of an alliance's hive is up. */
     public void setHive(Alliance alliance, Hive up) {
         filter.setArm(alliance == Alliance.RED ? HiveTags.RED : HiveTags.BLUE, HiveTags.restAngle(alliance, up));
+    }
+
+    /** The Limelight's mount on the robot, from RobotConstants. */
+    public static PoseFilter.Camera camera() {
+        return new PoseFilter.Camera(RobotConstants.Launcher.TURRET_OFFSET_X, RobotConstants.Launcher.TURRET_OFFSET_Y,
+                RobotConstants.Vision.LENS_AHEAD, RobotConstants.Vision.LENS_HEIGHT, RobotConstants.Vision.TILT);
+    }
+
+    /** When setPose() last moved the pose (seconds, System.nanoTime's clock), -infinity if never. */
+    public double getLastResetTime() {
+        return lastReset;
     }
 
     /** When update() last read the Pinpoint (seconds, System.nanoTime's clock), NaN before the first. */
