@@ -418,9 +418,14 @@ public class RobotConstants {
         // 2.6 in down (1 - 2.6 = -1.6) and y 1.3 in up.
         public static double START_X_OFFSET = -1.6;
         public static double START_Y_OFFSET = 1.3;
+        // The right corner needs its own correction: starting there with the offsets above, a robot placed at the
+        // real 72, 72 read 75.4, 70.7, so x moves another 3.4 in down (-1.6 - 3.4 = -5.0) and y another 1.3 up
+        // (1.3 + 1.3 = 2.6).
+        public static double RIGHT_START_X_OFFSET = -5.0;
+        public static double RIGHT_START_Y_OFFSET = 2.6;
         public static Pose RED_LEFT_CORNER =  // tile A6, alliance wall x rear wall
                 new Pose(WALL + ROBOT_LENGTH / 2 + START_X_OFFSET, 144 - WALL - ROBOT_WIDTH / 2 + START_Y_OFFSET, 0);
         public static Pose RED_RIGHT_CORNER = // tile A1, alliance wall x audience wall
-                new Pose(WALL + ROBOT_LENGTH / 2 + START_X_OFFSET, WALL + ROBOT_WIDTH / 2 + START_Y_OFFSET, 0);
+                new Pose(WALL + ROBOT_LENGTH / 2 + RIGHT_START_X_OFFSET, WALL + ROBOT_WIDTH / 2 + RIGHT_START_Y_OFFSET, 0);
     }
 }

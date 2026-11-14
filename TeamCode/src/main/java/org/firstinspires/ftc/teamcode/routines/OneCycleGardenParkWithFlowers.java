@@ -24,7 +24,6 @@ public class OneCycleGardenParkWithFlowers extends AutoRoutine {
      * redLeftFlowerBackout to the far flower would brush it). Only this routine uses it, so it lives here; it's the
      * old rear-flower approach spot (Nov 10), already facing the rear wall.
      */
-    private final Pose farFlowerAdjust = poseFactory.of(34, 118.764, 90);
 
     public OneCycleGardenParkWithFlowers(Robot robot, Alliance alliance) {
         super(robot, alliance);
@@ -82,12 +81,16 @@ public class OneCycleGardenParkWithFlowers extends AutoRoutine {
     }
 
     // Far flower: around the hive's foot to the adjust spot, Out, In, Out, In, then back off the wall
-    private Path toFarFlowerAdjust() {
-        return line(poses.redLeftFlowerBackout, farFlowerAdjust).linear(poses.redLeftFlowerBackout, farFlowerAdjust);
+    private Path farFlowerApproach() {
+        return line(poses.redLeftFlowerBackout, poses.redFarFlowerApproach).linear(poses.redLeftFlowerBackout, poses.redFarFlowerApproach);
+    }
+
+    private Path farFlowerAdjust() {
+        return line(poses.redFarFlowerApproach, poses.redFarFlowerAdjust).linear(poses.redFarFlowerApproach, poses.redFarFlowerAdjust);
     }
 
     private Path toFarFlower() {
-        return line(farFlowerAdjust, poses.redFarFlowerOut).linear(farFlowerAdjust, poses.redFarFlowerOut);
+        return line(poses.redFarFlowerApproach, poses.redFarFlowerOut).linear(poses.redFarFlowerApproach, poses.redFarFlowerOut);
     }
 
     private Path farFlowerIn() {
@@ -129,20 +132,21 @@ public class OneCycleGardenParkWithFlowers extends AutoRoutine {
                 // Left flower: slide in and out against it to knock its pollen out (intake still on)
                 follow(follower, approachLeftFlower()),
                 follow(follower, toLeftFlower()),
-                follow(follower, leftFlowerIn()).raceWith(waitMs(1500)),
+                follow(follower, leftFlowerIn()).raceWith(waitMs(1000)),
                 waitMs(500),
                 follow(follower, leftFlowerOut()),
-                follow(follower, leftFlowerIn()).raceWith(waitMs(1500)),
+                follow(follower, leftFlowerIn()).raceWith(waitMs(1000)),
                 waitMs(500),
                 follow(follower, leftFlowerBackout()),
 
                 // Far flower: arrive at the Out spot, slide In / Out / In, then back off the wall
-                follow(follower, toFarFlowerAdjust()),
+                follow(follower, farFlowerApproach()),
+                follow(follower, farFlowerAdjust()),
                 follow(follower, toFarFlower()),
-                follow(follower, farFlowerIn()).raceWith(waitMs(1500)),
+                follow(follower, farFlowerIn()).raceWith(waitMs(1000)),
                 waitMs(500),
                 follow(follower, farFlowerOut()),
-                follow(follower, farFlowerIn()).raceWith(waitMs(1500)),
+                follow(follower, farFlowerIn()).raceWith(waitMs(1000)),
                 waitMs(500),
                 follow(follower, farFlowerBackout())
         );
@@ -151,8 +155,9 @@ public class OneCycleGardenParkWithFlowers extends AutoRoutine {
                 // Keep the turret on the hive and the flywheel at the right speed while cycling
                 deadline(cycle, robot.aimAtHive(), robot.enableFlywheel()),
                 follow(follower, park()),
-                waitMs(3000),
-                robot.intake.off()
+                waitMs(2000),
+                robot.intake.off(),
+                robot.launcher.idle()
         );
     }
 }

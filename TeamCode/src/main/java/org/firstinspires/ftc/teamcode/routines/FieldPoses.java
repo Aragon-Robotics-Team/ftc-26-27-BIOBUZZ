@@ -35,14 +35,9 @@ public class FieldPoses {
 
     /** Lines up to travel through the middle of the hive on the garden side of red. **/
     public final Pose gardenCenterLine;
-    /** Flower side launch zone on red. **/
-    public final Pose flowerReady;
-    /** Position right before pollen from flower is knocked out. **/
-    public final Pose flowerKnock;
-    /** Position after pollen from flower is knocked out. **/
-    public final Pose flowerOut;
     /** Position to exit after pollen from flower is knocked out. **/
     public final Pose flowerLaunch;
+    public final Pose flowerLaunchHeading;
     /** At the rear-wall flower, where the intake picks up its pollen. */
     public final Pose flowerIntake;
     /** Backed off the rear-wall flower, where the flower pollen is shot. */
@@ -70,6 +65,9 @@ public class FieldPoses {
     public final Pose redLeftFlowerOut;
     /** Backed off the alliance wall. */
     public final Pose redLeftFlowerBackout;
+    /** Approach far flower. */
+    public final Pose redFarFlowerApproach;
+    public final Pose redFarFlowerAdjust;
     /** Go in to far flower by red alliance side. */
     public final Pose redFarFlowerIn;
     /** Back out slightly of far flower by red alliance side. */
@@ -87,7 +85,7 @@ public class FieldPoses {
         // y = 5.0366, 4.2134 in short of where the robot really sits, so they're all 4.2134 in up from what was tuned:
         // the same moves on the field
         start = poseFactory.of(56.8946, RobotConstants.Field.WALL + RobotConstants.Field.ROBOT_LENGTH / 2, 90);
-        farStart = poseFactory.of(15.9528, 132.7395, 90);
+        farStart = poseFactory.of(12.5, 139.7, -90);
         startLaunch = poseFactory.of(59.808, 15.1732, 90);
         gardenBorder = poseFactory.of(9.577, 28.2910, -90);
         gardenIntake = poseFactory.of(9.561, 13.2993, -90);
@@ -95,11 +93,9 @@ public class FieldPoses {
         adjustToPark = poseFactory.of(38.561, 24.2993, -90);
         bottomPark = poseFactory.of(10.5389, 96.1701, 0);
         topPark = poseFactory.of(11.4049, 124.6458, 0);
-        gardenCenterLine = poseFactory.of(60, 40, 90);
-        flowerReady = poseFactory.of(10, 60, 180);
-        flowerKnock = poseFactory.of(10, 55, 180);
-        flowerOut = poseFactory.of(30, 60, 180);
-        flowerLaunch = poseFactory.of(60, 119.7, 90);
+        gardenCenterLine = poseFactory.of(63.5, 25, 90);
+        flowerLaunch = poseFactory.of(63.5, 120, 90);
+        flowerLaunchHeading = poseFactory.of(59.808, 125, 0);
         flowerIntake = poseFactory.of(51, 131, 95);
         flowerShoot = poseFactory.of(56, 121, 95);
         rightLaunch = poseFactory.of(56, 20.219975, 90);
@@ -108,10 +104,12 @@ public class FieldPoses {
         allianceWallStart = poseFactory.of(RobotConstants.Field.WALL + RobotConstants.Field.ROBOT_LENGTH / 2, 36, 0);
         gardenLook = poseFactory.of(30, 16, 190);
         redLeftFlowerApproach = poseFactory.of(23,60.8,180);
-        redLeftFlowerIn = poseFactory.of(13.1, 59.2, 180);
-        redLeftFlowerOut = poseFactory.of(17.4, 60.8, 180);
+        redLeftFlowerIn = poseFactory.of(12.1, 60.2, 180);
+        redLeftFlowerOut = poseFactory.of(12.1, 62.2, 180);
         redLeftFlowerBackout = poseFactory.of(20.3, 60.8, 180);
-        redFarFlowerIn = poseFactory.of(61.5, 133, 90);
-        redFarFlowerOut = poseFactory.of(66.1, 133, 90);
+        redFarFlowerApproach = poseFactory.of(48,110,90);
+        redFarFlowerAdjust = poseFactory.of(62,115,90);
+        redFarFlowerIn = poseFactory.of(58, 135, 90);
+        redFarFlowerOut = poseFactory.of(62.1, 135, 90);
         redFarFlowerBackout = poseFactory.of(66.1, 121.8, 90);    }
 }
