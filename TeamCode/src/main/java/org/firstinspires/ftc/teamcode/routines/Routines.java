@@ -17,6 +17,7 @@ import java.util.List;
 public enum Routines {
     ONE_CYCLE_GARDEN_PARK(OneCycleGardenPark.class),
     ONE_CYCLE_GARDEN_PARK_WITH_FLOWERS(OneCycleGardenParkWithFlowers.class),
+    ONE_CYCLE_GARDEN_PARK_M(OneCycleGardenParkWithM.class),
     TWO_CYCLE_GARDEN_PARK(TwoCycleGardenPark.class),
     TWO_CYCLE_GARDEN_PARK_KNOCKOUT(TwoCycleGardenParkKnockout.class),
     ONE_CYCLE_FLOWER_PARK(OneCycleFlowerPark.class),
