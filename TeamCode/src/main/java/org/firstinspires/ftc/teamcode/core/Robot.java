@@ -50,6 +50,13 @@ public class Robot {
     public final HiveVision hiveVision;
     public final BallVision ballVision;
 
+    /**
+     * Aim and flywheel speed allow for the robot's motion (lead, AIM_LOOKAHEAD, the turret's tracking feedforward).
+     * Auto turns it off: there the chassis rocking from the turret's own swing, projected AIM_LOOKAHEAD ahead, moved
+     * the turret's target and kept it oscillating ±10° at the first shot (Auto log, Nov 14 14:14).
+     */
+    public boolean velocityCompensation = true;
+
     private final List<LynxModule> hubs;
     private final Subsystem[] subsystems;
 
@@ -114,7 +121,7 @@ public class Robot {
 
     /** Keep the turret on the hive's up cell, leading it while the robot moves. Runs until interrupted. */
     public Command aimAtHive() {
-        return launcher.aimAt(drivebase::getPose, drivebase::getVelocity, this::hiveTarget);
+        return launcher.aimAt(drivebase::getPose, this::aimVelocity, this::hiveTarget);
     }
 
     /**
@@ -122,7 +129,12 @@ public class Robot {
      * Limelight's correction). Runs until launcher.idle().
      */
     public Command enableFlywheel() {
-        return launcher.enableFlywheel(drivebase::getPose, drivebase::getVelocity, this::hiveCell);
+        return launcher.enableFlywheel(drivebase::getPose, this::aimVelocity, this::hiveCell);
+    }
+
+    /** The robot's velocity for aiming, or standing still when velocityCompensation is off. */
+    private Velocity aimVelocity() {
+        return velocityCompensation ? drivebase.getVelocity() : new Velocity(0, 0, 0);
     }
 
     // ---- Shooting ----
