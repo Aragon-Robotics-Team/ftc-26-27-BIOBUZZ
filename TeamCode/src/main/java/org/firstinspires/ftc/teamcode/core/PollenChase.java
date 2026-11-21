@@ -54,6 +54,10 @@ public class PollenChase {
     private static final double REMEMBER_S = 2;
     // A ball this close to the wall straight ahead is driven past all the way to the wall: a row of 4 along that line
     private static final double WALL_RUN = 12;
+    // A path end leaves the robot's footprint this far off the hive's feet and the flower columns, backed off along the
+    // approach (in BACK_OFF_STEP steps, up to MAX_BACK_OFF) if driving the mouth past the ball would put it into one
+    static final double KEEP_CLEAR = 0.5;
+    private static final double BACK_OFF_STEP = 0.25, MAX_BACK_OFF = 24;
 
     private enum State {
         APPROACH, // driving at a target in view
@@ -96,6 +100,7 @@ public class PollenChase {
     private int swept, refusals;
     private double lastSweptFrame = Double.NaN, sweptFullAt = Double.NaN;
     private double moreS = Double.POSITIVE_INFINITY, lastPickupAt; // see endingAfter; the last confirmed pickup
+    private String endReason; // why done() ended it, or null while it runs
 
     public PollenChase(Robot robot, int maxBalls, double timeoutS) {
         this.robot = robot;
@@ -129,9 +134,15 @@ public class PollenChase {
         return pickedUp + swept;
     }
 
+    /** Why the chase ended, or null while it's still going. */
+    public String getEndReason() {
+        return endReason;
+    }
+
     /** What the chase is doing, for telemetry. */
     public String status() {
         if (state == null) return "not started";
+        if (endReason != null) return "ended: " + endReason + ", picked up " + pickedUp;
         String doing = chasing != null ? state.toString()
                 : searchFrom == null ? "no target" : Double.isNaN(turnStart) ? "moving to turn" : "search turn";
         return doing + ", picked up " + pickedUp;
@@ -157,6 +168,7 @@ public class PollenChase {
         swept = 0;
         sweptFullAt = Double.NaN;
         refusals = 0;
+        endReason = null;
     }
 
     private boolean done() {
@@ -164,8 +176,13 @@ public class PollenChase {
         // Full by what the mouth passed over: CONFIRM_S more with the intake on, for it to take them in
         if (getPickedUp() < maxBalls) sweptFullAt = Double.NaN;
         else if (Double.isNaN(sweptFullAt)) sweptFullAt = t;
-        return pickedUp >= maxBalls || t - sweptFullAt >= CONFIRM_S || t - startTime > timeoutS
-                || searched(t) >= SEARCH_TURN || (pickedUp > 0 && t - lastPickupAt > moreS);
+        if (refusals >= FULL_REFUSALS) endReason = "full (" + refusals + " balls at the mouth wouldn't go in)";
+        else if (pickedUp >= maxBalls) endReason = "full (" + pickedUp + " confirmed)";
+        else if (t - sweptFullAt >= CONFIRM_S) endReason = "full (" + getPickedUp() + " swept over)";
+        else if (t - startTime > timeoutS) endReason = "timed out";
+        else if (searched(t) >= SEARCH_TURN) endReason = "search turn found no pollen";
+        else if (pickedUp > 0 && t - lastPickupAt > moreS) endReason = "no more pickups for a while";
+        return endReason != null;
     }
 
     private void execute() {
@@ -412,8 +429,11 @@ public class PollenChase {
         // A wall close ahead of the ball: on to the wall (clamp stops it short), for any balls in a row behind this one
         double past = wallAhead(target.x, target.y, ux, uy) < WALL_RUN && !flowerNear(target.x, target.y)
                 ? WALL_RUN : OVERSHOOT;
-        double[] at = onOurHalf(clamp(target.x + ux * (past - INTAKE_REACH)), clamp(target.y + uy * (past - INTAKE_REACH)),
+        // Short of any hive foot or flower the overshoot would run the robot into, kept to our half, then checked again
+        double[] at = clearOf(clamp(target.x + ux * (past - INTAKE_REACH)), clamp(target.y + uy * (past - INTAKE_REACH)),
                 heading, ux, uy);
+        at = onOurHalf(at[0], at[1], heading, ux, uy);
+        at = clearOf(at[0], at[1], heading, ux, uy);
         double x = at[0], y = at[1];
         double speed = distance < NEAR_BALL_DISTANCE ? NEAR_BALL_SPEED : CHASE_MAX_SPEED;
         if (detour != null) {
@@ -446,6 +466,57 @@ public class PollenChase {
         }
         follower.follow(line(pose, end).constant(heading)
                 .with(Constants.foresightConfig.maxVelocityConstraint.at(end == goal ? speed : CHASE_MAX_SPEED)));
+    }
+
+    /**
+     * (x, y), or the first spot back from it along -(ux, uy) where the robot at heading is KEEP_CLEAR off every hive
+     * foot and flower column and inside the walls. As is if there's none within MAX_BACK_OFF.
+     */
+    static double[] clearOf(double x, double y, double heading, double ux, double uy) {
+        for (double back = 0; back <= MAX_BACK_OFF; back += BACK_OFF_STEP) {
+            double cx = x - ux * back, cy = y - uy * back;
+            if (footprintClear(cx, cy, heading)) return new double[] {cx, cy};
+        }
+        return new double[] {x, y};
+    }
+
+    /** Whether the robot's frame at (x, y, heading) is KEEP_CLEAR off the hive's feet and flowers, and inside the walls. */
+    static boolean footprintClear(double x, double y, double heading) {
+        double c = Math.cos(heading), s = Math.sin(heading);
+        double hl = ROBOT_LENGTH / 2, hw = ROBOT_WIDTH / 2;
+        // Flower columns: the nearest point of the frame to each one's center
+        for (Pose flower : RobotConstants.Field.FLOWERS) {
+            double dx = flower.x() - x, dy = flower.y() - y;
+            double a = dx * c + dy * s, b = -dx * s + dy * c; // ahead, to the left
+            double qa = Math.max(-hl, Math.min(hl, a)), qb = Math.max(-hw, Math.min(hw, b));
+            if (Math.hypot(a - qa, b - qb) < RobotConstants.Field.FLOWER_RADIUS + KEEP_CLEAR) return false;
+        }
+        // Hive feet and walls: points around the frame's edge, an inch or less apart (the feet are 2 in wide), and
+        // each foot's corners inside the frame
+        int n = 16;
+        double lo = WALL - 0.05, hi = 144 - WALL + 0.05; // touching a wall is fine: the wall run drives to it
+        for (int side = 0; side < 4; side++) {
+            for (int i = 0; i <= n; i++) {
+                double f = -1 + 2.0 * i / n;
+                double a = side == 0 ? hl : side == 1 ? -hl : f * hl;
+                double b = side == 2 ? hw : side == 3 ? -hw : f * hw;
+                double px = x + a * c - b * s, py = y + a * s + b * c;
+                if (px < lo || px > hi || py < lo || py > hi) return false;
+                for (double[] foot : RobotConstants.Field.HIVE_FEET) {
+                    if (px > foot[0] - KEEP_CLEAR && px < foot[2] + KEEP_CLEAR
+                            && py > foot[1] - KEEP_CLEAR && py < foot[3] + KEEP_CLEAR) return false;
+                }
+            }
+        }
+        for (double[] foot : RobotConstants.Field.HIVE_FEET) {
+            for (int k = 0; k < 4; k++) {
+                double dx = (k < 2 ? foot[0] : foot[2]) - x, dy = (k % 2 == 0 ? foot[1] : foot[3]) - y;
+                if (Math.abs(dx * c + dy * s) < hl + KEEP_CLEAR && Math.abs(-dx * s + dy * c) < hw + KEEP_CLEAR) {
+                    return false;
+                }
+            }
+        }
+        return true;
     }
 
     /**

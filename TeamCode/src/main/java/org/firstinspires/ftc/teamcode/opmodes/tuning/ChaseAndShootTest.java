@@ -34,7 +34,8 @@ import org.psilynx.psikit.core.Logger;
  * or timeoutS), then it drives to the launch spot for the cell it thinks is up (MatchState.hive, which hive
  * vision keeps right as the hive tips; see launchFor), around flowers and the hive's feet, with the turret on the hive and the
  * flywheel spinning up, shoots what it has, and chases again from there for the room left. It stops when a chase picks
- * up nothing, or when there's no shot from the launch spot. A test, not a menu Auto.
+ * up nothing, or when there's no shot from the launch spot. A test, not a menu Auto. The turret stays on the hive
+ * throughout, so hive vision can see the tags while it chases.
  *
  * During init pick the alliance (square / circle) and the corner the robot starts in, back against the alliance wall (dpad left /
  * right). The hive starts with the RIGHT cell up, as at the start of a match.
@@ -71,6 +72,7 @@ public class ChaseAndShootTest extends OpMode {
         telemetry.addData("Start", "%s corner, back to the alliance wall   (dpad ←→)",
                 corner == RED_LEFT_CORNER ? "our LEFT" : "our RIGHT");
         telemetry.addData("Ball vision", robot.ballVision.status());
+        BallChaseTest.turretAndLimelightCheck(robot, telemetry);
         telemetry.update();
     }
 
@@ -78,7 +80,9 @@ public class ChaseAndShootTest extends OpMode {
     public void start() {
         robot.drivebase.setPose(MatchState.alliance.apply(corner));
         robot.start();
-        schedule(cycle());
+        // The turret on the hive the whole time, chasing too, so the Limelight on it keeps the tags in view and hive
+        // vision keeps MatchState.hive right (as in TeleOp)
+        schedule(robot.aimAtHive(), cycle());
         loopTimer.reset();
     }
 
@@ -95,7 +99,7 @@ public class ChaseAndShootTest extends OpMode {
                     held += chase.getPickedUp();
                     if (held == 0) return instant(() -> stage = "done: the chase found no pollen");
                     return sequential(
-                            deadline(lazy(this::driveAndShoot), robot.aimAtHive(), robot.enableFlywheel()),
+                            deadline(lazy(this::driveAndShoot), robot.enableFlywheel()),
                             lazy(() -> fired ? cycle() : instant(() -> stage = "done: no shot from the launch spot")));
                 }));
     }
