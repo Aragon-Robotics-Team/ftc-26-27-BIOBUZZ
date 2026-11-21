@@ -8,9 +8,11 @@ import static org.firstinspires.ftc.teamcode.core.RobotConstants.Field.ROBOT_LEN
 import static org.firstinspires.ftc.teamcode.core.RobotConstants.Field.ROBOT_WIDTH;
 import static org.firstinspires.ftc.teamcode.core.RobotConstants.Field.WALL;
 
+import com.pedropathing.api.Paths;
 import com.pedropathing.follower.Follower;
 import com.pedropathing.ivy.Command;
 import com.pedropathing.math.Pose;
+import com.pedropathing.paths.Path;
 
 import org.firstinspires.ftc.teamcode.pedro.Constants;
 import org.firstinspires.ftc.teamcode.subsystems.BallVision;
@@ -30,7 +32,9 @@ import java.util.List;
  * path is done, the target has to stay out of sight for CONFIRM_S to count as picked up; if it shows up again (pushed
  * or bounced) the chase goes after it again, up to MAX_TRIES times.
  *
- * Paths are capped at CHASE_MAX_SPEED, and NEAR_BALL_SPEED within NEAR_BALL_DISTANCE of the target. A flower or hive
+ * Paths are capped at CHASE_MAX_SPEED, NEAR_BALL_SPEED within NEAR_BALL_DISTANCE of the target, and OBSTACLE_SPEED
+ * on the stretch that passes within OBSTACLE_SLOW_DISTANCE of a hive foot or flower (from OBSTACLE_BRAKE_LEAD before
+ * it, since the drive slows down only once it's on the capped stretch). A flower or hive
  * foot in the way is driven around (FieldRoutes): the path goes to the first waypoint, then on. A ball beside a wall,
  * a foot or a flower is lined up first: LINE_UP_OUT out from it on its open side, then straight in, square. One within
  * WALL_RUN of the wall ahead (and not by a flower) is driven past to the wall, so balls in a row behind it (hidden behind the first) go in
@@ -40,13 +44,14 @@ import java.util.List;
  *
  * With nothing to chase it searches: turns in place at SEARCH_TURN_RATE, toward the side the camera looks, until pollen
  * comes into view. A frame up against a wall can't turn, so it first drives out to the nearest spot with room to turn.
- * Ends after maxBalls pickups, after a SEARCH_TURN without seeing any, or after timeoutS. The robot then holds its
- * position and the intake stays on.
+ * Ends after maxBalls confirmed pickups; with enoughAt (MIN_LOAD) of them, once no pollen is within NEARBY_DISTANCE;
+ * after a SEARCH_TURN without seeing any; or after timeoutS. The robot then holds its position and the intake stays on.
  *
- * Nothing counts the balls inside, so pickups are counted from the camera, erring high: every pollen seen in the last
- * REMEMBER_S that the intake's mouth then passes over went in (a row along a wall goes in together, and the ones behind
- * the first are hidden from the camera by then), and a target confirmed gone counts at least one. A target at the
- * mouth that won't go in, FULL_REFUSALS times in a row, means the robot is full.
+ * Nothing counts the balls inside, so pickups are counted from the camera, and only once they're confirmed: when a
+ * target the robot drove over stays gone for CONFIRM_S, it counts, and so does every other pollen the intake's mouth
+ * passed over that's gone too (a row along a wall goes in together). Passing over a ball isn't enough by itself: one
+ * pushed along ahead of the mouth is still seen, so it doesn't count. A target at the mouth that won't go in,
+ * FULL_REFUSALS times in a row, means the robot is full.
  */
 public class PollenChase {
     private static final int MAX_TRIES = 3;
@@ -97,8 +102,9 @@ public class PollenChase {
     // Pollen seen lately, field {x, y, last seen}; how many the mouth has passed over since the last confirmed pickup;
     // targets in a row that wouldn't go in
     private final List<double[]> seenPollen = new java.util.ArrayList<>();
-    private int swept, refusals;
-    private double lastSweptFrame = Double.NaN, sweptFullAt = Double.NaN;
+    private int refusals;
+    private double lastSweptFrame = Double.NaN;
+    private int enough = Integer.MAX_VALUE; // see enoughAt
     private double moreS = Double.POSITIVE_INFINITY, lastPickupAt; // see endingAfter; the last confirmed pickup
     private String endReason; // why done() ended it, or null while it runs
 
@@ -129,9 +135,18 @@ public class PollenChase {
         return this;
     }
 
-    /** Pollen taken in, as far as it can tell (it counts high rather than low). */
+    /**
+     * Ends the chase once it has confirmed this many pickups and there's no pollen within NEARBY_DISTANCE: worth going to
+     * shoot rather than hunting further. With pollen that close it keeps going, up to maxBalls. Before command().
+     */
+    public PollenChase enoughAt(int balls) {
+        enough = balls;
+        return this;
+    }
+
+    /** Pollen taken in, confirmed by the camera. */
     public int getPickedUp() {
-        return pickedUp + swept;
+        return pickedUp;
     }
 
     /** Why the chase ended, or null while it's still going. */
@@ -165,21 +180,17 @@ public class PollenChase {
         vision.tracker().drop();
         vision.clearSkips();
         seenPollen.clear();
-        swept = 0;
-        sweptFullAt = Double.NaN;
         refusals = 0;
         endReason = null;
     }
 
     private boolean done() {
         double t = now();
-        // Full by what the mouth passed over: CONFIRM_S more with the intake on, for it to take them in
-        if (getPickedUp() < maxBalls) sweptFullAt = Double.NaN;
-        else if (Double.isNaN(sweptFullAt)) sweptFullAt = t;
         if (refusals >= FULL_REFUSALS) endReason = "full (" + refusals + " balls at the mouth wouldn't go in)";
-        else if (pickedUp >= maxBalls) endReason = "full (" + pickedUp + " confirmed)";
-        else if (t - sweptFullAt >= CONFIRM_S) endReason = "full (" + getPickedUp() + " swept over)";
-        else if (t - startTime > timeoutS) endReason = "timed out";
+        else if (pickedUp >= maxBalls) endReason = "full (" + pickedUp + " picked up)";
+        else if (pickedUp >= enough && nearestPollen() > NEARBY_DISTANCE) {
+            endReason = "has " + pickedUp + ", no more pollen nearby";
+        } else if (t - startTime > timeoutS) endReason = "timed out";
         else if (searched(t) >= SEARCH_TURN) endReason = "search turn found no pollen";
         else if (pickedUp > 0 && t - lastPickupAt > moreS) endReason = "no more pickups for a while";
         return endReason != null;
@@ -192,7 +203,7 @@ public class PollenChase {
         sweep(tracker.chaseable(), t);
         if (MatchLog.active()) {
             Logger.recordOutput("Chase/status", status());
-            Logger.recordOutput("Chase/swept", swept);
+            Logger.recordOutput("Chase/swept", sweptNotConfirmed());
             Logger.recordOutput("Chase/target", target == null ? "none"
                     : String.format("%.1f, %.1f%s%s", target.x, target.y, target.atIntake ? " at intake" : "",
                     linedUp ? " lined up" : ""));
@@ -219,11 +230,12 @@ public class PollenChase {
         boolean wontGoIn = inReachTooLong(target, t);
         if (wontGoIn) refused();
         if (wontGoIn || (state != State.CONFIRM && stuck(t))) {
+            vision.skip(target.x, target.y, SKIP_S); // or the next frame picks it (or one beside it) right back
             tracker.drop();
             detour = null;
             return;
         }
-        if (state == State.APPROACH && rolling(target, t)) {
+        if (state == State.APPROACH && rolling(target, t, Math.abs(robot.drivebase.getVelocity().omega))) {
             follower.hold(follower.pose()); // let it settle
             goal = null;
             detour = null;
@@ -260,6 +272,7 @@ public class PollenChase {
                     if (Math.hypot(target.x - pose.x(), target.y - pose.y()) < IN_REACH) refused();
                     if (pickedUp >= maxBalls) break;
                     if (++tries >= MAX_TRIES) {
+                        vision.skip(target.x, target.y, SKIP_S);
                         tracker.drop();
                     } else {
                         goal = null;
@@ -267,9 +280,8 @@ public class PollenChase {
                         progressPose = null;
                     }
                 } else if (t - stateSince >= CONFIRM_S) {
-                    pickedUp += Math.max(1, swept); // the target is among those swept, if the camera saw it go in
+                    pickedUp += Math.max(1, confirmSwept(t)); // the target is among them, if the camera saw it go in
                     lastPickupAt = t;
-                    swept = 0;
                     refusals = 0;
                     tracker.drop();
                 }
@@ -447,7 +459,8 @@ public class PollenChase {
             if (open != null && linedUp) lineUp = null;
         }
         // Redo the path if the target moved enough, or it's come within NEAR_BALL_DISTANCE (a slower cap)
-        if (goal != null && Math.hypot(x - goal.x(), y - goal.y()) < REPLAN_DISTANCE && speed == pathSpeed) return;
+        double replan = Math.max(REPLAN_DISTANCE, REPLAN_FRACTION * distance);
+        if (goal != null && Math.hypot(x - goal.x(), y - goal.y()) < replan && speed == pathSpeed) return;
 
         goal = new Pose(x, y, heading);
         pathSpeed = speed;
@@ -464,8 +477,62 @@ public class PollenChase {
             detourLinesUp = true;
             end = lineUp;
         }
-        follower.follow(line(pose, end).constant(heading)
-                .with(Constants.foresightConfig.maxVelocityConstraint.at(end == goal ? speed : CHASE_MAX_SPEED)));
+        follower.follow(leg(pose, end, heading, end == goal ? speed : CHASE_MAX_SPEED));
+    }
+
+    /**
+     * A straight path from a to b at heading, capped at cap, and at OBSTACLE_SPEED on the stretch that passes within
+     * OBSTACLE_SLOW_DISTANCE of a hive foot or flower, starting OBSTACLE_BRAKE_LEAD before it.
+     */
+    static Path leg(Pose a, Pose b, double heading, double cap) {
+        double length = Math.hypot(b.x() - a.x(), b.y() - a.y());
+        int n = Math.max(1, (int) Math.ceil(length)); // about an inch apart
+        double first = -1, last = -1;
+        for (int i = 0; i <= n; i++) {
+            double f = (double) i / n;
+            if (nearObstacle(a.x() + (b.x() - a.x()) * f, a.y() + (b.y() - a.y()) * f)) {
+                if (first < 0) first = f;
+                last = f;
+            }
+        }
+        if (first < 0 || cap <= OBSTACLE_SPEED || length < 1) return capped(line(a, b).constant(heading), cap);
+        first -= OBSTACLE_BRAKE_LEAD / length;
+        // No stretches under 2 in: they'd be over before they mattered
+        if (first * length < 2) first = 0;
+        if ((1 - last) * length < 2) last = 1;
+        List<Path> parts = new java.util.ArrayList<>();
+        Pose from = a;
+        if (first > 0) {
+            Pose to = along(a, b, first, heading);
+            parts.add(capped(line(from, to).constant(heading), cap));
+            from = to;
+        }
+        Pose slowTo = last < 1 ? along(a, b, last, heading) : b;
+        parts.add(capped(line(from, slowTo).constant(heading), OBSTACLE_SPEED));
+        if (last < 1) parts.add(capped(line(slowTo, b).constant(heading), cap));
+        return parts.size() == 1 ? parts.get(0) : Paths.path(parts.toArray(new Path[0]));
+    }
+
+    private static Path capped(Path path, double speed) {
+        return path.with(Constants.foresightConfig.maxVelocityConstraint.at(speed));
+    }
+
+    private static Pose along(Pose a, Pose b, double f, double heading) {
+        return new Pose(a.x() + (b.x() - a.x()) * f, a.y() + (b.y() - a.y()) * f, heading);
+    }
+
+    /** Whether the robot's center at (x, y) is within OBSTACLE_SLOW_DISTANCE of a hive foot or a flower column. */
+    static boolean nearObstacle(double x, double y) {
+        for (double[] foot : RobotConstants.Field.HIVE_FEET) {
+            double qx = Math.max(foot[0], Math.min(foot[2], x)), qy = Math.max(foot[1], Math.min(foot[3], y));
+            if (Math.hypot(x - qx, y - qy) < OBSTACLE_SLOW_DISTANCE) return true;
+        }
+        for (Pose flower : RobotConstants.Field.FLOWERS) {
+            if (Math.hypot(x - flower.x(), y - flower.y()) < RobotConstants.Field.FLOWER_RADIUS + OBSTACLE_SLOW_DISTANCE) {
+                return true;
+            }
+        }
+        return false;
     }
 
     /**
@@ -579,7 +646,8 @@ public class PollenChase {
         double r = Ball.Type.POLLEN.diameter / 2;
         for (java.util.Iterator<double[]> it = seenPollen.iterator(); it.hasNext(); ) {
             double[] p = it.next();
-            if (t - p[2] > REMEMBER_S) {
+            // Swept ones are kept until a confirmed pickup counts them (or a while longer than the rest)
+            if (t - p[2] > (p[3] == 1 ? 3 * REMEMBER_S : REMEMBER_S)) {
                 it.remove();
                 continue;
             }
@@ -587,10 +655,41 @@ public class PollenChase {
             double dx = p[0] - pose.x(), dy = p[1] - pose.y();
             double ahead = dx * c + dy * s, side = -dx * s + dy * c;
             if (ahead > ROBOT_LENGTH / 2 - 1 && ahead < INTAKE_REACH + r && Math.abs(side) < INTAKE_WIDTH / 2 - r) {
-                swept++;
                 p[3] = 1;
             }
         }
+    }
+
+    /**
+     * At a confirmed pickup: the pollen the mouth passed over that's been out of sight CONFIRM_S since (taken in, not
+     * pushed along), each counted once.
+     */
+    private int confirmSwept(double t) {
+        int gone = 0;
+        for (double[] p : seenPollen) {
+            if (p[3] == 1 && t - p[2] >= CONFIRM_S) {
+                p[3] = 2;
+                gone++;
+            }
+        }
+        return gone;
+    }
+
+    /** Pollen the mouth has passed over that no pickup has counted yet: for the log. */
+    private int sweptNotConfirmed() {
+        int n = 0;
+        for (double[] p : seenPollen) if (p[3] == 1) n++;
+        return n;
+    }
+
+    /** Distance from the robot's center to the nearest pollen in view or being chased; infinite with none. */
+    private double nearestPollen() {
+        Pose pose = follower.pose();
+        double best = Double.POSITIVE_INFINITY;
+        for (double[] p : vision.tracker().chaseable()) best = Math.min(best, Math.hypot(p[0] - pose.x(), p[1] - pose.y()));
+        PollenTracker.Target target = vision.tracker().target();
+        if (target != null) best = Math.min(best, Math.hypot(target.x - pose.x(), target.y - pose.y()));
+        return best;
     }
 
     /** A target at the mouth didn't go in: after FULL_REFUSALS of those in a row, the robot is taken as full. */
@@ -616,8 +715,15 @@ public class PollenChase {
         return d;
     }
 
-    /** Whether the target has rolled more than MOVING_SPEED, net, over the last MOVING_WINDOW_S. */
-    private boolean rolling(PollenTracker.Target target, double t) {
+    /**
+     * Whether the target has rolled more than MOVING_SPEED, net, over the last MOVING_WINDOW_S. Not while the robot turns
+     * faster than ROLLING_MAX_TURN: its position smears then, so the sightings from then are let go.
+     */
+    private boolean rolling(PollenTracker.Target target, double t, double turnRate) {
+        if (turnRate > ROLLING_MAX_TURN) {
+            track.clear();
+            return false;
+        }
         track.addLast(new double[] {t, target.x, target.y});
         while (track.size() > 1 && t - track.peekFirst()[0] > MOVING_WINDOW_S) track.removeFirst();
         double[] first = track.peekFirst();

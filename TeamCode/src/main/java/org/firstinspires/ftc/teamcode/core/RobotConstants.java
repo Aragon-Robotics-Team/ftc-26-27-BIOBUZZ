@@ -216,9 +216,12 @@ public class RobotConstants {
 
         // ---- Target ----
         public static double LOCK_GATE = 6;         // inches: a pollen this close to the target's last spot is the target
+        public static double LOCK_GATE_FRACTION = 0.2; // ...or this fraction of its distance, if more (far estimates are noisier)
         public static double SMOOTHING = 0.5;       // weight of each new sighting in the target's position
-        public static double SWITCH_MARGIN = 0.75;  // another pollen takes over when closer than this x the target's distance
-        public static int SWITCH_FRAMES = 5;        // ...for this many frames in a row
+        // Which pollen to go for: distance plus TURN_COST inches per radian the intake has to turn to face it (90° = 19 in)
+        public static double TURN_COST = 12;
+        public static double SWITCH_MARGIN = 0.6;   // another pollen takes over when it costs under this x the target's cost
+        public static int SWITCH_FRAMES = 6;        // ...for this many frames in a row
         // The camera can't see the last few inches before the mouth (with the CAD mount, 2-5 in). A target last seen
         // within NEAR_MOUTH of the mouth, in front of it and touching the edge of the frame (within EDGE_MARGIN_PX),
         // went into that blind spot rather than getting lost.
@@ -226,11 +229,18 @@ public class RobotConstants {
         public static double EDGE_MARGIN_PX = 12;
 
         // ---- Chase ----
-        public static double CHASE_MAX_SPEED = 30;  // in/s. TODO: tune
-        public static double NEAR_BALL_SPEED = 22;     // in/s within NEAR_BALL_DISTANCE of the ball, for the camera and intake
+        // in/s (the drive tops out near 90). Was 30 / 22 near a ball; the path slows to its end at the ball anyway
+        public static double CHASE_MAX_SPEED = 50;
+        public static double NEAR_BALL_SPEED = 50;     // in/s within NEAR_BALL_DISTANCE of the ball: lower it if the intake knocks balls away
+        // Slow near a hive foot or flower column: on the stretch of a path where the robot's center comes within
+        // OBSTACLE_SLOW_DISTANCE of one (from its outside), starting OBSTACLE_BRAKE_LEAD inches before, to slow down in
+        public static double OBSTACLE_SPEED = 22;      // in/s
+        public static double OBSTACLE_SLOW_DISTANCE = 14; // inches: the robot's half length plus 6
+        public static double OBSTACLE_BRAKE_LEAD = 12;    // inches
         public static double NEAR_BALL_DISTANCE = 24;  // inches, robot center to ball
         public static double OVERSHOOT = 4;         // inches the mouth drives past the ball
         public static double REPLAN_DISTANCE = 2;   // inches the target has to move before the path is redone
+        public static double REPLAN_FRACTION = 0.1; // ...or this fraction of the distance to it, if more (far estimates wobble)
         public static double LOST_S = 0.5;          // a target out of view this long (not at the intake) is given up
         public static double CONFIRM_S = 0.4;       // after driving over it, how long it has to stay gone to count
         // With no pollen to chase the robot turns in place to look for more: left, the way the camera already looks
@@ -254,6 +264,13 @@ public class RobotConstants {
         // A target rolling faster than this (net, over MOVING_WINDOW_S) is waited for, not chased
         public static double MOVING_SPEED = 10;     // in/s
         public static double MOVING_WINDOW_S = 0.3;
+        // Turning faster than this, ball positions smear (the pose and the frame aren't from quite the same moment), so
+        // a still ball looks like it's rolling: it isn't judged then
+        public static double ROLLING_MAX_TURN = Math.toRadians(45); // rad/s
+        // How many to have before going to shoot: with MIN_LOAD picked up and no more pollen within NEARBY_DISTANCE of
+        // the robot, the chase ends (Chase And Shoot); with pollen that close it keeps going, up to the capacity
+        public static int MIN_LOAD = 2;
+        public static double NEARBY_DISTANCE = 36;  // inches, robot center to ball
         // A ball within LINE_UP_DISTANCE of a wall, a hive foot or a flower column is approached square from its open
         // side: first to LINE_UP_OUT out on that line (unless already within LINE_UP_TOLERANCE of it), then nose in
         public static double LINE_UP_DISTANCE = 10;
