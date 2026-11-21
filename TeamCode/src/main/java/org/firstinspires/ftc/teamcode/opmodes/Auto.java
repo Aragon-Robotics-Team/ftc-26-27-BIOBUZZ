@@ -44,6 +44,7 @@ public class Auto extends OpMode {
         MatchLog.start("Auto");
 
         robot = new Robot(hardwareMap);
+        robot.velocityCompensation = false; // aim as if standing still (see Robot.velocityCompensation)
         follower = robot.drivebase.getFollower();
         panelsDisplay = new PanelsDisplay();
 

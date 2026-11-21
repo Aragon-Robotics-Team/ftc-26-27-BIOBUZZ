@@ -58,13 +58,13 @@
   <label><div class="row">Max angle off the tag's face <b id="llOffV"></b></div><input id="llOff" type="range" min="30" max="80" step="1" value="60"></label>
 
   <h2>goBILDA global shutter webcam (chassis)</h2>
-  <label>Side plate<div class="seg" data-key="wSide"><button data-v="left" class="on">Left</button><button data-v="right">Right</button></div></label>
-  <label><div class="row">Lens height <b id="wHV"></b></div><input id="wH" type="range" min="4" max="10" step="0.5" value="7"></label>
-  <label><div class="row">Tilt down <b id="wTiltV"></b></div><input id="wTilt" type="range" min="0" max="45" step="1" value="22"></label>
-  <label><div class="row">Toe-in toward the centre <b id="wToeV"></b></div><input id="wToe" type="range" min="0" max="40" step="1" value="22"></label>
-  <label><div class="row">Roll, outer side up <b id="wRollV"></b></div><input id="wRoll" type="range" min="-20" max="20" step="0.1" value="8.6"></label>
-  <label><div class="row">Lens ahead of robot centre <b id="wFwdV"></b></div><input id="wFwd" type="range" min="4" max="14" step="0.5" value="5.5"></label>
-  <label><div class="row">Lens off the centre line <b id="wLatV"></b></div><input id="wLat" type="range" min="0" max="10" step="0.5" value="5.5"></label>
+  <label>Side plate<div class="seg" data-key="wSide"><button data-v="left">Left</button><button data-v="right" class="on">Right</button></div></label>
+  <label><div class="row">Lens height <b id="wHV"></b></div><input id="wH" type="range" min="4" max="10" step="0.5" value="9"></label>
+  <label><div class="row">Tilt down <b id="wTiltV"></b></div><input id="wTilt" type="range" min="0" max="45" step="1" value="24"></label>
+  <label><div class="row">Toe-in toward the centre <b id="wToeV"></b></div><input id="wToe" type="range" min="0" max="40" step="1" value="15"></label>
+  <label><div class="row">Roll, outer side up <b id="wRollV"></b></div><input id="wRoll" type="range" min="-20" max="20" step="0.1" value="0"></label>
+  <label><div class="row">Lens ahead of robot centre <b id="wFwdV"></b></div><input id="wFwd" type="range" min="4" max="14" step="0.5" value="6"></label>
+  <label><div class="row">Lens off the centre line <b id="wLatV"></b></div><input id="wLat" type="range" min="0" max="10" step="0.5" value="5"></label>
 
   <h2>Pollen and nectar</h2>
   <div class="seg" data-key="balls" style="margin-bottom:6px"><button data-v="staged" class="on">As staged</button><button data-v="scattered">Scattered</button></div>
@@ -104,7 +104,7 @@ const M = window.CameraModel;
 const S = {
   alliance: 'Red', up: 'South', heading: -90, robot: { x: -12.75, y: 62 },
   llOrient: 'landscape', llH: 12, llTilt: 45, // CAD mount llRange: 110, llOff: 60,
-  wSide: 'left', wH: 7, wTilt: 22, wToe: 22, wRoll: 8.6, wFwd: 5.5, wLat: 5.5, // CAD mount
+  wSide: 'right', wH: 9, wTilt: 24, wToe: 15, wRoll: 0, wFwd: 6, wLat: 5, // CAD mount (Oct 27) at the sliders' steps, with the tilt and toe-in proposed for robot v2
   showHeat: true, showLL: true, showW: true, showPip: true, balls: 'staged',
 };
 const LIP = 7; // intake lip, inches ahead of robot centre (CAD)

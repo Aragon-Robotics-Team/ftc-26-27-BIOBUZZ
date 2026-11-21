@@ -22,6 +22,8 @@ import org.firstinspires.ftc.teamcode.subsystems.Launcher;
  * PIDF (bangBang = false):
  * 1. With kP = kI = kD = 0, set kV so the actual speed sits just under the target (the Flywheel Auto Tuner measures it).
  * 2. Raise kP until it recovers quickly from a shot without oscillating. Add kI only if it settles below target.
+ * Hybrid (hybrid = true, bangBang = false): PIDF, plus full power while more than fullPowerError below target. Tune
+ * PIDF first, then lower fullPowerError for a harder recovery from a shot, until it overshoots.
  * Bang-bang (bangBang = true): only kV matters. Lower it if the speed sits above target with the power at the hold
  * value; it's fine for the power to flick to full now and then.
  * Cross (gamepad 1) toggles the flywheel on / off.
@@ -31,6 +33,8 @@ import org.firstinspires.ftc.teamcode.subsystems.Launcher;
 public class FlywheelTuner extends OpMode {
     public static double targetVelocity = RobotConstants.Launcher.TARGET_VELOCITY; // ticks/sec
     public static boolean bangBang = RobotConstants.Launcher.FLYWHEEL_CONTROL == FlywheelControl.BANG_BANG;
+    public static boolean hybrid = RobotConstants.Launcher.FLYWHEEL_CONTROL == FlywheelControl.HYBRID;
+    public static double fullPowerError = RobotConstants.Launcher.FLYWHEEL_FULL_POWER_ERROR; // ticks/sec, hybrid only
     public static double kV = RobotConstants.Launcher.FLYWHEEL_KV;
     public static double kS = RobotConstants.Launcher.FLYWHEEL_KS;
     public static double kP = RobotConstants.Launcher.FLYWHEEL_KP;
@@ -77,7 +81,9 @@ public class FlywheelTuner extends OpMode {
     /** Send any values edited in Panels to the launcher. */
     private void pushChanges() {
         // The flywheel control reads these every loop
-        RobotConstants.Launcher.FLYWHEEL_CONTROL = bangBang ? FlywheelControl.BANG_BANG : FlywheelControl.PIDF;
+        RobotConstants.Launcher.FLYWHEEL_CONTROL = bangBang ? FlywheelControl.BANG_BANG
+                : hybrid ? FlywheelControl.HYBRID : FlywheelControl.PIDF;
+        RobotConstants.Launcher.FLYWHEEL_FULL_POWER_ERROR = fullPowerError;
         RobotConstants.Launcher.FLYWHEEL_KV = kV;
         RobotConstants.Launcher.FLYWHEEL_KS = kS;
         RobotConstants.Launcher.FLYWHEEL_KP = kP;

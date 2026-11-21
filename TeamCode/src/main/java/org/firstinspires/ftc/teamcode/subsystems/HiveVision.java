@@ -14,6 +14,7 @@ import com.qualcomm.robotcore.hardware.HardwareMap;
 import org.firstinspires.ftc.robotcore.external.Telemetry;
 import org.firstinspires.ftc.robotcore.external.navigation.DistanceUnit;
 import org.firstinspires.ftc.robotcore.external.navigation.Position;
+import org.firstinspires.ftc.teamcode.core.AimCorrection;
 import org.firstinspires.ftc.teamcode.core.Hive;
 import org.firstinspires.ftc.teamcode.core.HiveTags;
 import org.firstinspires.ftc.teamcode.core.MatchState;
@@ -39,6 +40,9 @@ import java.util.List;
  * Also hands every hive tag it sees to the drivetrain's FusedLocalizer, to correct the pose (fuseInto, when
  * Localization.FUSE_HIVE_TAGS): then the camera runs whether or not the hive state is enabled. Each frame goes in once,
  * with the turret angle from when it was taken (frames are a few tens of ms old by the time they're read).
+ *
+ * And, while Vision.AIM_FROM_TAGS, moves the aim target by how far the up cell's tags are from where the pose puts them
+ * (core.AimCorrection, aimTarget): the shot follows the camera, the pose stays the Pinpoint's.
  */
 public class HiveVision implements Subsystem {
     /** Every tag in the last frame, ours or not, for the Hive Vision Test OpMode. */
@@ -78,6 +82,14 @@ public class HiveVision implements Subsystem {
     private int turretCount, turretNext;
     private long lastFused = 0;
     private int fusedTags = 0;
+    // The pose each loop, beside the turret angle, for the aim correction
+    private final double[] poseX = new double[TURRET_HISTORY], poseY = new double[TURRET_HISTORY],
+            poseHeading = new double[TURRET_HISTORY];
+
+    private final AimCorrection aim = new AimCorrection(FusedLocalizer.camera(), AIM_SMOOTHING, MAX_AIM_CORRECTION,
+            AIM_HEIGHT_TOLERANCE);
+    private long lastAimed = 0;
+    private double lastReset = Double.NEGATIVE_INFINITY;
 
     public HiveVision(HardwareMap hardwareMap) {
         Limelight3A found = null;
@@ -96,7 +108,7 @@ public class HiveVision implements Subsystem {
         this.enabled = enabled;
     }
 
-    /** Also correct this localizer's pose from the tags. Robot gives it the turret angle each loop (recordTurret). */
+    /** Also correct this localizer's pose from the tags. Robot gives it the turret angle each loop (record). */
     public void fuseInto(FusedLocalizer localizer) {
         this.localizer = localizer;
     }
@@ -162,7 +174,7 @@ public class HiveVision implements Subsystem {
 
     @Override
     public void start() {
-        if ((enabled || fusing()) && limelight != null) {
+        if ((enabled || fusing() || AIM_FROM_TAGS) && limelight != null) {
             limelight.start();
             running = true;
         }
@@ -170,6 +182,11 @@ public class HiveVision implements Subsystem {
 
     @Override
     public void update() {
+        // A pose reset makes every aim offset stale (and frames from before it measured the old pose)
+        if (localizer != null && localizer.getLastResetTime() != lastReset) {
+            lastReset = localizer.getLastResetTime();
+            aim.reset();
+        }
         if (!running) return;
         LLResult result = limelight.getLatestResult();
         if (result == null) return;
@@ -180,6 +197,10 @@ public class HiveVision implements Subsystem {
         if (fusing() && frameId != lastFused) {
             lastFused = frameId;
             fuse(result);
+        }
+        if (AIM_FROM_TAGS && frameId != lastAimed) {
+            lastAimed = frameId;
+            correctAim(result);
         }
         if (!enabled) return;
 
@@ -217,15 +238,42 @@ public class HiveVision implements Subsystem {
         }
     }
 
+    /** The up cell's tags in the frame to the aim correction, with the pose and turret angle from when it was taken. */
+    private void correctAim(LLResult result) {
+        double taken = now() - (lastStaleness + result.getCaptureLatency() + result.getTargetingLatency()) / 1000;
+        if (taken < lastReset || turretCount == 0) return;
+        List<AimCorrection.Tag> tags = new ArrayList<>();
+        for (LLResultTypes.FiducialResult f : result.getFiducialResults()) {
+            Position p = f.getTargetPoseCameraSpace().getPosition().toUnit(DistanceUnit.INCH);
+            if (p.z <= 0) continue;
+            tags.add(new AimCorrection.Tag(f.getFiducialId(), p.x, p.y, p.z));
+        }
+        if (tags.isEmpty()) return;
+        aim.addFrame(taken, poseAt(taken), turretAt(taken), tags.toArray(new AimCorrection.Tag[0]),
+                MatchState.alliance, MatchState.hive);
+    }
+
+    /** Where to aim for a cell: its target moved by what the camera last saw of it (as is with AIM_FROM_TAGS off). */
+    public Pose aimTarget(Pose target, Hive cell) {
+        return AIM_FROM_TAGS ? aim.apply(target, cell) : target;
+    }
+
+    public AimCorrection getAimCorrection() {
+        return aim;
+    }
+
     /**
-     * The turret's angle as of time: this loop's encoder reading, stamped with the time of this loop's pose
-     * (FusedLocalizer.getLastUpdateTime), so a frame's turret angle and robot pose are from the same moment. Call after
-     * the launcher has read the encoder.
+     * The turret's angle and the robot's pose as of time: this loop's readings, stamped with the time of this loop's
+     * pose (FusedLocalizer.getLastUpdateTime), so a frame's turret angle and robot pose are from the same moment. Call
+     * after the launcher has read the encoder.
      */
-    public void recordTurret(double time, double angle) {
+    public void record(double time, double turretAngle, Pose pose) {
         if (Double.isNaN(time)) return;
         turretTimes[turretNext] = time;
-        turretAngles[turretNext] = angle;
+        turretAngles[turretNext] = turretAngle;
+        poseX[turretNext] = pose.x();
+        poseY[turretNext] = pose.y();
+        poseHeading[turretNext] = pose.heading();
         turretNext = (turretNext + 1) % TURRET_HISTORY;
         turretCount = Math.min(turretCount + 1, TURRET_HISTORY);
     }
@@ -233,21 +281,42 @@ public class HiveVision implements Subsystem {
     /** The turret's angle at a time, between the two loops either side of it (the oldest or newest kept beyond). */
     private double turretAt(double time) {
         if (turretCount == 0) return 0;
-        double beforeT = Double.NEGATIVE_INFINITY, beforeA = 0, afterT = Double.POSITIVE_INFINITY, afterA = 0;
+        bracket(time);
+        return turretAngles[before] + (turretAngles[after] - turretAngles[before]) * fraction;
+    }
+
+    /** The robot's pose at a time, the same way. */
+    private Pose poseAt(double time) {
+        bracket(time);
+        double turn = Angle.normalizeSigned(poseHeading[after] - poseHeading[before]);
+        return new Pose(poseX[before] + (poseX[after] - poseX[before]) * fraction,
+                poseY[before] + (poseY[after] - poseY[before]) * fraction,
+                Angle.normalizeSigned(poseHeading[before] + turn * fraction));
+    }
+
+    // bracket()'s answer: the kept loops either side of a time, and how far between them it is
+    private int before, after;
+    private double fraction;
+
+    private void bracket(double time) {
+        double beforeT = Double.NEGATIVE_INFINITY, afterT = Double.POSITIVE_INFINITY;
+        int b = -1, a = -1;
         for (int i = 0; i < turretCount; i++) {
             double t = turretTimes[i];
             if (t <= time && t > beforeT) {
                 beforeT = t;
-                beforeA = turretAngles[i];
+                b = i;
             }
             if (t >= time && t < afterT) {
                 afterT = t;
-                afterA = turretAngles[i];
+                a = i;
             }
         }
-        if (beforeT == Double.NEGATIVE_INFINITY) return afterA;
-        if (afterT == Double.POSITIVE_INFINITY || afterT == beforeT) return beforeA;
-        return beforeA + (afterA - beforeA) * (time - beforeT) / (afterT - beforeT);
+        if (b < 0) b = a;
+        if (a < 0) a = b;
+        before = b;
+        after = a;
+        fraction = a == b ? 0 : (time - beforeT) / (afterT - beforeT);
     }
 
     @Override
@@ -284,6 +353,15 @@ public class HiveVision implements Subsystem {
     @Override
     public void telemetry(Telemetry telemetry) {
         telemetry.addData("Hive vision", status());
+        if (AIM_FROM_TAGS && running) {
+            Hive up = MatchState.hive;
+            if (aim.has(up)) {
+                telemetry.addData("Aim from tags", "%s cell %+.1f, %+.1f in (%d tags, %.1f s ago, %d skipped)", up,
+                        aim.dx(up), aim.dy(up), aim.tags(up), now() - aim.updated(up), aim.getRejected());
+            } else {
+                telemetry.addData("Aim from tags", "%s cell not seen yet: aiming from the pose", up);
+            }
+        }
         if (fusing() && running) {
             PoseFilter filter = localizer.getFilter();
             telemetry.addData("Pose from tags", "%d tags used, %d thrown out, ±%.1f in ±%.1f°", fusedTags,
