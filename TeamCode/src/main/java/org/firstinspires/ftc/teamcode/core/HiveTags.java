@@ -9,7 +9,13 @@ package org.firstinspires.ftc.teamcode.core;
  * Geometry (Competition Manual 9.6 / 9.9; the sim's SimHives has the same numbers): the arm pivots 43.95 in above the
  * tiles, 12.75 in from the field center toward its own alliance's wall, about an axis along Pedro x (cells along y).
  * Each cell has four 3.25 in tags in a row across the underside of its floor, centered 14.27 in out along the arm
- * from the pivot and 1.6 in below the arm's axis, 3.75 in apart.
+ * from the pivot and 1.6 in below the arm's axis. They are not evenly spaced (Figure 9-15): the inner two are 2.75 in
+ * either side of the cluster's center (a gap for the arm's post) and the outer two 6.5 in.
+ *
+ * Order across (Figures 9-15 to 9-17): read facing the tags, the sticker runs lowest ID to highest left to right, with
+ * its bottom edge toward the field center. From above that puts the lowest ID at the high-x end on the rear cells
+ * (red 30, blue 42) and at the low-x end on the audience cells (red 34, blue 38): the figure's "33 32 31 30",
+ * "34 35 36 37", "38 39 40 41", "45 44 43 42".
  *
  * Frame: Pedro coordinates (inches) plus height above the tiles. Arm angle: radians about +x, so positive raises the
  * cell toward the rear wall (+y); it rests near ±30°.
@@ -20,7 +26,8 @@ public final class HiveTags {
     public static final double REST_ANGLE = Math.toRadians(30);
     public static final double ALONG_ARM = 14.27;
     public static final double BELOW_ARM = 1.6;
-    public static final double TAG_PITCH = 3.25 + 0.5;
+    /** Each tag's center from its cluster's center, in sticker order (lowest ID first), as read facing the tags. */
+    public static final double[] ACROSS = {-6.5, -2.75, 2.75, 6.5};
 
     /** Which hive: 0 red, 1 blue. */
     public static final int RED = 0, BLUE = 1;
@@ -37,7 +44,7 @@ public final class HiveTags {
     /**
      * Where a tag is with its hive's arm at an angle, Pedro inches: {x, y, height}. Red: 30-33 on the rear cell (+y),
      * 34-37 the audience one. Blue is red's hive turned 180° about the field center: 38-41 on its audience cell,
-     * 42-45 its rear one, each row in the turned order.
+     * 42-45 its rear one.
      */
     public static double[] position(int id, double armAngle) {
         int hive = hiveOf(id);
@@ -46,7 +53,8 @@ public final class HiveTags {
         int i = (id - first) % 4;
         boolean firstCell = id - first < 4;                 // 30-33 / 38-41
         boolean rear = hive == RED ? firstCell : !firstCell; // the cell toward +y
-        double across = (i - 1.5) * TAG_PITCH * (hive == RED ? 1 : -1);
+        // Facing a rear cell's tags (looking up, the sticker's bottom toward -y), the viewer's right is -x
+        double across = ACROSS[i] * (rear ? -1 : 1);
         double along = rear ? ALONG_ARM : -ALONG_ARM;       // out along the arm toward +y or -y
         // Turn (along, -BELOW_ARM) about the pivot by the arm angle
         double c = Math.cos(armAngle), s = Math.sin(armAngle);

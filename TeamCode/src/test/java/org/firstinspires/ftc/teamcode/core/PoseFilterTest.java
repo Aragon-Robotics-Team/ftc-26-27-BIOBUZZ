@@ -41,6 +41,34 @@ public class PoseFilterTest {
     }
 
     @Test
+    public void tagsAreWhereTheManualPutsThem() {
+        // Competition Manual Figures 9-15 to 9-17, with the arm level: tag centers 2.75 in and 6.5 in either side of
+        // the hive's center line (59.25 red, 84.75 blue), in the order the field figure lists them from low x to high
+        double[][] expected = {
+                // id, x
+                {33, 52.75}, {32, 56.5}, {31, 62.0}, {30, 65.75},  // red rear ("Red Scoring Tags")
+                {34, 52.75}, {35, 56.5}, {36, 62.0}, {37, 65.75},  // red audience
+                {45, 78.25}, {44, 82.0}, {43, 87.5}, {42, 91.25},  // blue rear ("Blue Scoring Tags")
+                {38, 78.25}, {39, 82.0}, {40, 87.5}, {41, 91.25},  // blue audience
+        };
+        for (double[] e : expected) {
+            int id = (int) e[0];
+            double[] p = HiveTags.position(id, 0);
+            assertEquals("x of tag " + id, e[1], p[0], 1e-9);
+            boolean rear = id <= 33 || id >= 42;
+            assertEquals("y of tag " + id, rear ? 72 + HiveTags.ALONG_ARM : 72 - HiveTags.ALONG_ARM, p[1], 1e-9);
+        }
+        // Blue's hive is red's turned 180° about the field center, the arm mirrored with it
+        for (int k = 0; k < 8; k++) {
+            double[] red = HiveTags.position(30 + k, Math.toRadians(25));
+            double[] blue = HiveTags.position(38 + k, Math.toRadians(-25));
+            assertEquals(144 - red[0], blue[0], 1e-9);
+            assertEquals(144 - red[1], blue[1], 1e-9);
+            assertEquals(red[2], blue[2], 1e-9);
+        }
+    }
+
+    @Test
     public void cameraFrameMatchesHiveReader() {
         // A robot facing the hive: HiveReader's height from the camera-frame position is the tag's real height
         PoseFilter filter = filter(30, 40, Math.toRadians(70), Math.toRadians(-30));
