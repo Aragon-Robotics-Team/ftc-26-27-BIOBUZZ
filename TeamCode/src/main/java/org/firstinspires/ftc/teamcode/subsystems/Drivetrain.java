@@ -101,14 +101,23 @@ public class Drivetrain implements Subsystem {
                 .setInterruptedBehavior(InterruptedBehavior.SUSPEND);
     }
 
-    /**
-     * Field-centric drive like {@link #driveFieldCentric}, but the second stick says which way to face instead of
-     * how fast to turn: the intake turns to point where it's pushed, and the robot holds that heading once it's let
-     * go. Both sticks use the same frame (forward = away from our driver station, +left).
-     *
-     * @param faceForward second stick, forward component
-     * @param faceLeft    second stick, left component
-     */
+    public Command driveRobotCentric(DoubleSupplier forward, DoubleSupplier strafe, DoubleSupplier turn) {
+        return infinite(() -> follower.manual(ManualDrive.fieldCentric(
+                forward.getAsDouble(), strafe.getAsDouble(), turn.getAsDouble(),
+                0,0)))
+                .requiring(this)
+                .setInterruptedBehavior(InterruptedBehavior.SUSPEND);
+    }
+
+
+        /**
+         * Field-centric drive like {@link #driveFieldCentric}, but the second stick says which way to face instead of
+         * how fast to turn: the intake turns to point where it's pushed, and the robot holds that heading once it's let
+         * go. Both sticks use the same frame (forward = away from our driver station, +left).
+         *
+         * @param faceForward second stick, forward component
+         * @param faceLeft    second stick, left component
+         */
     public Command driveTwinStick(DoubleSupplier forward, DoubleSupplier strafe,
                                   DoubleSupplier faceForward, DoubleSupplier faceLeft, double headingOffset) {
         return infinite(() -> {

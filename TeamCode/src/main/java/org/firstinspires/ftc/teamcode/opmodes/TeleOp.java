@@ -144,11 +144,10 @@ public class TeleOp extends OpMode {
                         () -> -gamepad1.right_stick_x * driveScale(),
                         headingOffset);
             default:
-                return robot.drivebase.driveFieldCentric(
+                return robot.drivebase.driveRobotCentric(
                         () -> -gamepad1.left_stick_y * driveScale(),
                         () -> -gamepad1.left_stick_x * driveScale(),
-                        () -> -gamepad1.right_stick_x * driveScale(),
-                        headingOffset);
+                        () -> -gamepad1.right_stick_x * driveScale());
         }
     }
 
@@ -180,7 +179,7 @@ public class TeleOp extends OpMode {
 
     /** Slow mode while LT is held, and while shooting (RT) so the robot stays steady for the shot. */
     private double driveScale() {
-        return gamepad1.left_trigger > 0.5 || robot.intake.isFeeding() ? SLOW_MODE_SCALE : 1.0;
+        return (gamepad1.left_trigger > 0.5 || robot.intake.isFeeding()) ? SLOW_MODE_SCALE : 0.5;
     }
 
     /** Button presses schedule commands. */
