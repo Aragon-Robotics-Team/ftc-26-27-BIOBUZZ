@@ -4,6 +4,7 @@
 #   ./replay-auto.sh                                  every Auto on one field
 #   ./replay-auto.sh one_cycle_garden_park            just that one, with the balls
 #   ./replay-auto.sh one_cycle_garden_park --blue
+#   ./replay-auto.sh one_cycle_garden_park --partner  include a scripted alliance partner
 #   ./replay-auto.sh --no-sim                         reopen the last run's logs
 #
 # Then press play (space) in AdvantageScope.

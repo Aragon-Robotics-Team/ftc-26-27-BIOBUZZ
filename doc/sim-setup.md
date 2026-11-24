@@ -16,7 +16,8 @@ One Auto, with the balls (Mac: `./replay-auto.sh` instead of `replay-auto.bat`):
 ```
 replay-auto.bat one_cycle_garden_park
 replay-auto.bat one_cycle_garden_park --blue
-replay-auto.bat --no-sim          reopen the last run without running the sim again
+replay-auto.bat one_cycle_garden_park --partner   include a scripted alliance partner
+replay-auto.bat --no-sim                          reopen the last run without running the sim again
 ```
 
 The routine names are in `TeamCode/.../routines/Routines.java`, in lower case.

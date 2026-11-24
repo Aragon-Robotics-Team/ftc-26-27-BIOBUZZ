@@ -3,6 +3,7 @@
     python3 tools/advantagescope/replay_auto.py                         every Auto on one field
     python3 tools/advantagescope/replay_auto.py one_cycle_garden_park   just that one, with the balls
     python3 tools/advantagescope/replay_auto.py one_cycle_garden_park --blue
+    python3 tools/advantagescope/replay_auto.py one_cycle_garden_park --partner
     python3 tools/advantagescope/replay_auto.py --no-sim                reopen the last run's logs
 
 Then press play (space) in AdvantageScope. It replaces AdvantageScope's open tabs with the sim's (sim-layout.json for
@@ -42,10 +43,11 @@ def routines():
     return [name.lower() for name in re.findall(r"^\s*([A-Z0-9_]+)\(", body, re.M)]
 
 
-def run_sim(routine, alliance):
+def run_sim(routine, alliance, partner=False):
     gradlew = os.path.join(ROOT, "gradlew.bat" if SYSTEM == "Windows" else "gradlew")
     command = [gradlew, ":TeamCode:testDebugUnitTest", "--tests", "*AutoSimTest*", "--rerun", "--info",
-               f"-PsimRoutine={routine}", f"-PsimAlliance={alliance}"]
+               f"-PsimRoutine={routine}", f"-PsimAlliance={alliance}",
+               f"-PsimPartner={'true' if partner else 'false'}"]
     if SYSTEM != "Windows":
         command.insert(0, "sh")
     # A SimLoop built and published locally (./gradlew :SimLoop:publishToMavenLocal in the SimLoop clone)
@@ -104,7 +106,7 @@ def uuid():
     return "".join(secrets.choice(string.ascii_lowercase + string.digits) for _ in range(32))
 
 
-def all_autos_tabs(names):
+def all_autos_tabs(names, partner=False):
     def source(kind, key, log_type, **options):
         return {"type": kind, "logKey": key, "logType": log_type, "visible": True, "options": options}
     sources = []
@@ -113,8 +115,9 @@ def all_autos_tabs(names):
         sources.append(source("trajectory", f"{name}/RealOutputs/Path", "Translation2d[]", color=color, size="bold"))
     first = names[0] + "/RealOutputs/"
     sources += [source("robot", first + "Hive/red/trayPose3d", "Pose3d", model="BIOBUZZ Hive Red"),
-                source("robot", first + "Hive/blue/trayPose3d", "Pose3d", model="BIOBUZZ Hive Blue"),
-                source("robot", first + "Sim/partner/pose2d", "Pose2d", model="Drive Base")]
+                source("robot", first + "Hive/blue/trayPose3d", "Pose3d", model="BIOBUZZ Hive Blue")]
+    if partner:
+        sources.append(source("robot", first + "Sim/partner/pose2d", "Pose2d", model="Drive Base"))
     return [{"type": 0, "title": "", "controller": None, "controllerUUID": uuid(), "renderer": "", "controlsHeight": 0},
             {"type": 3, "title": "All autos", "controller": {"sources": sources, "game": GAME},
              "controllerUUID": uuid(), "controlsHeight": 200,
@@ -172,6 +175,7 @@ def main():
     parser = argparse.ArgumentParser(description="Run an Auto in the sim and open it in AdvantageScope.")
     parser.add_argument("routine", nargs="?", default="all", help="e.g. one_cycle_garden_park; leave out for every Auto")
     parser.add_argument("--blue", action="store_true", help="blue alliance (red otherwise)")
+    parser.add_argument("--partner", action="store_true", help="include a scripted alliance partner")
     parser.add_argument("--no-sim", action="store_true", help="don't rerun the sim, open the last logs")
     args = parser.parse_args()
     routine = args.routine.lower()
@@ -181,7 +185,7 @@ def main():
         raise SystemExit(f"No routine {args.routine}. Routines: {', '.join(known)}")
 
     if not args.no_sim:
-        run_sim(routine, alliance)
+        run_sim(routine, alliance, args.partner)
     names = [f"{r}-{alliance}" for r in (known if routine == "all" else [routine])]
     logs = [os.path.join(SIM, f"auto-{name}.rlog") for name in names]
     found = [(name, log) for name, log in zip(names, logs) if os.path.exists(log)]
@@ -193,7 +197,7 @@ def main():
     if routine == "all":
         log = os.path.join(SIM, f"all-autos-{alliance}.rlog")
         merge_autos.main([path for _, path in found], log)
-        tabs = all_autos_tabs([name for name, _ in found])
+        tabs = all_autos_tabs([name for name, _ in found], args.partner)
     else:
         log = found[0][1]
         tabs = json.load(open(os.path.join(HERE, "sim-layout.json")))["hubs"][0]["state"]["tabs"]["tabs"]

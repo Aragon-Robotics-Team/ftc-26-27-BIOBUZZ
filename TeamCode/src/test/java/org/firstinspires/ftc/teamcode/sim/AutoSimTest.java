@@ -21,15 +21,17 @@ import java.util.Locale;
 import java.util.stream.Stream;
 
 /**
- * The real Auto on the simulated robot, with a scripted alliance partner (SimPartner) and the match's staged balls:
+ * The real Auto on the simulated robot, with the match's staged balls:
  * every routine in the menu, from its own startPose(), each to its own build/sim/auto-&lt;routine&gt;-&lt;alliance&gt;.rlog. On red unless
- * {@code -PsimAlliance=blue}; {@code -PsimRoutine=one_cycle_garden_park} runs just that one.
+ * {@code -PsimAlliance=blue}; {@code -PsimRoutine=one_cycle_garden_park} runs just that one; {@code -PsimPartner=true}
+ * adds a scripted alliance partner (SimPartner).
  * tools/advantagescope/replay_auto.py runs this and opens the result in AdvantageScope.
  */
 class AutoSimTest {
     private static final Alliance ALLIANCE =
             "blue".equalsIgnoreCase(System.getProperty("simAlliance")) ? Alliance.BLUE : Alliance.RED;
     private static final String ONLY_ROUTINE = System.getProperty("simRoutine", "all");
+    private static final boolean WITH_PARTNER = Boolean.parseBoolean(System.getProperty("simPartner", "false"));
 
     // Auto's init() takes 25 ticks (the Pinpoint localizer's 500 ms sleep), so the menu is driven after that
     private static final int FIRST_PRESS_TICK = 30;
@@ -62,9 +64,11 @@ class AutoSimTest {
         Pose start = startOf(routine);
         // The drive like a real mecanum's: slower, strafing less well, slipping on the tiles
         BiobuzzRobotSim sim = new BiobuzzRobotSim(true).alliance(ALLIANCE);
-        // Camera Cycles counts on a partner that shoots after our first tip (its init default); the others get the
-        // partner that shoots straight away
-        sim = routine == Routines.CAMERA_CYCLES ? sim.withPartnerAfterTip() : sim.withPartner();
+        if (WITH_PARTNER) {
+            // Camera Cycles counts on a partner that shoots after our first tip (its init default); the others get the
+            // partner that shoots straight away
+            sim = routine == Routines.CAMERA_CYCLES ? sim.withPartnerAfterTip() : sim.withPartner();
+        }
         sim.placeAt(start.x(), start.y(), start.heading());
 
         String name = (routine + "-" + ALLIANCE).toLowerCase(Locale.US);
@@ -84,8 +88,10 @@ class AutoSimTest {
         System.out.printf("Auto %s: %d shots, %d held, %s %d points (%d tips, %d in the cell)%n", name, sim.shotsFired(),
                 sim.field.getHeldCount(), ALLIANCE, sim.match.score(ALLIANCE), sim.match.tips(ALLIANCE),
                 sim.match.cellBalls(ALLIANCE));
-        // Our preload and the partner's (SimPartner), 4 pollen each, land in the up cell on top of the 3 staged nectar
-        assertTrue(sim.match.tips(ALLIANCE) >= 1, "the two preloads should tip our hive");
+        if (WITH_PARTNER) {
+            // Our preload and the partner's (SimPartner), 4 pollen each, land in the up cell on top of the 3 staged nectar
+            assertTrue(sim.match.tips(ALLIANCE) >= 1, "the two preloads should tip our hive");
+        }
 
         List<List<String>> sent = result.telemetry().transmissions();
         String routineLine = SimTelemetry.lastLine(sent, "Routine");
