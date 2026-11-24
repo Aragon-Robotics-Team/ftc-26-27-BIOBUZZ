@@ -9,8 +9,11 @@ import java.util.List;
  * target stays put while the robot drives (the pixels don't). Plain Java; BallVision feeds it each new frame with the
  * robot pose from when the frame was taken.
  *
- * The closest chaseable pollen gets locked. It stays the target while a pollen keeps showing up near it; another one
- * takes over only after being clearly closer (switchMargin x the locked distance) for switchFrames frames in a row.
+ * The cheapest chaseable pollen to get to gets locked: its distance plus turnCost for every radian the intake would
+ * have to turn to face it, so a ball ahead beats one about as far off to the side. It stays the target while a pollen
+ * keeps showing up near it (within lockGate, or lockGateFraction of its distance for a far one, whose estimate is
+ * noisier); another one takes over only after being clearly cheaper (switchMargin x the locked one's cost) for
+ * switchFrames frames in a row.
  * The tracker never lets go of a target by itself: the chase decides when it's picked up or lost and calls
  * {@link #drop()}.
  */
@@ -18,6 +21,9 @@ public class PollenTracker {
     /** The robot's values are in RobotConstants.BallVision. */
     public static class Settings {
         public double lockGate;        // inches: a pollen this close to the target's last spot is the target
+        public double lockGateFraction; // ...or this fraction of its distance from the robot, if more
+        public double turnCost;        // inches a radian of turn to face a pollen counts as
+        public double intakeHeadingOffset; // radians from the robot's heading to the way the intake faces
         public double smoothing;       // weight of each new sighting in the target's position
         public double switchMargin;
         public int switchFrames;
@@ -88,7 +94,7 @@ public class PollenTracker {
         }
         chaseable = positions;
 
-        Target match = target == null ? null : nearest(seen, target.x, target.y, settings.lockGate);
+        Target match = target == null ? null : nearest(seen, target.x, target.y, gate(target, robot));
         if (match != null) {
             double a = settings.smoothing;
             target.x += a * (match.x - target.x);
@@ -99,13 +105,13 @@ public class PollenTracker {
         }
 
         Target closest = null;
-        double closestDistance = Double.POSITIVE_INFINITY;
+        double closestCost = Double.POSITIVE_INFINITY;
         for (Target t : seen) {
             if (t == match) continue;
-            double d = Math.hypot(t.x - robot[0], t.y - robot[1]);
-            if (d < closestDistance) {
+            double c = cost(t, robot);
+            if (c < closestCost) {
                 closest = t;
-                closestDistance = d;
+                closestCost = c;
             }
         }
         if (target == null) {
@@ -113,12 +119,11 @@ public class PollenTracker {
             challenger = null;
             return;
         }
-        double targetDistance = Math.hypot(target.x - robot[0], target.y - robot[1]);
-        if (closest == null || closestDistance >= settings.switchMargin * targetDistance) {
+        if (closest == null || closestCost >= settings.switchMargin * cost(target, robot)) {
             challenger = null;
             return;
         }
-        if (challenger != null && Math.hypot(closest.x - challenger.x, closest.y - challenger.y) < settings.lockGate) {
+        if (challenger != null && Math.hypot(closest.x - challenger.x, closest.y - challenger.y) < gate(challenger, robot)) {
             challengerFrames++;
         } else {
             challengerFrames = 1;
@@ -128,6 +133,19 @@ public class PollenTracker {
             target = challenger;
             challenger = null;
         }
+    }
+
+    /** What getting to a pollen costs: its distance, plus turnCost per radian the intake has to turn to face it. */
+    private double cost(Target t, double[] robot) {
+        double dx = t.x - robot[0], dy = t.y - robot[1];
+        double turn = Math.atan2(dy, dx) - robot[2] - settings.intakeHeadingOffset;
+        turn = Math.atan2(Math.sin(turn), Math.cos(turn));
+        return Math.hypot(dx, dy) + settings.turnCost * Math.abs(turn);
+    }
+
+    /** How far a sighting may be from a tracked pollen's spot and still be it: further out, the estimate is noisier. */
+    private double gate(Target t, double[] robot) {
+        return Math.max(settings.lockGate, settings.lockGateFraction * Math.hypot(t.x - robot[0], t.y - robot[1]));
     }
 
     private static Target nearest(List<Target> targets, double x, double y, double within) {

@@ -16,8 +16,8 @@ import java.util.List;
 /**
  * Waypoints for a straight drive that would hit a flower column or one of the hive's feet. A line is in the way when it
  * passes closer than PASS (the robot's wider half plus an inch) to one; the waypoint around it is CLEARANCE out (the
- * robot's half diagonal plus KEEP_OUT_MARGIN), where the robot can turn. A drive that starts or ends that close to one is
- * left alone: it's going to a ball beside it. Pedro coordinates, inches. Flowers and feet are symmetric about the field
+ * robot's half diagonal plus KEEP_OUT_MARGIN), where the robot can turn. A drive that starts or ends that close to one
+ * (to or from a ball beside it) is only checked against PASS_NEAR: it may run alongside, but not through it. Pedro coordinates, inches. Flowers and feet are symmetric about the field
  * center, so this works for both alliances. No hardware, so it's unit tested.
  */
 public final class FieldRoutes {
@@ -25,6 +25,11 @@ public final class FieldRoutes {
     public static final double PASS = Math.max(ROBOT_LENGTH, ROBOT_WIDTH) / 2 + 1;
     /** How far a waypoint is from a flower column's outside or a hive foot. */
     public static final double CLEARANCE = Math.hypot(ROBOT_LENGTH, ROBOT_WIDTH) / 2 + KEEP_OUT_MARGIN;
+    /**
+     * How close the robot's center may pass one when the drive starts or ends beside it (to or from a ball there): its
+     * narrower half plus a little, so it can drive alongside but not across it.
+     */
+    public static final double PASS_NEAR = Math.min(ROBOT_LENGTH, ROBOT_WIDTH) / 2 + 0.25;
     private static final int MAX_SPLITS = 4;
 
     private FieldRoutes() {}
@@ -58,8 +63,10 @@ public final class FieldRoutes {
     /** A waypoint around the first obstacle on the line from (ax, ay) to (bx, by), or null if it's clear. */
     private static double[] around(double ax, double ay, double bx, double by, Alliance half) {
         for (double[] foot : HIVE_FEET) {
-            if (inBox(ax, ay, foot, PASS) || inBox(bx, by, foot, PASS)) continue;
-            if (!crosses(ax, ay, bx, by, foot[0] - PASS, foot[1] - PASS, foot[2] + PASS, foot[3] + PASS)) continue;
+            boolean near = inBox(ax, ay, foot, PASS) || inBox(bx, by, foot, PASS);
+            double pass = near ? PASS_NEAR : PASS;
+            if (inBox(ax, ay, foot, pass) || inBox(bx, by, foot, pass)) continue;
+            if (!crosses(ax, ay, bx, by, foot[0] - pass, foot[1] - pass, foot[2] + pass, foot[3] + pass)) continue;
             double y, x;
             if (ay <= foot[1] - PASS || ay >= foot[3] + PASS) {
                 // a is already past an end of the foot: round that end to b's side
@@ -70,7 +77,7 @@ public final class FieldRoutes {
                 y = (ay + by) / 2 < (foot[1] + foot[3]) / 2 ? foot[1] - CLEARANCE : foot[3] + CLEARANCE;
                 x = ax < (foot[0] + foot[2]) / 2 ? foot[0] - CLEARANCE : foot[2] + CLEARANCE;
             }
-            if (half != null) {
+            if (half != null && !near) {
                 // Kept to a side: the far side of the foot. Already there, round the end toward b; else get there
                 // round the end chosen above
                 x = half == Alliance.RED ? foot[0] - CLEARANCE : foot[2] + CLEARANCE;
@@ -81,6 +88,9 @@ public final class FieldRoutes {
         }
         for (Pose flower : FLOWERS) {
             double pass = FLOWER_RADIUS + PASS;
+            if (Math.hypot(ax - flower.x(), ay - flower.y()) < pass || Math.hypot(bx - flower.x(), by - flower.y()) < pass) {
+                pass = FLOWER_RADIUS + PASS_NEAR; // to or from a ball beside it: alongside, not through
+            }
             if (Math.hypot(ax - flower.x(), ay - flower.y()) < pass || Math.hypot(bx - flower.x(), by - flower.y()) < pass) {
                 continue;
             }

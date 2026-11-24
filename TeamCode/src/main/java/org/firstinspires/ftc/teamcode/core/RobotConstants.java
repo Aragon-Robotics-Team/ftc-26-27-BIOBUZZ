@@ -51,7 +51,7 @@ public class RobotConstants {
         public static double OUTTAKE_POWER = -1.0;
         // While shooting. The intake drives the transfer, so this sets how fast balls go into the flywheel. Lowered from
         // 1.0 (Nov 9): at full power balls came 0.13 s apart and the flywheel needs 0.2-0.5 s to recover from each one
-        public static double FEED_POWER = 0.6;
+        public static double FEED_POWER = 0.75;
         public static double FLOWER_INTAKE_MS = 300; // how long Auto waits at a flower with the intake on TODO tune
         public static int CAPACITY = 4;              // balls the robot holds
     }
@@ -106,6 +106,13 @@ public class RobotConstants {
         // Operator: hold square / circle this long to set that cell and lock (or unlock) automatic hive detection
         public static double HOLD_TO_LOCK_S = 1;
         public static int LOCK_RUMBLE_MS = 250;
+
+        // Aim from the up cell's tags (core.AimCorrection): where the Limelight sees them against where the pose puts
+        // them moves the aim target by the difference. The pose itself isn't changed. Off: aim from the pose alone
+        public static boolean AIM_FROM_TAGS = true;
+        public static double AIM_SMOOTHING = 0.3;         // share of each new frame's offset taken (1: latest frame only)
+        public static double MAX_AIM_CORRECTION = 12;     // inches: a frame saying the pose is further off is a misread
+        public static double AIM_HEIGHT_TOLERANCE = 6;    // inches: an up-cell tag further off in height = hive tipped
     }
 
     /**
@@ -114,7 +121,9 @@ public class RobotConstants {
      * grow, and log the Limelight's tag positions with the robot standing still.
      */
     public static class Localization {
-        // Correct the pose from the hive's tags. Off: the pose is the Pinpoint's alone, as before
+        // Correct the pose from the hive's tags. Off: the pose is the Pinpoint's alone, as before.
+        // Keep off: on the robot this Kalman fusion made localization less accurate, not more. Vision.AIM_FROM_TAGS
+        // corrects only the aim from the tags instead
         public static boolean FUSE_HIVE_TAGS = false;
         // Odometry: how far off it gets
         public static double TRANSLATION_DRIFT = 0.1;                 // inches per √inch driven
@@ -207,9 +216,12 @@ public class RobotConstants {
 
         // ---- Target ----
         public static double LOCK_GATE = 6;         // inches: a pollen this close to the target's last spot is the target
+        public static double LOCK_GATE_FRACTION = 0.2; // ...or this fraction of its distance, if more (far estimates are noisier)
         public static double SMOOTHING = 0.5;       // weight of each new sighting in the target's position
-        public static double SWITCH_MARGIN = 0.75;  // another pollen takes over when closer than this x the target's distance
-        public static int SWITCH_FRAMES = 5;        // ...for this many frames in a row
+        // Which pollen to go for: distance plus TURN_COST inches per radian the intake has to turn to face it (90° = 19 in)
+        public static double TURN_COST = 12;
+        public static double SWITCH_MARGIN = 0.6;   // another pollen takes over when it costs under this x the target's cost
+        public static int SWITCH_FRAMES = 6;        // ...for this many frames in a row
         // The camera can't see the last few inches before the mouth (with the CAD mount, 2-5 in). A target last seen
         // within NEAR_MOUTH of the mouth, in front of it and touching the edge of the frame (within EDGE_MARGIN_PX),
         // went into that blind spot rather than getting lost.
@@ -217,11 +229,18 @@ public class RobotConstants {
         public static double EDGE_MARGIN_PX = 12;
 
         // ---- Chase ----
-        public static double CHASE_MAX_SPEED = 30;  // in/s. TODO: tune
-        public static double NEAR_BALL_SPEED = 22;     // in/s within NEAR_BALL_DISTANCE of the ball, for the camera and intake
+        // in/s (the drive tops out near 90). Was 30 / 22 near a ball; the path slows to its end at the ball anyway
+        public static double CHASE_MAX_SPEED = 50;
+        public static double NEAR_BALL_SPEED = 50;     // in/s within NEAR_BALL_DISTANCE of the ball: lower it if the intake knocks balls away
+        // Slow near a hive foot or flower column: on the stretch of a path where the robot's center comes within
+        // OBSTACLE_SLOW_DISTANCE of one (from its outside), starting OBSTACLE_BRAKE_LEAD inches before, to slow down in
+        public static double OBSTACLE_SPEED = 22;      // in/s
+        public static double OBSTACLE_SLOW_DISTANCE = 14; // inches: the robot's half length plus 6
+        public static double OBSTACLE_BRAKE_LEAD = 12;    // inches
         public static double NEAR_BALL_DISTANCE = 24;  // inches, robot center to ball
         public static double OVERSHOOT = 4;         // inches the mouth drives past the ball
         public static double REPLAN_DISTANCE = 2;   // inches the target has to move before the path is redone
+        public static double REPLAN_FRACTION = 0.1; // ...or this fraction of the distance to it, if more (far estimates wobble)
         public static double LOST_S = 0.5;          // a target out of view this long (not at the intake) is given up
         public static double CONFIRM_S = 0.4;       // after driving over it, how long it has to stay gone to count
         // With no pollen to chase the robot turns in place to look for more: left, the way the camera already looks
@@ -245,6 +264,13 @@ public class RobotConstants {
         // A target rolling faster than this (net, over MOVING_WINDOW_S) is waited for, not chased
         public static double MOVING_SPEED = 10;     // in/s
         public static double MOVING_WINDOW_S = 0.3;
+        // Turning faster than this, ball positions smear (the pose and the frame aren't from quite the same moment), so
+        // a still ball looks like it's rolling: it isn't judged then
+        public static double ROLLING_MAX_TURN = Math.toRadians(45); // rad/s
+        // How many to have before going to shoot: with MIN_LOAD picked up and no more pollen within NEARBY_DISTANCE of
+        // the robot, the chase ends (Chase And Shoot); with pollen that close it keeps going, up to the capacity
+        public static int MIN_LOAD = 2;
+        public static double NEARBY_DISTANCE = 36;  // inches, robot center to ball
         // A ball within LINE_UP_DISTANCE of a wall, a hive foot or a flower column is approached square from its open
         // side: first to LINE_UP_OUT out on that line (unless already within LINE_UP_TOLERANCE of it), then nose in
         public static double LINE_UP_DISTANCE = 10;
@@ -261,7 +287,14 @@ public class RobotConstants {
 
         // ---- Flywheel ----
         // goBILDA 6000 RPM: 28 ticks/rev, about 2800 ticks/sec flat out. The counter-rollers are geared off this motor.
-        public static double FLYWHEEL_MAX_VELOCITY = 2079; // ticks/sec (Nov 9)
+        public static double FLYWHEEL_MAX_VELOCITY = 2081; // ticks/sec (Nov 13)
+        // Highest speed the flywheel is sent to while aiming at the hive (ticks/sec): we never score from anywhere that
+        // needs more, and spinning up past it only costs time. A shot that needs more counts as no shot, and the
+        // flywheel holds the last speed it had for one within the cap. The tuners and the Shot Table Calibration's
+        // hand-set speed aren't capped
+        public static double FLYWHEEL_SPEED_CAP = 1100;
+        // What it holds out of range before there's been a shot within the cap (ticks/sec): a typical shot's speed
+        public static double FLYWHEEL_OUT_OF_RANGE_VELOCITY = 830;
         // Fixed speed for spinUp() and the Flywheel Tuner
         public static double TARGET_VELOCITY = 1609;  // ticks/sec (Oct 26)
         public static double VELOCITY_TOLERANCE = 50; // ticks/sec, when not aiming with ShotSolver. TODO: tune
@@ -269,16 +302,22 @@ public class RobotConstants {
         /** How the flywheel holds its speed. Both run in our own loop (subsystems.FlywheelController), not the hub's. */
         public enum FlywheelControl {
             PIDF,     // battery-compensated feedforward plus PID on the speed error
-            BANG_BANG // full power below target, the feedforward at or above it
+            BANG_BANG, // full power below target, the feedforward at or above it
+            HYBRID     // full power while more than FLYWHEEL_FULL_POWER_ERROR below target, PIDF closer in
         }
-        public static FlywheelControl FLYWHEEL_CONTROL = FlywheelControl.BANG_BANG;
+        // Nov 10 logs: bang-bang overshot ~+8-10% after each ball (the speed reading lags ~0.1 s) and PIDF recovered too
+        // slowly for the next ball. Hybrid gets bang-bang's recovery from a ball and PIDF's hold
+        public static FlywheelControl FLYWHEEL_CONTROL = FlywheelControl.HYBRID;
+        // HYBRID: ticks/sec below target where full power hands over to PIDF. Lower recovers harder but overshoots more
+        // (the reading lags); 40 was best in a sim of balls 0.17 s apart (FEED_POWER 0.75). TODO: check in the logs
+        public static double FLYWHEEL_FULL_POWER_ERROR = 40;
         // Feedforward: power at 12 V to hold a speed, scaled by 12 / battery volts so it holds the same on a tired battery.
         // The Flywheel Auto Tuner prints KV. A little low is fine; too high and the flywheel settles above target.
-        public static double FLYWHEEL_KV = 0.000525; // power per tick/sec (Nov 9)
+        public static double FLYWHEEL_KV = 0.000541; // power per tick/sec (Nov 13)
         public static double FLYWHEEL_KS = 0.003244;        // power to overcome friction
         // PID on the speed error. KP = KV is about the hub PIDF that rapid-fired well on Oct 28 (P = F = 16.84 in the
         // hub's units). The Flywheel Auto Tuner finds KP.
-        public static double FLYWHEEL_KP = 0.003149; // power per tick/sec of error (Nov 9)
+        public static double FLYWHEEL_KP = 0.002164; // power per tick/sec of error (Nov 13)
         public static double FLYWHEEL_KI = 0;        // power per tick of accumulated error
         public static double FLYWHEEL_KD = 0;        // power per tick/sec²; leave 0: the speed reading is too noisy to differentiate
 
@@ -293,7 +332,7 @@ public class RobotConstants {
         public static double TURRET_MIN_ANGLE = Math.toRadians(-112.5); // ±90° plus 22.5° each side (Nov 9)
         public static double TURRET_MAX_ANGLE = Math.toRadians(112.5);
         // Turret pivot relative to the robot center (inches, +x forward, +y left): the ring gear's axis (CAD, Oct 26)
-        public static double TURRET_OFFSET_X = 1.02;
+        public static double TURRET_OFFSET_X = 0;
         public static double TURRET_OFFSET_Y = 0;
         // TODO: tune from turret tuner opmode
         public static double TURRET_KP = 1.9;         // power per radian of error (Oct 26)
@@ -328,6 +367,10 @@ public class RobotConstants {
         public static double FLYWHEEL_TICKS_PER_EXIT_SPEED = 3.4;
         // The ball keeps the robot's velocity when it leaves; false simulates every shot from a standstill
         public static boolean SHOOT_ON_THE_MOVE = true;
+        // Fastest robot speed (in/s) the flywheel's speed allows for. Driving faster, it's set as if the robot were
+        // moving this fast, so a fast drive in to stop and shoot doesn't spin it way up (it can't brake, only coast
+        // down). The turret still leads the full speed. 0: the flywheel always plans a standing shot
+        public static double FLYWHEEL_MOVE_LIMIT = 0;
         // Pollen, from the AndyMark product page. Nectar is bigger and heavier in proportion, so it flies the same.
         public static double BALL_DIAMETER = 2.8; // inches
         public static double BALL_MASS = 0.0249;  // kg
@@ -340,15 +383,32 @@ public class RobotConstants {
         public static double SCORING_MARGIN = 0.5; // inches the ball's edge must clear each side of the opening by
         // Ready to shoot once flywheel and turret errors are within this fraction of what the shot can take
         public static double READY_WINDOW_FRACTION = 0.5;
+
+        // ---- Shot table (core.ShotTable) ----
+        // Flywheel speed from measured spots instead of the shot model: the model's speeds were inconsistent (Nov 10).
+        // The turret still aims with the model (it leads the target on the move). Fill the table with the Shot Table
+        // Calibration OpMode; it lives in /sdcard/FIRST/data/shot_table.csv on the robot. The repo's copy,
+        // TeamCode/src/main/assets/shot_table.csv, is used when the robot has no file of its own.
+        // With the table empty (or this false) the flywheel goes back to the model.
+        // Off Nov 14: the model sets the flywheel speed
+        public static boolean USE_SHOT_TABLE = false;
+        // How far past the nearest / farthest entry (inches) the table still extrapolates and calls it a shot
+        public static double SHOT_TABLE_EXTRAPOLATE = 12;
+        // Entries within this many inches of each other are averaged into one point before interpolating, so repeat
+        // saves at about the same distance smooth out noise rather than zig-zag. 0 interpolates through every entry
+        public static double SHOT_TABLE_MERGE = 3;
+        // Flywheel at-speed window with the table when the model has no margin for this shot (ticks/sec either way)
+        public static double SHOT_TABLE_TOLERANCE = 40;
     }
 
     /** Red-side poses in Pedro coordinates (inches). Blue is rotated 180° with Alliance.apply; never write blue poses. */
     public static class Field {
         // Center of each cell's opening, from the red driver station's point of view, with the heading pointing out of
-        // the opening. The hive is 12.75 in from field center toward our wall, and the up cell's
-        // opening is centered 15.7 in out from the hive center. Checked Oct 28
-        public static Pose RED_HIVE_LEFT_CELL = new Pose(59.25, 87.7, Math.toRadians(90));   // rear cell
-        public static Pose RED_HIVE_RIGHT_CELL = new Pose(59.25, 56.3, Math.toRadians(-90)); // audience cell
+        // the opening. The hive is 15.75 in from field center toward our wall, and the up cell's
+        // opening is centered 15.7 in out from the hive center. Checked Oct 28 at 12.75 in; moved 3 in toward the
+        // alliance wall Nov 13 (aim was off, the field geometry may not match), with HiveTags.PIVOT_FROM_CENTER
+        public static Pose RED_HIVE_LEFT_CELL = new Pose(56.25, 87.7, Math.toRadians(90));   // rear cell
+        public static Pose RED_HIVE_RIGHT_CELL = new Pose(56.25, 56.3, Math.toRadians(-90)); // audience cell
         // The up cell's opening (Competition Manual 9.6): 20 in wide, 14 in tall, centered 59.6 in
         // above the tiles, and leaning back 30° with the arm, so its face points outward and 30° up
         public static double HIVE_OPENING_CENTER_Z = 59.6;
@@ -392,9 +452,19 @@ public class RobotConstants {
 
         // Pose resets: robot pushed into the corner, back against the alliance wall, so the center is half the
         // length off the alliance wall and half the width off the side wall.
+        // START_X/Y_OFFSET: measured correction, inches, in red-side coordinates (Alliance.apply mirrors it for blue).
+        // With START_X_OFFSET = 1, a robot placed at the real 72, 72 read 74.6, 70.7 on telemetry, so x moves
+        // 2.6 in down (1 - 2.6 = -1.6) and y 1.3 in up.
+        public static double START_X_OFFSET = -1.6;
+        public static double START_Y_OFFSET = 1.3;
+        // The right corner needs its own correction: starting there with the offsets above, a robot placed at the
+        // real 72, 72 read 75.4, 70.7, so x moves another 3.4 in down (-1.6 - 3.4 = -5.0) and y another 1.3 up
+        // (1.3 + 1.3 = 2.6).
+        public static double RIGHT_START_X_OFFSET = -5.0;
+        public static double RIGHT_START_Y_OFFSET = 2.6;
         public static Pose RED_LEFT_CORNER =  // tile A6, alliance wall x rear wall
-                new Pose(WALL + ROBOT_LENGTH / 2, 144 - WALL - ROBOT_WIDTH / 2, 0);
+                new Pose(WALL + ROBOT_LENGTH / 2 + START_X_OFFSET, 144 - WALL - ROBOT_WIDTH / 2 + START_Y_OFFSET, 0);
         public static Pose RED_RIGHT_CORNER = // tile A1, alliance wall x audience wall
-                new Pose(WALL + ROBOT_LENGTH / 2, WALL + ROBOT_WIDTH / 2, 0);
+                new Pose(WALL + ROBOT_LENGTH / 2 + RIGHT_START_X_OFFSET, WALL + ROBOT_WIDTH / 2 + RIGHT_START_Y_OFFSET, 0);
     }
 }

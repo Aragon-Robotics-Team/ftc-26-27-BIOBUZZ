@@ -76,6 +76,9 @@ public class BallVision implements Subsystem {
 
         PollenTracker.Settings settings = new PollenTracker.Settings();
         settings.lockGate = LOCK_GATE;
+        settings.lockGateFraction = LOCK_GATE_FRACTION;
+        settings.turnCost = TURN_COST;
+        settings.intakeHeadingOffset = RobotConstants.Drive.INTAKE_HEADING_OFFSET;
         settings.smoothing = SMOOTHING;
         settings.switchMargin = SWITCH_MARGIN;
         settings.switchFrames = SWITCH_FRAMES;

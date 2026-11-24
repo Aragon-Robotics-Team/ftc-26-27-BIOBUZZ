@@ -16,12 +16,16 @@ import java.util.List;
 //super advanced reflection stuff wow!
 public enum Routines {
     ONE_CYCLE_GARDEN_PARK(OneCycleGardenPark.class),
+    ONE_CYCLE_GARDEN_PARK_WITH_FLOWERS(OneCycleGardenParkWithFlowers.class),
+    ONE_CYCLE_GARDEN_PARK_M(OneCycleGardenParkWithM.class),
     TWO_CYCLE_GARDEN_PARK(TwoCycleGardenPark.class),
-    ONE_CYCLE_FLOWER_PARK(OneCycleFlowerPark.class),
-    TWO_CYCLE_FLOWER_PARK(TwoCycleFlowerPark.class),
-    CYCLE_GARDEN_PARK(CycleGardenPark.class),
+    TWO_CYCLE_GARDEN_PARK_KNOCKOUT(TwoCycleGardenParkKnockout.class),
+//    ONE_CYCLE_FLOWER_PARK(OneCycleFlowerPark.class),
+//    TWO_CYCLE_FLOWER_PARK(TwoCycleFlowerPark.class),
+//    CYCLE_GARDEN_PARK(CycleGardenPark.class),
     CAMERA_CYCLES(CameraCycles.class),
-    EXAMPLE(ExampleRoutine.class);
+    UNOBTRUSIVE_PARK(UnobtrusivePark.class);
+//    EXAMPLE(ExampleRoutine.class);
 
     private final Class<? extends AutoRoutine> type;
 

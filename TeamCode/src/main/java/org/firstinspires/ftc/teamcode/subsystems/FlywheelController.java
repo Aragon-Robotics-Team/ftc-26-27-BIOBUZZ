@@ -9,6 +9,7 @@ import org.firstinspires.ftc.teamcode.core.RobotConstants.Launcher.FlywheelContr
  * RUN_WITHOUT_ENCODER and gets the power this works out, once per loop.
  * - PIDF: battery-compensated feedforward (FLYWHEEL_KS + FLYWHEEL_KV × target) plus PID on the speed error.
  * - BANG_BANG: full power below target, the feedforward at or above it.
+ * - HYBRID: full power while more than FLYWHEEL_FULL_POWER_ERROR below target (a ball just went through), PIDF closer in.
  * The gains are read from RobotConstants.Launcher on every call, so the tuners can change them live. No hardware, so
  * it can be unit tested.
  */
@@ -39,6 +40,11 @@ public class FlywheelController {
         if (FLYWHEEL_CONTROL == FlywheelControl.BANG_BANG) {
             reset();
             return error > 0 ? 1 : clip(feedforward);
+        }
+        if (FLYWHEEL_CONTROL == FlywheelControl.HYBRID && error > FLYWHEEL_FULL_POWER_ERROR) {
+            integral = 0;
+            lastError = error;
+            return 1;
         }
 
         if (dt > 0) {

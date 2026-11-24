@@ -60,27 +60,30 @@ public class OneCycleGardenPark extends AutoRoutine {
     public Command autoRoutine() {
         Command cycle = sequential(
                 // Preloads
+                robot.intake.intake(),
                 follow(follower, startToLaunch()),
+                waitMs(2000),
                 robot.shoot(),
                 // Tip
                 robot.flipHive(),
 
                 // Garden: intake on the way in, stop once back out
-                robot.intake.intake(),
                 follow(follower, prepareGardenIntake()),
                 follow(follower, gardenIntake1()).raceWith(waitMs(1500)),
                 waitMs(1000),
                 follow(follower, gardenIntakeBack()),
                 follow(follower, gardenIntake2()).raceWith(waitMs(1500)),
                 waitMs(1000),
-                follow(follower, adjustBeforePark()),
-                robot.intake.off()
+                follow(follower, adjustBeforePark())
         );
 
         return sequential(
                 // Keep the turret on the hive and the flywheel at the right speed while cycling
                 deadline(cycle, robot.aimAtHive(), robot.enableFlywheel()),
-                follow(follower, park())
+                follow(follower, park()),
+                waitMs(2000),
+                robot.intake.off(),
+                robot.launcher.idle()
         );
     }
 }

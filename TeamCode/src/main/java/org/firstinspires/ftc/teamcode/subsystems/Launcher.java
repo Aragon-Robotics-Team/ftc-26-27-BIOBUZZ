@@ -19,15 +19,20 @@ import com.qualcomm.robotcore.util.Range;
 import org.firstinspires.ftc.robotcore.external.Telemetry;
 import org.firstinspires.ftc.teamcode.core.ShotSolver;
 import org.firstinspires.ftc.teamcode.core.ShotSolver.Shot;
+import org.firstinspires.ftc.teamcode.core.ShotTable;
 
+import java.util.function.DoubleSupplier;
 import java.util.function.Supplier;
 
 /**
  * Turreted flywheel shooter. The flywheel holds its speed with our own loop ({@link FlywheelController}, PIDF or
  * bang-bang, see FLYWHEEL_CONTROL), not the hub's; the turret runs a PID loop on its encoder angle,
  * plus a velocity feedforward so it can track a target while the robot moves.
- * Aiming simulates every shot ({@link ShotSolver}): the turret heading and flywheel speed come from a flight model
- * with drag that allows for the robot's motion, and "ready" means both are within the error that shot can take.
+ * Aiming simulates every shot ({@link ShotSolver}): the turret heading comes from a flight model with drag that
+ * allows for the robot's motion. The flywheel speed comes from the measured {@link ShotTable} by distance (when it
+ * has entries and USE_SHOT_TABLE is on), else from the same model. "Ready" means both are within the error that shot
+ * can take. The flywheel allows for at most FLYWHEEL_MOVE_LIMIT of the robot's speed: it can't brake, so it shouldn't
+ * spin up for a fast drive that ends in a standing shot.
  * Flywheel commands require the flywheel motor and turret commands require the turret motor, so aiming and
  * spinning up can run at the same time. The gate and intake do the actual feeding (see Robot).
  */
@@ -58,6 +63,7 @@ public class Launcher implements Subsystem {
     private double turretTargetAngle = 0;
     private double turretTargetRate = 0; // rad/s the target is moving at, for the feedforward
     private boolean turretTargetClipped = false; // the wanted angle is past a soft limit
+    private double turretWantedAngle = 0; // where the shot wants the turret, before clipping to the soft limits
     private double turretAngle = 0;
     private double turretAngleOffset = 0;
 
@@ -72,9 +78,19 @@ public class Launcher implements Subsystem {
     private double turretVelocity = 0; // rad/s, measured
 
     private final ShotSolver shotSolver = new ShotSolver();
+    // The flywheel's own solver while the robot is faster than FLYWHEEL_MOVE_LIMIT (a different shot from the turret's)
+    private final ShotSolver limitedSolver = new ShotSolver();
     // The shots the flywheel and turret are following, while enableFlywheel() / aimAt() run
     private Shot flywheelShot = null;
     private Shot turretShot = null;
+    // While enableFlywheel() runs with the shot table: the distance it looked up and the speed it gave (before nudge)
+    private boolean usingTable = false;
+    private double tableDistance = 0;
+    private double tableVelocity = 0;
+    // The shot needs more than FLYWHEEL_SPEED_CAP: there's no shot, and the flywheel holds lastInRange instead
+    private boolean overCap = false;
+    // The last flywheel speed (before the nudge) for a shot within the cap, NaN before the first
+    private double lastInRange = Double.NaN;
 
     public Launcher(HardwareMap hardwareMap) {
         flywheel = hardwareMap.get(DcMotorEx.class, FLYWHEEL_MOTOR_NAME);
@@ -103,9 +119,71 @@ public class Launcher implements Subsystem {
      */
     public Command enableFlywheel(Supplier<Pose> robotPose, Supplier<Velocity> robotVelocity, Supplier<Pose> target) {
         return infinite(() -> {
-            flywheelShot = shotSolver.solve(robotPose.get(), robotVelocity.get(), target.get());
-            targetVelocity = flywheelShot.flywheelVelocity + velocityNudge;
-        }).setEnd(end -> flywheelShot = null).requiring(flywheel);
+            Pose pose = robotPose.get();
+            Velocity actual = robotVelocity.get();
+            Velocity velocity = limitForFlywheel(actual);
+            Pose goal = target.get();
+            // Under the limit it's the turret's shot, and the solver solves it once for both
+            flywheelShot = (velocity == actual ? shotSolver : limitedSolver).solve(pose, velocity, goal);
+            usingTable = USE_SHOT_TABLE && !ShotTable.isEmpty();
+            if (usingTable) {
+                tableDistance = tableDistance(pose, velocity, goal, flywheelShot);
+                tableVelocity = ShotTable.velocityAt(tableDistance);
+                targetVelocity = tableVelocity + velocityNudge;
+            } else {
+                targetVelocity = flywheelShot.flywheelVelocity + velocityNudge;
+            }
+            // Too far to score: hold a shooting speed rather than spin up for it, so stopping to shoot doesn't wait
+            // for the flywheel to coast back down (it can't brake)
+            overCap = targetVelocity > FLYWHEEL_SPEED_CAP;
+            if (overCap) {
+                double hold = Double.isNaN(lastInRange) ? FLYWHEEL_OUT_OF_RANGE_VELOCITY : lastInRange;
+                targetVelocity = Math.min(hold + velocityNudge, FLYWHEEL_SPEED_CAP);
+            } else {
+                lastInRange = targetVelocity - velocityNudge;
+            }
+        }).setEnd(end -> {
+            flywheelShot = null;
+            usingTable = false;
+            overCap = false;
+        }).requiring(flywheel);
+    }
+
+    /**
+     * Hold whatever speed the supplier gives (ticks/sec), no nudge. For the Shot Table Calibration, where the
+     * operator sets the speed by hand. Runs until {@link #idle()}.
+     */
+    public Command holdVelocity(DoubleSupplier velocity) {
+        return infinite(() -> targetVelocity = velocity.getAsDouble()).requiring(flywheel);
+    }
+
+    /** The robot's velocity slowed to FLYWHEEL_MOVE_LIMIT (the same object if it's already under). */
+    private static Velocity limitForFlywheel(Velocity velocity) {
+        double speed = Math.hypot(velocity.vx, velocity.vy);
+        double limit = Math.max(0, FLYWHEEL_MOVE_LIMIT);
+        if (speed <= limit) return velocity;
+        double scale = limit / speed;
+        return new Velocity(velocity.vx * scale, velocity.vy * scale, velocity.omega);
+    }
+
+    /**
+     * The distance to look up in the shot table. The table is for standing shots, so a moving robot looks up the
+     * distance from where the ball's inherited motion would carry the turret by the time the ball arrives (the
+     * "virtual target"): driving toward the hive needs a shorter shot, away a longer one. Taken from the same
+     * look-ahead pose the solver aims from. Standing still, it's just {@link #distanceTo}.
+     */
+    private double tableDistance(Pose pose, Velocity velocity, Pose target, Shot shot) {
+        Pose ahead = new Pose(
+                pose.x() + velocity.vx * AIM_LOOKAHEAD,
+                pose.y() + velocity.vy * AIM_LOOKAHEAD,
+                pose.heading() + velocity.omega * AIM_LOOKAHEAD);
+        Pose pivot = ShotSolver.turretPivot(ahead);
+        double x = pivot.x(), y = pivot.y();
+        if (SHOOT_ON_THE_MOVE && shot.feasible) {
+            x += velocity.vx * shot.timeOfFlight;
+            y += velocity.vy * shot.timeOfFlight;
+        }
+        return Math.hypot(target.x() - x, target.y() - y);
     }
 
     /** Spin the flywheel at the fixed TARGET_VELOCITY. Used by the Flywheel Tuner. */
@@ -178,8 +256,23 @@ public class Launcher implements Subsystem {
     }
 
     private double flywheelTolerance() {
+        if (usingTable) {
+            // The model's margin as a fraction of the speed, applied to the table's speed
+            if (flywheelShot == null || !flywheelShot.feasible || flywheelShot.exitSpeed <= 0) return SHOT_TABLE_TOLERANCE;
+            return tableVelocity * flywheelShot.speedTolerance / flywheelShot.exitSpeed * READY_WINDOW_FRACTION;
+        }
         if (flywheelShot == null || !flywheelShot.feasible) return VELOCITY_TOLERANCE;
         return flywheelShot.speedTolerance * FLYWHEEL_TICKS_PER_EXIT_SPEED * READY_WINDOW_FRACTION;
+    }
+
+    /** True while the flywheel speed comes from the shot table rather than the shot model. */
+    public boolean isUsingShotTable() {
+        return usingTable;
+    }
+
+    /** The distance the shot table was last looked up at (inches), while {@link #isUsingShotTable()}. */
+    public double getTableDistance() {
+        return tableDistance;
     }
 
     public double getFlywheelVelocity() {
@@ -223,11 +316,12 @@ public class Launcher implements Subsystem {
     }
 
     /**
-     * Within the angle error the current shot can take (TURRET_ANGLE_TOLERANCE when not aiming at a target).
-     * Never while the wanted angle is past a soft limit: parked on the limit, the turret points the wrong way.
+     * Within the angle error the current shot can take (TURRET_ANGLE_TOLERANCE when not aiming at a target) of where
+     * the shot wants the turret, before clipping. A target just past a soft limit, with the turret parked on it, still
+     * counts when it's that close; one deep in the blind zone behind the robot is far off and doesn't.
      */
     public boolean isTurretOnTarget() {
-        return !turretTargetClipped && Math.abs(turretTargetAngle - getTurretAngle()) <= turretTolerance();
+        return Math.abs(Angle.normalizeSigned(turretWantedAngle - getTurretAngle())) <= turretTolerance();
     }
 
     /**
@@ -245,6 +339,10 @@ public class Launcher implements Subsystem {
 
     /** False when aiming at a target that no flywheel speed can reach from here (e.g. too close for the hood). */
     public boolean hasShot() {
+        if (overCap) return false; // farther than we ever score from
+        // With the table, "in range" is the table's measured range: the model's reach no longer decides it.
+        // An infeasible model shot still points the turret straight at the target, which is right standing still.
+        if (usingTable) return ShotTable.covers(tableDistance);
         return (flywheelShot == null || flywheelShot.feasible) && (turretShot == null || turretShot.feasible);
     }
 
@@ -275,13 +373,16 @@ public class Launcher implements Subsystem {
     }
 
     /**
-     * Clamped to [TURRET_MIN_ANGLE, TURRET_MAX_ANGLE], so targets past the limits need the drivetrain to turn.
+     * Kept to [TURRET_MIN_ANGLE, TURRET_MAX_ANGLE], so targets past the limits need the drivetrain to turn. Past
+     * them, the turret parks on the limit the target left through and stays there until the target is back in range
+     * (TurretLimits), rather than swinging between the limits as the target crosses straight behind the robot.
      * @param rate how fast the target is moving (radians/sec), for the feedforward
      */
     private void setTurretTarget(double angle, double rate) {
-        double normalized = Angle.normalizeSigned(angle);
-        turretTargetAngle = Range.clip(normalized, TURRET_MIN_ANGLE, TURRET_MAX_ANGLE);
-        turretTargetClipped = turretTargetAngle != normalized;
+        turretWantedAngle = Angle.normalizeSigned(angle);
+        turretTargetAngle = TurretLimits.target(turretWantedAngle, turretTargetAngle, turretTargetClipped,
+                TURRET_MIN_ANGLE, TURRET_MAX_ANGLE);
+        turretTargetClipped = turretTargetAngle != turretWantedAngle;
         // Parked on a soft limit: don't push into it
         turretTargetRate = turretTargetClipped ? 0 : rate;
     }
@@ -349,12 +450,23 @@ public class Launcher implements Subsystem {
     public void telemetry(Telemetry telemetry) {
         telemetry.addData("Launcher ready", isReady());
         telemetry.addData("Flywheel target / actual", "%.0f / %.0f", targetVelocity, flywheelVelocity);
+        if (overCap) telemetry.addData("Flywheel", "too far to score (needs over %.0f): holding %.0f",
+                FLYWHEEL_SPEED_CAP, targetVelocity);
         telemetry.addData("Flywheel power (" + FLYWHEEL_CONTROL + ")", "%.2f at %.1f V", flywheelPower, batteryVolts);
         telemetry.addData("Turret target / actual (deg)", "%.1f / %.1f",
                 Math.toDegrees(turretTargetAngle), Math.toDegrees(getTurretAngle()));
+        if (turretTargetClipped) {
+            telemetry.addData("Turret wanted (deg)", "%.1f, past its limit", Math.toDegrees(turretWantedAngle));
+        }
         telemetry.addData("Turret turn speed target / actual (deg/s)", "%.0f / %.0f",
                 Math.toDegrees(turretTargetRate), Math.toDegrees(turretVelocity));
         telemetry.addData("Turret power", "%.2f", turret.getPower());
+        if (usingTable) {
+            telemetry.addData("Shot table", "%.0f in → %.0f ticks/s%s   [%s]", tableDistance, tableVelocity,
+                    ShotTable.covers(tableDistance) ? "" : " (out of range)", ShotTable.getSource());
+        } else if (USE_SHOT_TABLE) {
+            telemetry.addLine("Shot table empty: flywheel speed from the shot model");
+        }
         Shot shot = getShot();
         if (shot == null) return;
         if (!shot.feasible) {

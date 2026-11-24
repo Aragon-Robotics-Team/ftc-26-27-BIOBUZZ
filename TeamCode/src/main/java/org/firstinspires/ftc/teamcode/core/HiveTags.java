@@ -7,7 +7,7 @@ package org.firstinspires.ftc.teamcode.core;
  * PoseFilter estimates each hive's arm angle along with the robot's pose. Everything else here is fixed.
  *
  * Geometry (Competition Manual 9.6 / 9.9; the sim's SimHives has the same numbers): the arm pivots 43.95 in above the
- * tiles, 12.75 in from the field center toward its own alliance's wall, about an axis along Pedro x (cells along y).
+ * tiles, 15.75 in from the field center toward its own alliance's wall, about an axis along Pedro x (cells along y).
  * Each cell has four 3.25 in tags in a row across the underside of its floor, centered 14.27 in out along the arm
  * from the pivot and 1.6 in below the arm's axis, 3.75 in apart.
  *
@@ -16,7 +16,8 @@ package org.firstinspires.ftc.teamcode.core;
  */
 public final class HiveTags {
     public static final double PIVOT_HEIGHT = 43.95;
-    public static final double PIVOT_FROM_CENTER = 12.75;
+    // 12.75 by the manual; moved 3 in toward the alliance wall Nov 13 with RobotConstants.Field.RED_HIVE_*_CELL
+    public static final double PIVOT_FROM_CENTER = 15.75;
     public static final double REST_ANGLE = Math.toRadians(30);
     public static final double ALONG_ARM = 14.27;
     public static final double BELOW_ARM = 1.6;

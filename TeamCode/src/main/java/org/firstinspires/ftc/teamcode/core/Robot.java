@@ -50,6 +50,13 @@ public class Robot {
     public final HiveVision hiveVision;
     public final BallVision ballVision;
 
+    /**
+     * Aim and flywheel speed allow for the robot's motion (lead, AIM_LOOKAHEAD, the turret's tracking feedforward).
+     * Auto turns it off: there the chassis rocking from the turret's own swing, projected AIM_LOOKAHEAD ahead, moved
+     * the turret's target and kept it oscillating ±10° at the first shot (Auto log, Nov 14 14:14).
+     */
+    public boolean velocityCompensation = true;
+
     private final List<LynxModule> hubs;
     private final Subsystem[] subsystems;
 
@@ -76,13 +83,26 @@ public class Robot {
 
     // ---- Hive ----
 
-    /** Center of the opening of our hive's up cell. */
+    /**
+     * Center of the opening of our hive's up cell, moved by where the Limelight last saw that cell's tags against where
+     * the pose puts them (Vision.AIM_FROM_TAGS, HiveVision.aimTarget). For the turret's aim.
+     */
     public Pose hiveTarget() {
+        return hiveVision.aimTarget(hiveCell(), MatchState.hive);
+    }
+
+    /**
+     * Center of the opening of our hive's up cell where the field constants put it, not moved by the Limelight. The
+     * flywheel's speed comes from the distance to this (the odometry distance): the tags' correction made the LEFT
+     * cell read about 7 in closer than it is, and its shots fell short (TeleOp logs, Nov 14).
+     */
+    public Pose hiveCell() {
         return MatchState.hive.cell(MatchState.alliance);
     }
 
+    /** Inches from the turret pivot to the up cell, by odometry (hiveCell), as the flywheel uses it. */
     public double distanceToHive() {
-        return launcher.distanceTo(drivebase.getPose(), hiveTarget());
+        return launcher.distanceTo(drivebase.getPose(), hiveCell());
     }
 
     /** The operator says which cell is up. Hive vision gives a hand-set state a moment before it overrules it. */
@@ -101,12 +121,20 @@ public class Robot {
 
     /** Keep the turret on the hive's up cell, leading it while the robot moves. Runs until interrupted. */
     public Command aimAtHive() {
-        return launcher.aimAt(drivebase::getPose, drivebase::getVelocity, this::hiveTarget);
+        return launcher.aimAt(drivebase::getPose, this::aimVelocity, this::hiveTarget);
     }
 
-    /** Flywheel speed follows the simulated shot into the hive's up cell. Runs until launcher.idle(). */
+    /**
+     * Flywheel speed follows the simulated shot into the hive's up cell, at the odometry distance (hiveCell, not the
+     * Limelight's correction). Runs until launcher.idle().
+     */
     public Command enableFlywheel() {
-        return launcher.enableFlywheel(drivebase::getPose, drivebase::getVelocity, this::hiveTarget);
+        return launcher.enableFlywheel(drivebase::getPose, this::aimVelocity, this::hiveCell);
+    }
+
+    /** The robot's velocity for aiming, or standing still when velocityCompensation is off. */
+    private Velocity aimVelocity() {
+        return velocityCompensation ? drivebase.getVelocity() : new Velocity(0, 0, 0);
     }
 
     // ---- Shooting ----
@@ -207,8 +235,8 @@ public class Robot {
     public void update() {
         for (LynxModule hub : hubs) hub.clearBulkCache();
         for (Subsystem subsystem : subsystems) subsystem.update();
-        // Where the turret was when this loop's pose was read: both from this loop's reads
-        hiveVision.recordTurret(drivebase.getLocalizer().getLastUpdateTime(), launcher.getTurretAngle());
+        // Where the turret and the robot were when this loop's pose was read: both from this loop's reads
+        hiveVision.record(drivebase.getLocalizer().getLastUpdateTime(), launcher.getTurretAngle(), drivebase.getPose());
     }
 
     public void stop() {
@@ -240,6 +268,12 @@ public class Robot {
         Logger.recordOutput("Localization/tagsRejected", filter.getRejected());
         Logger.recordOutput("Localization/redArmDeg", Math.toDegrees(filter.arm(HiveTags.RED)));
         Logger.recordOutput("Localization/blueArmDeg", Math.toDegrees(filter.arm(HiveTags.BLUE)));
+        AimCorrection aim = hiveVision.getAimCorrection();
+        Logger.recordOutput("Aim/fromTags", aim.has(MatchState.hive));
+        Logger.recordOutput("Aim/dx", aim.dx(MatchState.hive));
+        Logger.recordOutput("Aim/dy", aim.dy(MatchState.hive));
+        Logger.recordOutput("Aim/tags", aim.tags(MatchState.hive));
+        Logger.recordOutput("Aim/skipped", aim.getRejected());
         Velocity velocity = drivebase.getVelocity();
         Logger.recordOutput("Drive/speed", Math.hypot(velocity.vx, velocity.vy));
         Logger.recordOutput("Drive/turnRateDeg", Math.toDegrees(velocity.omega));
@@ -250,6 +284,8 @@ public class Robot {
         Logger.recordOutput("Launcher/flywheelTarget", launcher.getTargetVelocity());
         Logger.recordOutput("Launcher/flywheelActual", launcher.getFlywheelVelocity());
         Logger.recordOutput("Launcher/flywheelNudge", launcher.getVelocityNudge());
+        Logger.recordOutput("Launcher/usingShotTable", launcher.isUsingShotTable());
+        Logger.recordOutput("Launcher/tableDistance", launcher.getTableDistance());
         Logger.recordOutput("Launcher/flywheelPower", launcher.getFlywheelPower());
         Logger.recordOutput("Launcher/batteryVolts", launcher.getBatteryVolts());
         Logger.recordOutput("Launcher/ready", launcher.isReady());
