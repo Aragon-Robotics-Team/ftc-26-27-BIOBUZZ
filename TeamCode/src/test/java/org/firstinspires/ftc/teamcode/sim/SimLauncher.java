@@ -17,7 +17,7 @@ import java.util.List;
 
 /**
  * The robot's ball path in the sim, from what the code commands: the intake takes pollen (never nectar) that reaches its mouth while it
- * runs; with the gate open and the intake running, stored balls go to the flywheel one at a time and leave from the
+ * runs, and the bottom pollen of a flower it's pushed up to (takeFromFlowers); with the gate open and the intake running, stored balls go to the flywheel one at a time and leave from the
  * turret at the hood angle, as fast as the flywheel is really spinning (FLYWHEEL_TICKS_PER_EXIT_SPEED), carrying the
  * robot's motion. SimLoop flies them with gravity and drag and no lift, like ShotSolver with LIFT_COEFFICIENT 0 (the
  * counter-rollers leave the ball without spin).
@@ -42,6 +42,13 @@ final class SimLauncher {
     private static final double MOUTH_DEPTH = 0.5; // inches inside INTAKE_REACH a ball still counts as touching it
     // The intake only takes pollen: nectar is too big for it, so the robot pushes nectar like any other obstacle
     private static final List<String> POLLEN_ONLY = java.util.Collections.singletonList(Ball.Type.POLLEN.name());
+    // A flower's bottom pollen comes out through its Retrieval Opening (G418.B: only pollen, only from the bottom),
+    // as BiobuzzSim lets it: the robot on the field side, within 40° of straight out from the wall, and the pollen
+    // between the side plates and within FLOWER_REACH of the mouth. Square against the column, the mouth is 3.65 in
+    // from its axis (the column's 2.65 in and the mouth 1 in inside the bumper), so the rollers have to reach about
+    // 2.25 in past the mouth, under the middle ring, to the ball. PLACEHOLDER: check that the real intake does
+    private static final double FLOWER_REACH = 4.0;          // inches, mouth to the bottom pollen's center
+    private static final double FLOWER_APPROACH_COS = Math.cos(Math.toRadians(40));
     private final ShotArcRecorder shots = new ShotArcRecorder(SHOT_SLOTS);
 
     private double intakeWait, feedWait;
@@ -101,11 +108,12 @@ final class SimLauncher {
     }
 
     /**
-     * One tick, after GamePieceTracker.updateRobotPose and before advance. Field frame, inches and radians:
-     * the turret axis's position, its field heading, the robot's velocity, and the point a shot should go through.
+     * One tick, after GamePieceTracker.updateRobotPose and before advance. Field frame, inches and radians: the
+     * robot's pose, the turret axis's position, its field heading, the robot's velocity, and the point a shot should
+     * go through.
      */
-    void update(double deltaTime, double axisX, double axisY, double turretHeading, double vx, double vy,
-                double[] aim) {
+    void update(double deltaTime, double robotX, double robotY, double robotHeading, double axisX, double axisY,
+                double turretHeading, double vx, double vy, double[] aim) {
         boolean intakeRunning = intake.getPower() > 0.1;
         boolean gateOpen = gate.getPosition()
                 > (RobotConstants.Gate.CLOSED_POSITION + RobotConstants.Gate.OPEN_POSITION) / 2;
@@ -118,7 +126,10 @@ final class SimLauncher {
         }
 
         boolean room = field.getHeldCount() < CAPACITY;
-        if (intakeWait <= 0 && field.tryAcquire(mouth, intakeRunning && room, POLLEN_ONLY, 1) > 0) intakeWait = INTAKE_INTERVAL;
+        if (intakeWait <= 0 && intakeRunning && room) {
+            if (field.tryAcquire(mouth, true, POLLEN_ONLY, 1) > 0
+                    || takeFromFlowers(robotX, robotY, robotHeading)) intakeWait = INTAKE_INTERVAL;
+        }
 
         int next = field.nextHeldPieceId();
         if (gateOpen && intakeRunning && feedWait <= 0 && next >= 0) {
@@ -126,6 +137,58 @@ final class SimLauncher {
             launch(next, axisX, axisY, turretHeading, vx, vy, aim);
         }
         followFlight();
+    }
+
+    /**
+     * Takes the bottom pollen of a flower the intake is up against (FLOWER_REACH), and wakes the ones above it so they
+     * drop into its place. Nothing comes out when the bottom ball is nectar: it blocks the opening. Field frame.
+     */
+    private boolean takeFromFlowers(double robotX, double robotY, double heading) {
+        double fx = Math.cos(heading), fy = Math.sin(heading);
+        double reach = RobotConstants.BallVision.INTAKE_REACH;
+        for (int i = 0; i < RobotConstants.Field.FLOWERS.length; i++) {
+            double[] c = SimField.flowerCenter(i), in = SimField.flowerInward(i);
+            double ox = robotX - c[0], oy = robotY - c[1];
+            if ((ox * in[0] + oy * in[1]) < FLOWER_APPROACH_COS * Math.hypot(ox, oy)) continue; // not from the field side
+            // The lowest ball in the column. The ones stacked on it are IN_FLIGHT to SimLoop (off the floor), asleep
+            GamePiece bottom = null;
+            for (GamePiece p : field.getPieces()) {
+                if (!inColumn(p)) continue;
+                if (Math.hypot(p.getFieldXInches() - c[0], p.getFieldYInches() - c[1]) > SimField.FLOWER_INNER_RADIUS) continue;
+                if (p.getFieldZInches() > SimField.FLOWER_TUBE_BOTTOM + 2) continue; // well up the tube
+                if (bottom == null || p.getFieldZInches() < bottom.getFieldZInches()) bottom = p;
+            }
+            // Only one resting in the lower ring: its top under the middle ring (BiobuzzSim's test), not one still falling
+            if (bottom == null || bottom.getState() != PossessionState.LOOSE
+                    || !bottom.getKind().equals(Ball.Type.POLLEN.name())
+                    || bottom.getFieldZInches() + 0.6 * bottom.getRadiusInches() > SimField.FLOWER_TUBE_BOTTOM) continue;
+            double dx = bottom.getFieldXInches() - robotX, dy = bottom.getFieldYInches() - robotY;
+            double ahead = dx * fx + dy * fy, side = -dx * fy + dy * fx;
+            if (ahead < reach || ahead > reach + FLOWER_REACH) continue;
+            if (Math.abs(side) > RobotConstants.BallVision.INTAKE_WIDTH / 2 - bottom.getRadiusInches()) continue;
+            // tryAcquire takes the lowest-id loose ball on the spot, judged on the floor only: if another loose one
+            // is there too (one that fell in beside it), leave both rather than take the wrong one
+            for (GamePiece p : field.getPieces()) {
+                if (p.getId() < bottom.getId() && p.getState() == PossessionState.LOOSE && Math.hypot(
+                        p.getFieldXInches() - bottom.getFieldXInches(), p.getFieldYInches() - bottom.getFieldYInches())
+                        < p.getRadiusInches() + 0.05) return false;
+            }
+            TriggerVolume spot = new TriggerVolume("flower", ahead, side, 0.05, 0.05);
+            if (field.tryAcquire(spot, true, POLLEN_ONLY, 1) == 0) return false;
+            for (GamePiece p : field.getPieces()) {
+                if (inColumn(p) && p.isSleeping() && Math.hypot(
+                        p.getFieldXInches() - c[0], p.getFieldYInches() - c[1]) < SimField.FLOWER_INNER_RADIUS) {
+                    SimField.setSleeping(p, false);
+                }
+            }
+            return true;
+        }
+        return false;
+    }
+
+    /** On the field and not in the robot or a hive's cell: a ball that can be resting in a flower. */
+    private static boolean inColumn(GamePiece p) {
+        return p.getState() == PossessionState.LOOSE || p.getState() == PossessionState.IN_FLIGHT;
     }
 
     private void launch(int id, double x, double y, double heading, double vx, double vy, double[] aim) {

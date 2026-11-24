@@ -10,12 +10,14 @@ import static org.firstinspires.ftc.teamcode.core.RobotConstants.Vision.HOLD_TO_
 import static org.firstinspires.ftc.teamcode.core.RobotConstants.Vision.LOCK_RUMBLE_MS;
 import static org.firstinspires.ftc.teamcode.util.Html.*;
 
+import com.pedropathing.ivy.Command;
 import com.pedropathing.ivy.Scheduler;
 import com.pedropathing.math.Pose;
 import com.pedropathing.utils.Angle;
 import com.qualcomm.robotcore.eventloop.opmode.OpMode;
 import com.qualcomm.robotcore.hardware.Gamepad;
 import com.qualcomm.robotcore.util.ElapsedTime;
+import com.qualcomm.robotcore.util.RobotLog;
 
 import org.firstinspires.ftc.robotcore.external.Telemetry;
 import org.firstinspires.ftc.teamcode.core.Alliance;
@@ -36,11 +38,16 @@ import org.firstinspires.ftc.teamcode.util.PanelsDisplay;
  * Gamepad 1 (driver):
  *   left stick      field-centric drive (stick forward = away from our driver station)
  *   right stick     point the intake that way (same frame); the robot holds that heading when let go.
- *                   With RobotConstants.Drive.TURN_MODE = RATE, right stick x sets the turn speed instead
+ *                   With RobotConstants.Drive.TURN_MODE = RATE, right stick x sets the turn speed instead.
+ *                   RATE_SNAP is RATE, plus: driving hard with the right stick centered and the robot within 10° of
+ *                   the drive direction (nose or tail first) turns it onto that direction, for full mecanum speed.
+ *                   The "TeleOp (Rate Snap)" and "TeleOp (Twin Stick)" OpModes (TeleOpRateSnap, TeleOpTwinStick)
+ *                   always use RATE_SNAP / TWIN_STICK
  *   hold L2         slow mode (driving only; with RATE, turning too)
  *   triangle        toggle intake        cross   toggle outtake
  *   R1              flywheel on          L1      flywheel off
  *   hold R2         open the gate and feed the shooter
+ *   square          toggle matchloader up / down
  * Gamepad 2 (operator):
  *   square / circle during init: blue / red alliance (until pressed, the alliance Auto ran as)
  *   dpad left/right nudge turret         dpad up/down  nudge flywheel speed
@@ -60,10 +67,12 @@ public class TeleOp extends OpMode {
     private Pose initCorner = null;
     private boolean started = false;
     private PanelsDisplay panelsDisplay;
-    // Gamepad 1 going quiet (watchGamepad): its last timestamp, when it changed (ms on clock), and the longest gap
+    // Gamepad 1 going quiet (watchGamepad): its last timestamp, when it changed (ms on clock), and the longest gap.
+    // The slowest loop since the last change, and in the longest gap: a gap that's one slow loop is the robot stalling
     private long padStamp;
     private boolean padMoving;
     private double padChangedMs = Double.NaN, longestPadGapMs, longestPadGapAtS;
+    private double lastLoopMs = Double.NaN, slowestLoopSincePadMs, longestPadGapLoopMs;
     private int padGaps;
 
     @Override
@@ -109,22 +118,38 @@ public class TeleOp extends OpMode {
         // Stick forward points away from our driver station: +x for red, -x for blue
         double headingOffset = MatchState.alliance == Alliance.BLUE ? Math.PI : 0;
         // Always-on commands, running for the whole match
-        schedule(
-                TURN_MODE == TurnMode.TWIN_STICK
-                        ? robot.drivebase.driveTwinStick(
-                                () -> -gamepad1.left_stick_y * driveScale(),
-                                () -> -gamepad1.left_stick_x * driveScale(),
-                                () -> -gamepad1.right_stick_y,
-                                () -> -gamepad1.right_stick_x,
-                                headingOffset)
-                        : robot.drivebase.driveFieldCentric(
-                                () -> -gamepad1.left_stick_y * driveScale(),
-                                () -> -gamepad1.left_stick_x * driveScale(),
-                                () -> -gamepad1.right_stick_x * driveScale(),
-                                headingOffset),
-                robot.aimAtHive()
-        );
+        schedule(drive(headingOffset), robot.aimAtHive());
         loopTimer.reset();
+    }
+
+    /** How the right stick turns the robot: RobotConstants.Drive.TURN_MODE, unless a subclass fixes it. */
+    protected TurnMode turnMode() {
+        return TURN_MODE;
+    }
+
+    /** The driver's always-on drive command, for turnMode(). */
+    private Command drive(double headingOffset) {
+        switch (turnMode()) {
+            case TWIN_STICK:
+                return robot.drivebase.driveTwinStick(
+                        () -> -gamepad1.left_stick_y * driveScale(),
+                        () -> -gamepad1.left_stick_x * driveScale(),
+                        () -> -gamepad1.right_stick_y,
+                        () -> -gamepad1.right_stick_x,
+                        headingOffset);
+            case RATE_SNAP:
+                return robot.drivebase.driveRateSnap(
+                        () -> -gamepad1.left_stick_y * driveScale(),
+                        () -> -gamepad1.left_stick_x * driveScale(),
+                        () -> -gamepad1.right_stick_x * driveScale(),
+                        headingOffset);
+            default:
+                return robot.drivebase.driveFieldCentric(
+                        () -> -gamepad1.left_stick_y * driveScale(),
+                        () -> -gamepad1.left_stick_x * driveScale(),
+                        () -> -gamepad1.right_stick_x * driveScale(),
+                        headingOffset);
+        }
     }
 
     @Override
@@ -153,8 +178,9 @@ public class TeleOp extends OpMode {
         }
     }
 
+    /** Slow mode while LT is held, and while shooting (RT) so the robot stays steady for the shot. */
     private double driveScale() {
-        return gamepad1.left_trigger > 0.5 ? SLOW_MODE_SCALE : 1.0;
+        return gamepad1.left_trigger > 0.5 || robot.intake.isFeeding() ? SLOW_MODE_SCALE : 1.0;
     }
 
     /** Button presses schedule commands. */
@@ -162,6 +188,8 @@ public class TeleOp extends OpMode {
         // ---- Gamepad 1: driver ----
         if (gamepad1.triangleWasPressed()) schedule(robot.intake.toggleIntake());
         if (gamepad1.crossWasPressed()) schedule(robot.intake.toggleOuttake());
+
+        if (gamepad1.squareWasPressed()) schedule(robot.matchloader.toggle());
 
         if (gamepad1.rightBumperWasPressed()) schedule(robot.enableFlywheel());
         if (gamepad1.leftBumperWasPressed()) schedule(robot.launcher.idle());
@@ -197,26 +225,36 @@ public class TeleOp extends OpMode {
     /**
      * Times how long gamepad 1's data goes without changing while the driver was using it. Its timestamp only moves
      * when the driver station sees an input change, so a gap counts only if, at its last update, a stick or trigger
-     * was off rest and none was pinned at its limit (a still or pinned stick stops the timestamp too). A long gap here
-     * while the robot kept driving means the driver station stopped sending: the gamepad, its USB, or the Wi-Fi.
+     * was off rest and none was pinned at its limit (a still or pinned stick stops the timestamp too). A stick is
+     * pinned when pushed to its rim in any direction, not just along an axis: diagonal driving and twin-stick aiming
+     * hold it there. A long gap while loops kept running means the driver station stopped sending: the gamepad, its
+     * USB, or the Wi-Fi. A gap that is mostly one slow loop is this OpMode stalling, not the driver station.
+     * Each gap over PAD_GAP_MS also goes to the robot controller log (tag PadGap) to line up with the SDK's own lines.
      */
     private void watchGamepad() {
         // Through a local: tools/ControlLayout follows gamepad1 and Gamepad parameters, and would draw these as controls
         Gamepad pad = gamepad1;
         double now = clock.milliseconds();
+        if (!Double.isNaN(lastLoopMs)) slowestLoopSincePadMs = Math.max(slowestLoopSincePadMs, now - lastLoopMs);
+        lastLoopMs = now;
         if (pad.timestamp == padStamp && !Double.isNaN(padChangedMs)) return;
         double gap = now - padChangedMs;
         if (padMoving && gap > longestPadGapMs) {
             longestPadGapMs = gap;
             longestPadGapAtS = clock.seconds();
+            longestPadGapLoopMs = slowestLoopSincePadMs;
         }
-        if (padMoving && gap > PAD_GAP_MS) padGaps++;
+        if (padMoving && gap > PAD_GAP_MS) {
+            padGaps++;
+            RobotLog.ii("PadGap", "gamepad 1 quiet %.0f ms, ended %.1f s after init, slowest loop in it %.0f ms",
+                    gap, clock.seconds(), slowestLoopSincePadMs);
+        }
         padStamp = pad.timestamp;
         padChangedMs = now;
-        float[] axes = {pad.left_stick_x, pad.left_stick_y, pad.right_stick_x, pad.right_stick_y, pad.left_trigger,
-                pad.right_trigger};
-        boolean pinned = false;
-        for (float axis : axes) pinned |= Math.abs(axis) >= 0.98;
+        slowestLoopSincePadMs = 0;
+        boolean pinned = Math.hypot(pad.left_stick_x, pad.left_stick_y) >= 0.9
+                || Math.hypot(pad.right_stick_x, pad.right_stick_y) >= 0.9
+                || pad.left_trigger >= 0.98 || pad.right_trigger >= 0.98;
         padMoving = !pad.atRest() && !pinned;
     }
 
@@ -243,6 +281,7 @@ public class TeleOp extends OpMode {
         telemetry.addLine("Hive " + bold(color(MatchState.hive.toString(), MatchState.hive == Hive.LEFT ? PINK : CYAN)) + " " + hiveVisionWord());
         telemetry.addLine("Intake " + intakeWord(robot.intake.getMode()) + (robot.intake.isFeeding() ? " (feeding)" : ""));
         telemetry.addLine("Gate " + (robot.gate.isOpen() ? bold(color("open", GREEN)) : bold(color("closed", GRAY))));
+        telemetry.addLine("Matchloader " + (robot.matchloader.isDown() ? bold(color("down", GREEN)) : bold(color("up", GRAY))));
 
         // ---- 2. Numbers ----
         if (shot != null && shot.feasible) {
@@ -254,8 +293,8 @@ public class TeleOp extends OpMode {
             // How far off the hive the turret points to make up for the robot's motion
             telemetry.addLine(String.format("Aim ahead %+.1f°", Math.toDegrees(shot.leadAngle)));
         }
-        String heading = TURN_MODE == TurnMode.TWIN_STICK
-                // Where the robot is pointing → where the driver asked it to point
+        String heading = turnMode() == TurnMode.TWIN_STICK || robot.drivebase.isSnapping()
+                // Where the robot is pointing → where the driver asked it to point (or the snap is turning it to)
                 ? String.format("Heading %.0f° → %.0f°", Math.toDegrees(Angle.normalizeSigned(pose.heading())),
                         Math.toDegrees(robot.drivebase.getTargetHeading()))
                 : String.format("Heading %.0f°", Math.toDegrees(pose.heading()));
@@ -263,8 +302,8 @@ public class TeleOp extends OpMode {
         telemetry.addLine(heading);
         telemetry.addLine(String.format("Loop %.1f ms %.0f Hz", loopMs, 1000 / loopMs));
         telemetry.addLine(String.format("Gamepad 1 updated %.0f ms ago (stamp %d)", clock.milliseconds() - padChangedMs, padStamp));
-        telemetry.addLine(String.format("Gamepad 1 longest gap %.0f ms at %.1f s (%d over %d ms)",
-                longestPadGapMs, longestPadGapAtS, padGaps, PAD_GAP_MS));
+        telemetry.addLine(String.format("Gamepad 1 longest gap %.0f ms at %.1f s, slowest loop in it %.0f ms (%d over %d ms)",
+                longestPadGapMs, longestPadGapAtS, longestPadGapLoopMs, padGaps, PAD_GAP_MS));
         telemetry.addLine("Follower " + robot.drivebase.getFollower().mode());
 
         // ---- 3. Everything else ----

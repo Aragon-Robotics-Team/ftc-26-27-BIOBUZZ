@@ -7,6 +7,9 @@ import com.pedropathing.follower.Follower;
 import com.pedropathing.ivy.Command;
 import com.pedropathing.math.Pose;
 import com.pedropathing.paths.Path;
+import com.qualcomm.robotcore.hardware.Gamepad;
+
+import org.firstinspires.ftc.robotcore.external.Telemetry;
 
 import org.firstinspires.ftc.teamcode.core.Alliance;
 import org.firstinspires.ftc.teamcode.core.Robot;
@@ -46,6 +49,9 @@ public abstract class AutoRoutine {
     public boolean usesBallVision() {
         return false;
     }
+
+    /** Every init loop once it's picked: options of its own from gamepad1, shown in telemetry. */
+    public void initLoop(Gamepad gamepad, Telemetry telemetry) {}
 
     /** Called once at the start, before the robot starts and autoRoutine() runs: e.g. to enable hive vision. */
     public void setUp() {}

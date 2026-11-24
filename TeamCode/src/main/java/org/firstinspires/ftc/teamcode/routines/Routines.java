@@ -20,8 +20,8 @@ public enum Routines {
     ONE_CYCLE_FLOWER_PARK(OneCycleFlowerPark.class),
     TWO_CYCLE_FLOWER_PARK(TwoCycleFlowerPark.class),
     CYCLE_GARDEN_PARK(CycleGardenPark.class),
-    SOLO_CARRY(SoloCarry.class),
     CECILIA_ROUTINE(CeciliaRoutine.class),
+    CAMERA_CYCLES(CameraCycles.class),
     EXAMPLE(ExampleRoutine.class);
 
     private final Class<? extends AutoRoutine> type;

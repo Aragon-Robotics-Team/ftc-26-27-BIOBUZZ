@@ -191,6 +191,11 @@ public class Launcher implements Subsystem {
         return flywheelPower;
     }
 
+    /** Battery volts the flywheel feedforward used this loop (read a few times a second while spinning). */
+    public double getBatteryVolts() {
+        return batteryVolts;
+    }
+
     public double getTargetVelocity() {
         return targetVelocity;
     }
@@ -223,6 +228,14 @@ public class Launcher implements Subsystem {
      */
     public boolean isTurretOnTarget() {
         return !turretTargetClipped && Math.abs(turretTargetAngle - getTurretAngle()) <= turretTolerance();
+    }
+
+    /**
+     * The turret is held at a soft limit (TURRET_MIN_ANGLE / TURRET_MAX_ANGLE), usually because the shot needs it
+     * turned past one, so the drivetrain has to turn instead.
+     */
+    public boolean isTurretAtLimit() {
+        return turretTargetAngle == TURRET_MIN_ANGLE || turretTargetAngle == TURRET_MAX_ANGLE;
     }
 
     private double turretTolerance() {

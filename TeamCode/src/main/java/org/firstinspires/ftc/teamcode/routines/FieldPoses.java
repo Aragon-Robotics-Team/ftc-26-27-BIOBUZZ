@@ -38,16 +38,16 @@ public class FieldPoses {
     public final Pose flowerIntake;
     /** Backed off the rear-wall flower, where the flower pollen is shot. */
     public final Pose flowerShoot;
+    /** At the alliance-wall flower: flowerIntake's spot turned 90° about its flower, the same place relative to it. */
+    public final Pose wallFlowerIntake;
 
     /**
      * Where to shoot into each cell from, out in front of its opening: startLaunch for the RIGHT (audience) cell, and
      * that spot mirrored across the hive's middle (y = 72 on red) for the LEFT (rear) one. Checked in the sim
-     * (ChaseAndShootSimTest, SoloCarrySimTest).
+     * (ChaseAndShootSimTest, CameraCyclesSimTest).
      */
     public final Pose rightLaunch, leftLaunch;
-    /** Back against the alliance wall on the second tile from the audience wall (A2), facing the field. */
-    public final Pose allianceWallStart;
-    /** Out from our garden corner, the ball camera on the garden's row of pollen. */
+    /** Out from our garden corner, turned so the ball camera looks along the garden's row of pollen. */
     public final Pose gardenLook;
 
 
@@ -73,11 +73,13 @@ public class FieldPoses {
         flowerLaunch = poseFactory.of(60, 119.7, 90);
         flowerIntake = poseFactory.of(51, 131, 95);
         flowerShoot = poseFactory.of(56, 121, 95);
+        Pose rear = RobotConstants.Field.FLOWERS[0], wall = RobotConstants.Field.FLOWERS[2];
+        wallFlowerIntake = poseFactory.of(wall.x() + (rear.y() - 131), wall.y() + (51 - rear.x()), 95 + 90);
         rightLaunch = poseFactory.of(56, 20.219975, 90);
         leftLaunch = poseFactory.of(56, 144 - 20.219975, -90);
-        // The camera looks 20° left of the intake (RobotConstants.BallVision.YAW): heading = where to look - 20°
-        allianceWallStart = poseFactory.of(RobotConstants.Field.WALL + RobotConstants.Field.ROBOT_LENGTH / 2, 36, 0);
-        gardenLook = poseFactory.of(30, 16, 190);
+        // The camera looks YAW left of the intake (RobotConstants.BallVision), so the robot turns that much less than
+        // the 210° the camera should look
+        gardenLook = poseFactory.of(30, 16, 210 - Math.toDegrees(RobotConstants.BallVision.YAW));
 
 
     }

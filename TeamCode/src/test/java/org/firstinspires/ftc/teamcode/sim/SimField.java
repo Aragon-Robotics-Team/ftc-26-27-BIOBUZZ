@@ -26,10 +26,13 @@ import java.util.List;
  * Manual as BiobuzzSim (the Roblox sim) has them, and the flowers from RobotConstants.Field.
  */
 final class SimField {
-    // ---- Flowers: a tube of stacked pollen, open underneath so the bottom one can be taken ----
-    private static final double FLOWER_INNER_RADIUS = 2.25;
+    // ---- Flowers: a tube of stacked pollen over the Retrieval Opening, where the bottom one can be taken ----
+    // (Competition Manual 9.7.) The lower ring sits on the tiles, 0.4 in tall, with a 2.79 in hole the bottom pollen
+    // sits in, on the tiles; the opening above it, up to the tube, passes pollen (2.8) but not nectar (3.6)
+    static final double FLOWER_INNER_RADIUS = 2.25;
     private static final double FLOWER_WALL = 0.4;
-    private static final double FLOWER_TUBE_BOTTOM = 3.95; // the gap under it passes pollen (2.8) but not nectar (3.6)
+    private static final double FLOWER_RING_HOLE_RADIUS = 2.79 / 2, FLOWER_RING_WIDTH = 1.45, FLOWER_RING_TOP = 0.4;
+    static final double FLOWER_TUBE_BOTTOM = 3.95;
     private static final double FLOWER_TOP = 21.5;
     private static final int POLLEN_PER_FLOWER = 4, POLLEN_PER_GARDEN = 4, NECTAR_PER_CELL = 3;
 
@@ -130,7 +133,8 @@ final class SimField {
 
     /**
      * Flower i's column as the chassis meets it: a square around the tube, field frame, from the gap under it up. The
-     * intake's mouth reaches past the bumper to under the tube's middle, so the bottom ball can still be taken.
+     * bumper stops against it with the intake's mouth INTAKE_REACH back from the bumper's face; SimLauncher lets the
+     * intake take the bottom pollen from there (takeFromFlowers).
      */
     static ObstacleBox flowerColumn(int i) {
         double[] c = flowerCenter(i);
@@ -144,11 +148,26 @@ final class SimField {
         return new double[] {FieldFrame.x(p.x(), p.y()), FieldFrame.y(p.x(), p.y())};
     }
 
-    /** A flower that never moves: the tube from its gap to its top, in field coordinates. */
+    /**
+     * The unit direction, field frame, from flower i's wall out onto the field: the side its Retrieval Opening is
+     * reached from.
+     */
+    static double[] flowerInward(int i) {
+        double[] c = flowerCenter(i);
+        return Math.abs(c[0]) > Math.abs(c[1]) ? new double[] {-Math.signum(c[0]), 0} : new double[] {0, -Math.signum(c[1])};
+    }
+
+    /**
+     * A flower that never moves, in field coordinates: the lower ring on the tiles and the tube from the top of the
+     * Retrieval Opening to its top. Not modelled: the two posts on the wall side between them, the middle ring's lip
+     * and the backstop.
+     */
     private static KinematicBody flower(int i) {
         double[] c = flowerCenter(i);
         List<ConvexShape> shapes = new ArrayList<>(SimShapes.ring("flower" + i, c[0], c[1], FLOWER_INNER_RADIUS,
                 FLOWER_WALL, FLOWER_TUBE_BOTTOM, FLOWER_TOP, 12));
+        shapes.addAll(SimShapes.ring("flower" + i + "Ring", c[0], c[1], FLOWER_RING_HOLE_RADIUS, FLOWER_RING_WIDTH, 0,
+                FLOWER_RING_TOP, 16));
         return new KinematicBody("flower" + i, new double[] {0, 0, 0}, new double[] {0, 0, 1}, shapes, null, 0.1, 0.5);
     }
 
@@ -213,7 +232,7 @@ final class SimField {
             double[] c = flowerCenter(i);
             for (int k = 0; k < POLLEN_PER_FLOWER; k++) {
                 int id = field.addPieceAt(Ball.Type.POLLEN.name(), c[0], c[1], r + k * (2 * 0.999 * r), r);
-                asleep(field.getPiece(id));
+                setSleeping(field.getPiece(id), true);
             }
         }
         for (int garden = 0; garden < 2; garden++) {
@@ -229,17 +248,18 @@ final class SimField {
     }
 
     /**
-     * Puts a staged piece to sleep, as the physics does with one that has come to rest: it stays exactly where it is
-     * until something near it moves or another piece hits it. The flowers' stacks need it: balls stacked straight up
-     * are balanced on a point, and with the tube open underneath the bottom one rolled out before the match started
-     * (the rest after it), so the robot chased the flowers' pollen off the tiles; on the field it stays in the flower.
+     * Puts a piece to sleep, as the physics does with one that has come to rest (it stays exactly where it is until
+     * something near it moves or another piece hits it), or wakes it. The flowers' stacks need both: balls stacked
+     * straight up are balanced on a point, so the staged ones sleep or they topple out through the Retrieval Opening
+     * before the match starts; and when the bottom one is taken, the ones above have to wake to drop into its place
+     * (SimLoop wakes a sleeping piece when it's hit or a body near it moves, not when what it rests on goes).
      * SimLoop has no public setter, so by reflection (as BiobuzzRobotSim moves the Limelight's tags).
      */
-    private static void asleep(GamePiece piece) {
+    static void setSleeping(GamePiece piece, boolean sleeping) {
         try {
             java.lang.reflect.Method set = GamePiece.class.getDeclaredMethod("setSleeping", boolean.class);
             set.setAccessible(true);
-            set.invoke(piece, true);
+            set.invoke(piece, sleeping);
         } catch (ReflectiveOperationException e) {
             throw new IllegalStateException("SimLoop's GamePiece.setSleeping changed", e);
         }

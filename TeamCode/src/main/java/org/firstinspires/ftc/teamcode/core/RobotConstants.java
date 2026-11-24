@@ -6,12 +6,13 @@ import com.qualcomm.robotcore.hardware.DcMotorSimple;
 /** Every robot tunable and hardware name in one place. Drivetrain / localizer config lives in pedro.Constants. */
 public class RobotConstants {
     public static class Drive {
-        public static double SLOW_MODE_SCALE = 0.4;
+        public static double SLOW_MODE_SCALE = 0.2; // Nov 9
 
         /** How the TeleOp right stick turns the robot. */
         public enum TurnMode {
             TWIN_STICK, // the intake turns to face where the right stick points, and holds that heading when let go
-            RATE        // right stick x sets the turn speed
+            RATE,       // right stick x sets the turn speed
+            RATE_SNAP   // like RATE, but driving hard with the stick centered lines the robot up with the drive direction
         }
         public static TurnMode TURN_MODE = TurnMode.RATE; // Oct 26: normal turning for now, TWIN_STICK once the heading PID is tuned
 
@@ -28,6 +29,18 @@ public class RobotConstants {
         public static double HEADING_KI = 0;          // turn power per radian-second
         public static double HEADING_KD = 0.2;        // turn power per radian/sec of turn speed
         public static double HEADING_MAX_POWER = 1.0; // full power: get to the heading as fast as possible
+
+        // ---- Rate turning with heading snap (TurnMode.RATE_SNAP) ----
+        // Mecanum is slower driving off its own axis (about 8% at 5° off, 15% at 10°). With the turn stick centered and
+        // the drive stick pushed hard, a heading this close to the drive direction (nose or tail first) is turned onto
+        // it with the heading PID above. TODO: tune
+        public static double SNAP_ENTER = Math.toRadians(10);
+        public static double SNAP_EXIT = Math.toRadians(13);  // stays snapped until this far off, so it doesn't flicker
+        // Drive stick (after slow mode) below this never snaps: the wheels aren't at full power, so there's no speed to gain
+        public static double SNAP_MIN_DRIVE = 0.8;
+        // Turning takes wheel power too, so the snap turns gently instead of slowing the robot down to do it
+        public static double SNAP_MAX_TURN = 0.3;
+        public static double TURN_DEADBAND = 0.05;            // turn stick within this counts as centered
     }
 
     public static class Intake {
@@ -36,8 +49,9 @@ public class RobotConstants {
 
         public static double INTAKE_POWER = 1.0;
         public static double OUTTAKE_POWER = -1.0;
-        // While shooting. The intake drives the transfer, so this sets how fast balls go into the flywheel (Oct 28)
-        public static double FEED_POWER = 1.0;
+        // While shooting. The intake drives the transfer, so this sets how fast balls go into the flywheel. Lowered from
+        // 1.0 (Nov 9): at full power balls came 0.13 s apart and the flywheel needs 0.2-0.5 s to recover from each one
+        public static double FEED_POWER = 0.6;
         public static double FLOWER_INTAKE_MS = 300; // how long Auto waits at a flower with the intake on TODO tune
         public static int CAPACITY = 4;              // balls the robot holds
     }
@@ -50,6 +64,13 @@ public class RobotConstants {
         public static double AUTO_SHOOT_MS = 2000; // how long Auto holds the gate open to empty the robot
     }
 
+    public static class Matchloader {
+        public static String SERVO_NAME = "matchloader";
+
+        public static double UP_POSITION = 0.250; // TODO: tune the value
+        public static double DOWN_POSITION = 0.6; // TODO: tune the value
+    }
+
     public static class Led {
         public static String SERVO_NAME = "led";
         public static double FLASH_MS = 300;
@@ -59,7 +80,7 @@ public class RobotConstants {
     public static class Logging {
         // Write an .rlog of every TeleOp and Auto run to the Control Hub (FIRST/data/logs). Off until TeleOp testing:
         // it costs loop time and nothing reads the logs yet. The sim logs the robot's state whatever this says.
-        public static boolean ENABLED = false;
+        public static boolean ENABLED = true; // on for flywheel debugging (Nov 9)
     }
 
     /** Hive state from the Limelight 3A on the turret (HiveVision). */
@@ -147,15 +168,15 @@ public class RobotConstants {
 
         // ---- Mount ----
         // On the printed mount (Part 36) at the front of the intake's right side (CAD "02 - Intake", Oct 27). The camera
-        // is tilted 30° down, then turned 20° in toward the center line about the vertical, so it looks 20° left of
-        // straight ahead, 30° down, and isn't rolled. Lens position from the robot center (between the wheels, on the
+        // is tilted 22° down, then turned 5° in toward the center line about the vertical, so it looks 5° left of
+        // straight ahead, 22° down, and isn't rolled. Lens position from the robot center (between the wheels, on the
         // tiles), inches: the front of the lens in goBILDA's camera CAD, 1 mm behind the case's front face. Rows run
         // along the case's long side (landscape), image up toward the top of the robot.
         public static double LENS_FORWARD = 6.17;
         public static double LENS_LEFT = -4.96;
         public static double LENS_HEIGHT = 8.93;
-        public static double YAW = Math.toRadians(20);  // + = turned left
-        public static double TILT = Math.toRadians(30); // below horizontal
+        public static double YAW = Math.toRadians(5);   // + = turned left
+        public static double TILT = Math.toRadians(22); // below horizontal
         public static double ROLL = 0;                  // + = the right side of the image is higher
 
         // ---- Pipeline ---- (BallPipeline; the rest of its settings are in BallPipeline.Settings)
@@ -240,7 +261,7 @@ public class RobotConstants {
 
         // ---- Flywheel ----
         // goBILDA 6000 RPM: 28 ticks/rev, about 2800 ticks/sec flat out. The counter-rollers are geared off this motor.
-        public static double FLYWHEEL_MAX_VELOCITY = 2100; // ticks/sec (Oct 26)
+        public static double FLYWHEEL_MAX_VELOCITY = 2079; // ticks/sec (Nov 9)
         // Fixed speed for spinUp() and the Flywheel Tuner
         public static double TARGET_VELOCITY = 1609;  // ticks/sec (Oct 26)
         public static double VELOCITY_TOLERANCE = 50; // ticks/sec, when not aiming with ShotSolver. TODO: tune
@@ -253,11 +274,11 @@ public class RobotConstants {
         public static FlywheelControl FLYWHEEL_CONTROL = FlywheelControl.BANG_BANG;
         // Feedforward: power at 12 V to hold a speed, scaled by 12 / battery volts so it holds the same on a tired battery.
         // The Flywheel Auto Tuner prints KV. A little low is fine; too high and the flywheel settles above target.
-        public static double FLYWHEEL_KV = 0.000541; // power per tick/sec (Oct 28)
+        public static double FLYWHEEL_KV = 0.000525; // power per tick/sec (Nov 9)
         public static double FLYWHEEL_KS = 0.003244;        // power to overcome friction
         // PID on the speed error. KP = KV is about the hub PIDF that rapid-fired well on Oct 28 (P = F = 16.84 in the
         // hub's units). The Flywheel Auto Tuner finds KP.
-        public static double FLYWHEEL_KP = 0.000541; // power per tick/sec of error
+        public static double FLYWHEEL_KP = 0.003149; // power per tick/sec of error (Nov 9)
         public static double FLYWHEEL_KI = 0;        // power per tick of accumulated error
         public static double FLYWHEEL_KD = 0;        // power per tick/sec²; leave 0: the speed reading is too noisy to differentiate
 
@@ -269,8 +290,8 @@ public class RobotConstants {
         // so changing TURRET_DIRECTION means checking this again.
         public static boolean TURRET_ENCODER_REVERSED = false; // Oct 26
         // TODO: set turret soft limits from CAD
-        public static double TURRET_MIN_ANGLE = -Math.PI / 2;
-        public static double TURRET_MAX_ANGLE = Math.PI / 2;
+        public static double TURRET_MIN_ANGLE = Math.toRadians(-112.5); // ±90° plus 22.5° each side (Nov 9)
+        public static double TURRET_MAX_ANGLE = Math.toRadians(112.5);
         // Turret pivot relative to the robot center (inches, +x forward, +y left): the ring gear's axis (CAD, Oct 26)
         public static double TURRET_OFFSET_X = 1.02;
         public static double TURRET_OFFSET_Y = 0;
@@ -289,8 +310,8 @@ public class RobotConstants {
         // Velocity feedforward, so the turret keeps up while the robot drives and turns instead of lagging behind.
         // Power per radian/sec of turret speed. 1 / free speed is a good start: 1150 RPM / (100/30) ≈ 36 rad/s. TODO: tune
         public static double TURRET_KV = 1.0 / 36;
-        // Aim from where the robot will be this far ahead, to make up for loop and localizer lag (seconds). TODO: tune
-        public static double AIM_LOOKAHEAD = 0.05;
+        // Aim from where the robot will be this far ahead, to make up for loop, localizer lag, and transfer time (seconds). TODO: tune
+        public static double AIM_LOOKAHEAD = 0.2;
 
         // ---- Shot model (ShotSolver) ----
         // Every shot is simulated (gravity, drag, and lift if the ball spins) to find the exit speed and turret angle that put the

@@ -42,8 +42,6 @@ class AutoSimTest {
     @TestFactory
     Stream<DynamicTest> everyRoutineDrivesAndThePinpointKeepsUp() {
         return Routines.enabled().stream()
-                // Solo Carry starts elsewhere and has its own test (SoloCarrySimTest)
-                .filter(routine -> routine != Routines.SOLO_CARRY)
                 .filter(routine -> ONLY_ROUTINE.equalsIgnoreCase("all") || ONLY_ROUTINE.equalsIgnoreCase(routine.name()))
                 .map(routine -> DynamicTest.dynamicTest(routine.toString(), () -> autoDrivesAndThePinpointKeepsUp(routine)));
     }
@@ -63,7 +61,10 @@ class AutoSimTest {
 
         Pose start = startOf(routine);
         // The drive like a real mecanum's: slower, strafing less well, slipping on the tiles
-        BiobuzzRobotSim sim = new BiobuzzRobotSim(true).alliance(ALLIANCE).withPartner();
+        BiobuzzRobotSim sim = new BiobuzzRobotSim(true).alliance(ALLIANCE);
+        // Camera Cycles counts on a partner that shoots after our first tip (its init default); the others get the
+        // partner that shoots straight away
+        sim = routine == Routines.CAMERA_CYCLES ? sim.withPartnerAfterTip() : sim.withPartner();
         sim.placeAt(start.x(), start.y(), start.heading());
 
         String name = (routine + "-" + ALLIANCE).toLowerCase(Locale.US);
